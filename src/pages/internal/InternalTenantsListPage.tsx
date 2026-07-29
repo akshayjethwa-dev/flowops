@@ -33,18 +33,43 @@ export const InternalTenantsListPage: React.FC = () => {
   const [newTenantName, setNewTenantName] = useState('');
   const [newTenantId, setNewTenantId] = useState('');
   const [isProvisioning, setIsProvisioning] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const handleNameChange = (val: string) => {
+    setNewTenantName(val);
+    setFormError(null);
+    // Auto generate slug if ID was empty or previously auto-generated
+    const slug = val.toLowerCase().replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
+    if (!newTenantId || newTenantId === slug.slice(0, -1) || newTenantId === slug.slice(0, -2)) {
+      setNewTenantId(slug);
+    }
+  };
 
   const handleCreateTenant = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTenantName || !newTenantId) return;
+    if (!newTenantName.trim()) return;
+
+    setFormError(null);
+
+    // Auto-disambiguate ID and company name if duplicates exist
+    let candidateId = (newTenantId || newTenantName.toLowerCase().replace(/[^a-z0-9]/g, '_')).trim().toLowerCase();
+    let candidateName = newTenantName.trim();
+    let counter = 1;
+    const baseId = candidateId;
+    const baseName = candidateName;
+
+    while (tenants.some(t => t.id.toLowerCase() === candidateId || t.companyName.trim().toLowerCase() === candidateName.toLowerCase())) {
+      counter++;
+      candidateId = `${baseId}_${counter}`;
+      candidateName = `${baseName} (Unit ${counter})`;
+    }
 
     setIsProvisioning(true);
-    // Simulate brief container deployment latency
-    await new Promise(resolve => setTimeout(resolve, 800));
+    await new Promise(resolve => setTimeout(resolve, 600));
 
     const success = await createTenant({
-      id: newTenantId.trim().toLowerCase(),
-      companyName: newTenantName.trim(),
+      id: candidateId,
+      companyName: candidateName,
       createdAt: new Date().toISOString(),
       isActive: true,
       onboardingStatus: 'pending'
@@ -56,9 +81,9 @@ export const InternalTenantsListPage: React.FC = () => {
       setNewTenantName('');
       setNewTenantId('');
       setShowForm(false);
-      alert(`Tenant Database Shard [${newTenantId}] successfully provisioned.`);
+      setFormError(null);
     } else {
-      alert(`Failed to complete provisioning process. Verify partition identifier is unique.`);
+      setFormError('Failed to complete provisioning process. Please check partition parameters.');
     }
   };
 
@@ -79,7 +104,7 @@ export const InternalTenantsListPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="p-8 text-center flex flex-col items-center justify-center min-h-[400px]">
+      <div className="p-8 text-center flex flex-col items-center justify-center min-h-100">
         <div className="animate-spin h-8 w-8 border-3 border-rose-500 border-t-transparent rounded-full mb-3" />
         <span className="text-xs font-mono text-slate-400 uppercase tracking-widest animate-pulse">
           Querying SaaS tenant topology...
@@ -98,10 +123,10 @@ export const InternalTenantsListPage: React.FC = () => {
             <span>Super-Admin Core Supervision</span>
           </div>
           <h1 className="text-xl font-bold tracking-tight text-slate-900 leading-tight">
-            Ashrey Systems Tenant Controller
+            Manage Plants & Facilities (SaaS Tenant Controller)
           </h1>
           <p className="text-xs text-slate-500 mt-1">
-            Global network operations console to manage isolated database shards, review onboarding, toggle soft locks, and configure pilot accounts.
+            Global network operations console to manage isolated database shards, onboard industrial plants, review facilities, and toggle soft locks.
           </p>
         </div>
 
@@ -111,7 +136,7 @@ export const InternalTenantsListPage: React.FC = () => {
             className="bg-rose-600 hover:bg-rose-700 text-white font-mono text-[10px] uppercase font-bold tracking-widest px-4 py-2.5 rounded-lg flex items-center space-x-1.5 cursor-pointer shadow-xs transition-all shrink-0"
           >
             <Plus className="h-4 w-4 text-rose-200 shrink-0" />
-            <span>Provision New Shard</span>
+            <span>Register New Plant Facility</span>
           </button>
         )}
       </div>
@@ -121,7 +146,7 @@ export const InternalTenantsListPage: React.FC = () => {
         <div className="bg-slate-900 border border-slate-800 rounded-lg p-5 shadow-md max-w-2xl">
           <div className="flex justify-between items-center pb-3 mb-4 border-b border-slate-800">
             <h3 className="text-xs font-bold font-mono tracking-wider text-rose-400 uppercase flex items-center space-x-1.5">
-              <span>🚀 Deploy Tenant Micro-Partition Shard</span>
+              <span>🚀 Deploy & Register New Industrial Plant</span>
             </h3>
             <button
               onClick={() => setShowForm(false)}
@@ -135,7 +160,7 @@ export const InternalTenantsListPage: React.FC = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-[10px] font-mono uppercase tracking-wider text-slate-400 font-bold mb-1.5">
-                  Tenant Unique ID / Shard Key *
+                  Plant / Tenant Unique Shard Key *
                 </label>
                 <input
                   type="text"
@@ -155,18 +180,28 @@ export const InternalTenantsListPage: React.FC = () => {
 
               <div>
                 <label className="block text-[10px] font-mono uppercase tracking-wider text-slate-400 font-bold mb-1.5">
-                  Legal Enterprise Title *
+                  Plant Name / Legal Entity Title *
                 </label>
                 <input
                   type="text"
                   required
                   placeholder="e.g. Coimbatore Gears Ltd."
                   value={newTenantName}
-                  onChange={(e) => setNewTenantName(e.target.value)}
+                  onChange={(e) => handleNameChange(e.target.value)}
                   className="w-full bg-slate-950 border border-slate-800 text-slate-100 rounded-lg px-3 py-2 text-xs font-sans tracking-wide focus:border-rose-500 focus:outline-hidden"
                 />
               </div>
             </div>
+
+            {formError && (
+              <div className="p-3 bg-rose-950/60 border border-rose-800 rounded-lg text-xs text-rose-200 leading-relaxed flex items-start space-x-2">
+                <AlertTriangle className="h-4 w-4 shrink-0 text-rose-400 mt-0.5" />
+                <div>
+                  <h5 className="font-mono text-[10px] font-bold uppercase tracking-wider text-rose-300">Operations Error</h5>
+                  <p className="mt-0.5">{formError}</p>
+                </div>
+              </div>
+            )}
 
             <div className="p-3 bg-rose-950/20 border border-rose-900/30 rounded-lg text-[11px] text-rose-300 leading-relaxed flex items-start space-x-2">
               <AlertTriangle className="h-4.5 w-4.5 shrink-0 text-rose-400 mt-0.5" />
@@ -199,7 +234,7 @@ export const InternalTenantsListPage: React.FC = () => {
       {/* Filter Toolbar */}
       <div className="bg-white border border-slate-200 rounded-lg p-4 shadow-3xs flex flex-col lg:flex-row items-stretch lg:items-center gap-3">
         {/* Search */}
-        <div className="relative flex-grow">
+        <div className="relative grow">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
           <input
             type="text"
@@ -216,7 +251,7 @@ export const InternalTenantsListPage: React.FC = () => {
           <select
             value={onboardingFilter}
             onChange={(e) => setOnboardingFilter(e.target.value as any)}
-            className="border border-slate-205 bg-white text-slate-700 text-xs rounded-lg px-2 text-center py-1.5 font-mono font-bold uppercase cursor-pointer hover:bg-slate-5 font-bold tracking-wider"
+            className="border border-slate-205 bg-white text-slate-700 text-xs rounded-lg px-2 text-center py-1.5 font-mono font-bold uppercase cursor-pointer hover:bg-slate-5 tracking-wider"
           >
             <option value="all">All States</option>
             <option value="completed">Completed</option>
@@ -230,7 +265,7 @@ export const InternalTenantsListPage: React.FC = () => {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as any)}
-            className="border border-slate-205 bg-white text-slate-700 text-xs rounded-lg px-2 text-center py-1.5 font-mono font-bold uppercase cursor-pointer hover:bg-slate-5 font-bold tracking-wider"
+            className="border border-slate-205 bg-white text-slate-700 text-xs rounded-lg px-2 text-center py-1.5 font-mono font-bold uppercase cursor-pointer hover:bg-slate-5 tracking-wider"
           >
             <option value="all">Full Registry</option>
             <option value="active">Active Shards Only</option>

@@ -130,10 +130,6 @@ export const OnboardingWizard: React.FC = () => {
           setWhatsappPhone(saved.whatsappPhone || '');
         }
       }
-    } else {
-      // Pre-fill for brand new users even if tenantConfig doesn't exist yet
-      setCompanyName(tenant?.companyName || '');
-      setContactEmail(profile?.email || '');
     }
   }, [tenantConfig, tenant, profile]);
 
@@ -166,6 +162,7 @@ export const OnboardingWizard: React.FC = () => {
 
   // Intermediate state persistence function
   const saveStateToConfig = async (nextStepIndex: number) => {
+    if (!tenantConfig) return;
     setSaving(true);
     setWizardError(null);
 
@@ -195,21 +192,17 @@ export const OnboardingWizard: React.FC = () => {
         whatsappPhone
       };
 
-      // Detect browser timezone as a safe fallback for Error 1
-      const defaultTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Kolkata';
-
       await saveTenantConfig({
-        ...(tenantConfig || {} as any), // Safely spread existing config
+        ...tenantConfig,
         tenantName: companyName,
         address,
         gstNumber,
         contactEmail,
         contactPhone,
         defaultCurrency: currency,
-        timeZone: tenantConfig?.timeZone || defaultTimeZone, // FIX 1: Ensures strict string assignment
         onboardingCompleted: false,
         onboardingState: updatedOnboardingState
-      } as any);
+      });
 
       setCurrentStep(nextStepIndex);
     } catch (err: any) {
@@ -339,23 +332,21 @@ export const OnboardingWizard: React.FC = () => {
 
   // FINAL FINISH ACTION
   const handleFinish = async () => {
+    if (!tenantConfig) return;
     setSaving(true);
     try {
-      const defaultTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Kolkata';
-
       // Set completed flag inside config
       await saveTenantConfig({
-        ...(tenantConfig || {} as any), // Safely spread existing config
+        ...tenantConfig,
         tenantName: companyName,
         address,
         gstNumber,
         contactEmail,
         contactPhone,
         defaultCurrency: currency,
-        timeZone: tenantConfig?.timeZone || defaultTimeZone, // FIX 1: Ensures strict string assignment
         onboardingCompleted: true,
-        onboardingState: undefined // FIX 2: Changed 'null' to 'undefined' to satisfy TS Optional type
-      } as any);
+        onboardingState: undefined // Fixed Type Issue (changed from null to undefined)
+      });
 
       // Erase sandbox skipping flag inside session storage
       sessionStorage.removeItem('onboarding_skipped');
@@ -367,17 +358,23 @@ export const OnboardingWizard: React.FC = () => {
     }
   };
 
-  // Helper handling adding stages
+  // Helper handling adding stages (With automated unique naming resolver)
   const handleAddStage = () => {
     if (!newStageName.trim()) return;
-    if (setupStages.map(s => s.name.toLowerCase()).includes(newStageName.trim().toLowerCase())) {
-      setWizardError('Checkpoint name matches an existing operational node.');
-      return;
+    
+    let candidateName = newStageName.trim();
+    const baseName = candidateName;
+    let counter = 1;
+    
+    // Auto-disambiguate without throwing annoying error
+    while (setupStages.some(s => s.name.toLowerCase() === candidateName.toLowerCase())) {
+      counter++;
+      candidateName = `${baseName} ${counter}`;
     }
+
     const color = newStageColor;
     const finalStages = setupStages.map(s => ({ ...s, isFinalStage: false })); // temporary clear final
-    const insertIndex = finalStages.length;
-    const newStage = { name: newStageName.trim(), color, isFinalStage: false };
+    const newStage = { name: candidateName, color, isFinalStage: false };
     
     // Add inside array, set final stage
     const updated = [...finalStages, newStage];
@@ -390,13 +387,10 @@ export const OnboardingWizard: React.FC = () => {
     setWizardError(null);
   };
 
-  // Delete production checkpoints
+  // Delete production checkpoints safely
   const handleDeleteStage = (index: number) => {
-    if (setupStages[index].isFinalStage && setupStages.length > 1) {
-      setWizardError('Final Stage must persist. Specify another final stage before deletion.');
-      return;
-    }
     const updated = setupStages.filter((_, idx) => idx !== index);
+    // Auto-assign the last remaining stage as the final stage to prevent UI blockages
     if (updated.length > 0 && !updated.some(s => s.isFinalStage)) {
       updated[updated.length - 1].isFinalStage = true;
     }
@@ -423,21 +417,29 @@ export const OnboardingWizard: React.FC = () => {
     setSetupStages(cleared);
   };
 
-  // Team members construction helpers
+  // Team members construction helpers (Auto updates duplicate emails silently)
   const handleAddTeamMember = () => {
     if (!memberName.trim() || !memberEmail.trim()) {
       setWizardError('Worker name and corporate email are required credentials.');
       return;
     }
-    if (teamMembers.some(m => m.email.toLowerCase() === memberEmail.trim().toLowerCase())) {
-      setWizardError('Corporate identity is already scheduled for onboarding.');
-      return;
+
+    const cleanEmail = memberEmail.trim().toLowerCase();
+    const existingIdx = teamMembers.findIndex(m => m.email.toLowerCase() === cleanEmail);
+    
+    if (existingIdx >= 0) {
+      // Silently update existing user info instead of throwing a validation wall
+      const updated = [...teamMembers];
+      updated[existingIdx] = { name: memberName.trim(), email: cleanEmail, role: memberRole };
+      setTeamMembers(updated);
+    } else {
+      setTeamMembers([...teamMembers, {
+        name: memberName.trim(),
+        email: cleanEmail,
+        role: memberRole
+      }]);
     }
-    setTeamMembers([...teamMembers, {
-      name: memberName.trim(),
-      email: memberEmail.trim(),
-      role: memberRole
-    }]);
+    
     setMemberName('');
     setMemberEmail('');
     setMemberRole('production');

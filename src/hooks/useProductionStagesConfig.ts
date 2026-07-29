@@ -110,21 +110,27 @@ export const useProductionStagesConfig = (tenantId: string | undefined) => {
     }
 
     const isSandbox = localStorage.getItem('isSandboxMode') === 'true' || !db;
-    const stageId = name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '_');
+    const baseStageId = name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '_');
+    let stageId = baseStageId;
+    let stageName = name.trim();
+    let counter = 1;
+
+    // Auto-disambiguate duplicate stage IDs
+    while (stages.some(s => s.id === stageId)) {
+      counter++;
+      stageId = `${baseStageId}_${counter}`;
+      stageName = `${name.trim()} (${counter})`;
+    }
+
     const order = stages.length > 0 ? Math.max(...stages.map(s => s.order)) + 1 : 0;
 
     const newStage: ProductionStageConfig = {
       id: stageId,
-      name: name.trim(),
+      name: stageName,
       color,
       isFinalStage,
       order
     };
-
-    // Prevent duplicate values
-    if (stages.some(s => s.id === stageId)) {
-      throw new Error('An identical workflow checkpoint code already operates in this routing line.');
-    }
 
     if (isSandbox) {
       const updated = [...stages, newStage];
@@ -245,13 +251,27 @@ export const useProductionStagesConfig = (tenantId: string | undefined) => {
       throw new Error('Only administrator profile owners can configure production stages.');
     }
 
-    const updated: ProductionStageConfig[] = newStages.map((s, idx) => ({
-      id: s.name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '_'),
-      name: s.name.trim(),
-      color: s.color,
-      isFinalStage: s.isFinalStage,
-      order: idx
-    }));
+    const seenIds = new Set<string>();
+    const updated: ProductionStageConfig[] = newStages.map((s, idx) => {
+      let baseId = s.name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '_');
+      let id = baseId;
+      let counter = 1;
+      
+      // Auto-disambiguate payload IDs completely seamlessly
+      while (seenIds.has(id)) {
+        counter++;
+        id = `${baseId}_${counter}`;
+      }
+      seenIds.add(id);
+
+      return {
+        id,
+        name: s.name.trim(),
+        color: s.color,
+        isFinalStage: s.isFinalStage,
+        order: idx
+      };
+    });
 
     const isSandbox = localStorage.getItem('isSandboxMode') === 'true' || !db;
 

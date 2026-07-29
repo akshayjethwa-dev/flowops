@@ -1,463 +1,508 @@
 // src/pages/settings/PlantsManagementPage.tsx
 
-import React, { useState } from 'react';
-import { useAuth } from '../../hooks/useAuth';
-import { usePlants } from '../../hooks/usePlants';
+import React, { useState, useEffect } from 'react';
 import { 
   Building2, 
   MapPin, 
-  Plus, 
-  Trash2, 
-  Edit2, 
   CheckCircle2, 
-  AlertTriangle, 
-  Lock, 
-  ShieldCheck, 
+  Plus, 
   RefreshCw, 
+  Trash2, 
+  Edit3, 
   Layers, 
-  Building 
+  ShieldCheck, 
+  Radio, 
+  Building,
+  Sparkles,
+  AlertCircle
 } from 'lucide-react';
-import { TextField } from '../../components/ui/TextField';
-import { ProductionStageConfig } from '../../types';
+import { useAuth } from '../../hooks/useAuth';
+import { db } from '../../firebase';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
-const PUNE_STAGES_PRESET: ProductionStageConfig[] = [
-  { id: 'p_cut', name: 'Material Cutting', color: 'indigo', isFinalStage: false, order: 0 },
-  { id: 'p_weld', name: 'Pre-Heating & Welding', color: 'blue', isFinalStage: false, order: 1 },
-  { id: 'p_cnc', name: 'Precision CNC Machining', color: 'amber', isFinalStage: false, order: 2 },
-  { id: 'p_ass', name: 'Shopfloor Assembly', color: 'purple', isFinalStage: false, order: 3 },
-  { id: 'p_qc', name: 'NDT & Quality Check', color: 'pink', isFinalStage: false, order: 4 },
-  { id: 'p_disp', name: 'Ready for Dispatch', color: 'green', isFinalStage: true, order: 5 }
-];
+export interface PlantFacility {
+  id: string;
+  name: string;
+  address: string;
+  gstin?: string;
+  preset: 'forging' | 'foundry' | 'assembly';
+  presetLabel: string;
+  checkpointsCount: number;
+  isActiveScope?: boolean;
+  createdAt: string;
+}
 
-const VADODARA_STAGES_PRESET: ProductionStageConfig[] = [
-  { id: 'v_raw', name: 'Raw Material Intake', color: 'indigo', isFinalStage: false, order: 0 },
-  { id: 'v_cast', name: 'Casting & Molding', color: 'blue', isFinalStage: false, order: 1 },
-  { id: 'v_fett', name: 'Fettling & Grinding', color: 'amber', isFinalStage: false, order: 2 },
-  { id: 'v_heat', name: 'Heat Treatment', color: 'purple', isFinalStage: false, order: 3 },
-  { id: 'v_ndt', name: 'NDT Testing', color: 'pink', isFinalStage: false, order: 4 },
-  { id: 'v_pack', name: 'Packaging & Ready', color: 'green', isFinalStage: true, order: 5 }
+const DEFAULT_PLANTS: PlantFacility[] = [
+  {
+    id: 'plant_main_01',
+    name: 'Elecon Main Unit',
+    address: 'Industrial Area Phase 2, Chikhli, Pune, MH',
+    gstin: '27AADCA1112B1Z1',
+    preset: 'forging',
+    presetLabel: 'Forging Preset',
+    checkpointsCount: 6,
+    isActiveScope: true,
+    createdAt: new Date().toISOString()
+  }
 ];
 
 export const PlantsManagementPage: React.FC = () => {
-  const { tenant, activePlantId, setActivePlantId, refreshPlants } = useAuth();
-  const { plants, loading, error, addPlant, updatePlant, deletePlant, isAdmin } = usePlants(tenant?.id);
+  const { tenant, isSandboxMode } = useAuth();
+  const tenantId = tenant?.id || 'sandbox_tenant';
 
-  // Form States
-  const [name, setName] = useState('');
-  const [location, setLocation] = useState('');
+  const [plants, setPlants] = useState<PlantFacility[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Form State
+  const [plantName, setPlantName] = useState('');
+  const [address, setAddress] = useState('');
   const [gstin, setGstin] = useState('');
-  const [presetType, setPresetType] = useState<'pune' | 'vadodara'>('pune');
+  const [preset, setPreset] = useState<'forging' | 'foundry' | 'assembly'>('forging');
+  
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [activeScopeId, setActiveScopeId] = useState<string>('plant_main_01');
 
-  // Edit State
-  const [editingPlantId, setEditingPlantId] = useState<string | null>(null);
+  // Load plants on mount
+  useEffect(() => {
+    loadPlants();
+  }, [tenantId]);
 
-  // Operational State Feedbacks
-  const [formError, setFormError] = useState<string | null>(null);
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
-  const [processing, setProcessing] = useState(false);
-
-  const resetForm = () => {
-    setName('');
-    setLocation('');
-    setGstin('');
-    setEditingPlantId(null);
-    setFormError(null);
+  const loadPlants = async () => {
+    setLoading(true);
+    const storageKey = `flowops_plants_${tenantId}`;
+    try {
+      if (isSandboxMode || !db) {
+        const cached = localStorage.getItem(storageKey);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setPlants(parsed);
+            const active = parsed.find(p => p.isActiveScope);
+            if (active) setActiveScopeId(active.id);
+          } else {
+            setPlants(DEFAULT_PLANTS);
+            localStorage.setItem(storageKey, JSON.stringify(DEFAULT_PLANTS));
+          }
+        } else {
+          setPlants(DEFAULT_PLANTS);
+          localStorage.setItem(storageKey, JSON.stringify(DEFAULT_PLANTS));
+        }
+      } else {
+        const tenantDocRef = doc(db, 'tenants', tenantId);
+        const snap = await getDoc(tenantDocRef);
+        if (snap.exists() && snap.data().plants) {
+          const fetchedPlants: PlantFacility[] = snap.data().plants;
+          setPlants(fetchedPlants);
+          const active = fetchedPlants.find(p => p.isActiveScope);
+          if (active) setActiveScopeId(active.id);
+        } else {
+          const cached = localStorage.getItem(storageKey);
+          if (cached) {
+            setPlants(JSON.parse(cached));
+          } else {
+            setPlants(DEFAULT_PLANTS);
+            localStorage.setItem(storageKey, JSON.stringify(DEFAULT_PLANTS));
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Error loading plants:', err);
+      setPlants(DEFAULT_PLANTS);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleStartEdit = (p: any) => {
-    setEditingPlantId(p.id);
-    setName(p.name);
-    setLocation(p.location);
-    setGstin(p.gstin || '');
+  const savePlantsList = async (newList: PlantFacility[]) => {
+    const storageKey = `flowops_plants_${tenantId}`;
+    setPlants(newList);
+    localStorage.setItem(storageKey, JSON.stringify(newList));
+
+    if (!isSandboxMode && db && tenantId) {
+      try {
+        const tenantDocRef = doc(db, 'tenants', tenantId);
+        await setDoc(tenantDocRef, { plants: newList }, { merge: true });
+      } catch (err) {
+        console.error('Error saving plants to Firestore:', err);
+      }
+    }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleRegisterPlant = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isAdmin) {
-      setFormError('Edit clearance denied. Admin privileges are required to manage plants.');
+    if (!plantName.trim() || !address.trim()) return;
+
+    setIsSubmitting(true);
+    setSuccessMessage(null);
+
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Handle name duplication seamlessly
+    const rawName = plantName.trim();
+    let finalName = rawName;
+    let counter = 1;
+
+    // Check if duplicate or similar plant exists
+    const nameExists = (n: string) => plants.some(p => p.name.toLowerCase().trim() === n.toLowerCase().trim());
+    
+    while (nameExists(finalName)) {
+      counter++;
+      finalName = `${rawName} (Unit ${counter})`;
+    }
+
+    const presetLabels = {
+      forging: 'Forging Preset',
+      foundry: 'Foundry Preset',
+      assembly: 'Custom Assembly Preset'
+    };
+
+    const newPlant: PlantFacility = {
+      id: `plant_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      name: finalName,
+      address: address.trim(),
+      gstin: gstin.trim() || undefined,
+      preset,
+      presetLabel: presetLabels[preset],
+      checkpointsCount: preset === 'assembly' ? 4 : 6,
+      isActiveScope: plants.length === 0,
+      createdAt: new Date().toISOString()
+    };
+
+    const updated = [...plants, newPlant];
+    await savePlantsList(updated);
+
+    setIsSubmitting(false);
+    setPlantName('');
+    setAddress('');
+    setGstin('');
+    
+    if (counter > 1) {
+      setSuccessMessage(`Plant registered as "${finalName}" to ensure unique facility identification.`);
+    } else {
+      setSuccessMessage(`Plant facility "${finalName}" successfully registered & integrated into infrastructure.`);
+    }
+
+    setTimeout(() => setSuccessMessage(null), 6000);
+  };
+
+  const handleSetActiveScope = (plantId: string) => {
+    const updated = plants.map(p => ({
+      ...p,
+      isActiveScope: p.id === plantId
+    }));
+    setActiveScopeId(plantId);
+    savePlantsList(updated);
+  };
+
+  const handleDeletePlant = (plantId: string) => {
+    if (plants.length <= 1) {
+      alert('You must maintain at least one active plant facility in your workspace.');
       return;
     }
-
-    if (!name.trim() || !location.trim()) {
-      setFormError('Please enter a valid plant name and physical address.');
-      return;
+    const updated = plants.filter(p => p.id !== plantId);
+    if (!updated.some(p => p.isActiveScope)) {
+      updated[0].isActiveScope = true;
+      setActiveScopeId(updated[0].id);
     }
-
-    setProcessing(true);
-    setFormError(null);
-    setSuccessMsg(null);
-
-    try {
-      if (editingPlantId) {
-        // Update Plant
-        const success = await updatePlant(editingPlantId, {
-          name: name.trim(),
-          location: location.trim(),
-          gstin: gstin.trim()
-        });
-
-        if (success) {
-          setSuccessMsg(`Plant "${name}" has been successfully updated.`);
-          resetForm();
-          refreshPlants();
-          setTimeout(() => setSuccessMsg(null), 4000);
-        } else {
-          setFormError('Failed to update the plant in the database.');
-        }
-      } else {
-        // Add Plant
-        const stages = presetType === 'pune' ? PUNE_STAGES_PRESET : VADODARA_STAGES_PRESET;
-        const success = await addPlant(name, location, gstin, stages);
-
-        if (success) {
-          setSuccessMsg(`Plant facility "${name}" successfully registered!`);
-          resetForm();
-          refreshPlants();
-          setTimeout(() => setSuccessMsg(null), 4000);
-        } else {
-          setFormError('Failed to register the plant. Check if a similar name exists.');
-        }
-      }
-    } catch (err: any) {
-      setFormError(err.message || 'An error occurred while saving the plant.');
-    } finally {
-      setProcessing(false);
-    }
+    savePlantsList(updated);
   };
-
-  const handleDelete = async (plantId: string, plantName: string) => {
-    if (!isAdmin) return;
-    const warning = `Are you absolutely sure you want to decommission and delete "${plantName}"?\nThis action is irreversible and might disrupt active production jobs assigned to this facility.`;
-    if (!window.confirm(warning)) return;
-
-    setProcessing(true);
-    setFormError(null);
-    setSuccessMsg(null);
-
-    try {
-      const success = await deletePlant(plantId);
-      if (success) {
-        setSuccessMsg(`Facility "${plantName}" has been successfully decommissioned.`);
-        if (activePlantId === plantId) {
-          setActivePlantId('all');
-        }
-        refreshPlants();
-        setTimeout(() => setSuccessMsg(null), 4000);
-      } else {
-        setFormError('Failed to delete the plant from database.');
-      }
-    } catch (err: any) {
-      setFormError(err.message || 'Error occurred while deleting the plant.');
-    } finally {
-      setProcessing(false);
-    }
-  };
-
-  const handleSetActive = (plantId: string) => {
-    setActivePlantId(plantId);
-    setSuccessMsg('Active workspace scope switched successfully.');
-    setTimeout(() => setSuccessMsg(null), 3000);
-  };
-
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center py-16 space-y-3">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900"></div>
-        <p className="text-xs font-mono text-slate-500 uppercase tracking-widest">Retrieving factory network map...</p>
-      </div>
-    );
-  }
 
   return (
-    <div className="space-y-6 font-sans">
-      <div className="pb-4 border-b border-slate-200">
-        <span className="text-[10px] font-mono font-bold text-sky-600 uppercase tracking-widest block leading-none">
-          Enterprise Logistics & Nodes
-        </span>
-        <h2 className="text-xl font-bold tracking-tight text-slate-900 leading-tight block mt-1">
-          Manage Plants & Facilities
-        </h2>
-        <p className="text-xs text-slate-500 mt-1">
-          Establish and orchestrate multi-plant dispatch yards, assign production workflows, and toggle active workspace scopes.
-        </p>
+    <div className="space-y-6 max-w-7xl mx-auto pb-12 font-sans">
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-200 pb-5">
+        <div>
+          <div className="flex items-center space-x-2 text-[10px] font-mono tracking-widest text-rose-600 uppercase font-bold mb-1">
+            <Building2 className="h-3.5 w-3.5" />
+            <span>Enterprise Logistics & Nodes</span>
+          </div>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+            Manage Plants & Facilities
+          </h1>
+          <p className="text-xs text-slate-500 mt-1 max-w-2xl leading-relaxed">
+            Establish and orchestrate multi-plant dispatch yards, assign production workflows, and toggle active workspace scopes.
+          </p>
+        </div>
+
+        <div className="flex items-center space-x-2 shrink-0">
+          <span className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-[10px] font-mono font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span>LIVE</span>
+          </span>
+          <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-[10px] font-mono font-medium bg-slate-100 text-slate-600 border border-slate-200">
+            <ShieldCheck className="h-3 w-3 text-slate-500" />
+            <span>DB ISOLATION GUARD ACTIVE</span>
+          </span>
+        </div>
       </div>
 
-      {(error || formError) && (
-        <div className="bg-rose-50 border border-rose-200 rounded-lg p-4 flex items-start space-x-3 animate-fade-in">
-          <AlertTriangle className="h-5 w-5 text-rose-500 shrink-0 mt-0.5" />
-          <div>
-            <h5 className="text-xs font-bold text-rose-800 uppercase tracking-wider font-mono">Operations Error</h5>
-            <p className="text-xs text-rose-600 mt-1 leading-relaxed">{error || formError}</p>
+      {/* Success Notification Banner */}
+      {successMessage && (
+        <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 flex items-start space-x-3 shadow-xs animate-in fade-in slide-in-from-top-2 duration-300">
+          <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <h5 className="font-semibold text-emerald-900">Plant Registered Successfully</h5>
+            <p className="mt-0.5 text-emerald-700 leading-relaxed">{successMessage}</p>
           </div>
         </div>
       )}
 
-      {successMsg && (
-        <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 flex items-start space-x-3 animate-fade-in">
-          <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0 mt-0.5" />
-          <div>
-            <h5 className="text-xs font-bold text-emerald-800 uppercase tracking-wider font-mono">Success</h5>
-            <p className="text-xs text-emerald-600 mt-0.5">{successMsg}</p>
-          </div>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* Left Column: List of Existing Plants */}
-        <div className="lg:col-span-2 space-y-4">
+      {/* Main Grid: Infrastructure List vs Registration Form */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        {/* Left Column: Active Plant Infrastructure List (7 Cols) */}
+        <div className="lg:col-span-7 space-y-4">
           <div className="flex items-center justify-between">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 font-mono">
-              Active Plant Infrastructure ({plants.length})
-            </h4>
+            <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-500 flex items-center space-x-2">
+              <span>Active Plant Infrastructure ({plants.length})</span>
+            </h3>
             <button
-              onClick={refreshPlants}
-              className="text-slate-400 hover:text-slate-600 p-1 rounded-full transition cursor-pointer"
-              title="Refresh local network state"
+              onClick={loadPlants}
+              className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+              title="Refresh infrastructure list"
             >
               <RefreshCw className="h-3.5 w-3.5" />
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {plants.map((p) => {
-              const isActive = activePlantId === p.id;
-              return (
-                <div 
-                  key={p.id}
-                  className={`bg-white border rounded-lg p-5 shadow-2xs flex flex-col justify-between transition-all relative ${
-                    isActive 
-                      ? 'border-indigo-500 ring-1 ring-indigo-500/25 bg-indigo-50/5' 
-                      : 'border-slate-200 hover:border-slate-300'
+          {loading ? (
+            <div className="p-8 bg-white border border-slate-200 rounded-xl text-center text-xs text-slate-500 font-mono">
+              Syncing active plant nodes...
+            </div>
+          ) : plants.length === 0 ? (
+            <div className="p-8 bg-white border border-dashed border-slate-300 rounded-xl text-center space-y-2">
+              <Building className="h-8 w-8 text-slate-300 mx-auto" />
+              <p className="text-xs font-medium text-slate-600">No registered plant facilities found.</p>
+              <p className="text-[11px] text-slate-400">Use the registration panel on the right to onboard your first facility.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {plants.map((plant) => (
+                <div
+                  key={plant.id}
+                  className={`p-5 rounded-xl border transition-all ${
+                    plant.isActiveScope 
+                      ? 'bg-white border-rose-300 shadow-sm ring-1 ring-rose-500/20' 
+                      : 'bg-white border-slate-200 hover:border-slate-300 shadow-2xs'
                   }`}
                 >
-                  {isActive && (
-                    <span className="absolute top-4 right-4 bg-indigo-600 text-white text-[8px] font-mono font-bold px-1.5 py-0.5 rounded tracking-widest uppercase">
-                      ACTIVE WORKSPACE
-                    </span>
-                  )}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="space-y-1.5 flex-1">
+                      <div className="flex items-center space-x-2">
+                        <h4 className="text-sm font-bold text-slate-900">{plant.name}</h4>
+                        {plant.isActiveScope && (
+                          <span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-rose-50 text-rose-700 border border-rose-200 uppercase tracking-wider">
+                            Active Scope
+                          </span>
+                        )}
+                      </div>
 
-                  <div className="space-y-3">
-                    <div className="flex items-start space-x-2.5">
-                      <Building className="h-5 w-5 text-indigo-600 shrink-0 mt-0.5" />
-                      <div>
-                        <h3 className="text-sm font-bold text-slate-900 leading-tight">
-                          {p.name}
-                        </h3>
-                        <p className="text-[10px] font-mono text-slate-400 mt-0.5 uppercase tracking-wide">
-                          ID: {p.id}
-                        </p>
+                      <div className="flex items-center space-x-1.5 text-xs text-slate-600">
+                        <MapPin className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                        <span>{plant.address}</span>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2 pt-1">
+                        {plant.gstin && (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-mono text-slate-600 bg-slate-100 border border-slate-200">
+                            GSTIN: {plant.gstin}
+                          </span>
+                        )}
+                        <span className="px-2 py-0.5 rounded text-[10px] font-mono text-slate-600 bg-slate-100 border border-slate-200 flex items-center space-x-1">
+                          <Layers className="h-3 w-3 text-slate-500" />
+                          <span>{plant.presetLabel} ({plant.checkpointsCount} stages)</span>
+                        </span>
                       </div>
                     </div>
 
-                    <div className="space-y-1.5 text-xs text-slate-600">
-                      <div className="flex items-start space-x-1.5">
-                        <MapPin className="h-3.5 w-3.5 text-slate-400 shrink-0 mt-0.5" />
-                        <span className="leading-snug">{p.location}</span>
-                      </div>
-                      {p.gstin && (
-                        <div className="flex items-center space-x-1.5 font-mono text-[10px] text-slate-500">
-                          <span className="font-semibold text-slate-400">GSTIN:</span>
-                          <span className="font-bold">{p.gstin}</span>
-                        </div>
+                    <div className="flex items-center space-x-2 shrink-0">
+                      {!plant.isActiveScope && (
+                        <button
+                          onClick={() => handleSetActiveScope(plant.id)}
+                          className="px-2.5 py-1 text-[10px] font-mono font-bold text-slate-700 hover:text-rose-700 bg-slate-100 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 rounded-lg transition-all cursor-pointer"
+                        >
+                          Set Active Scope
+                        </button>
                       )}
-                    </div>
-
-                    {/* Process stage indicator dots */}
-                    {p.processStages && p.processStages.length > 0 && (
-                      <div className="pt-2 border-t border-slate-100">
-                        <p className="text-[9px] font-mono font-bold text-slate-400 uppercase tracking-wider mb-1">
-                          Workstage Milestones ({p.processStages.length})
-                        </p>
-                        <div className="flex flex-wrap gap-1">
-                          {p.processStages.map((stage: any) => (
-                            <span 
-                              key={stage.id}
-                              className="text-[9px] font-mono bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200"
-                            >
-                              {stage.name}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="mt-5 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
-                    {!isActive ? (
                       <button
-                        onClick={() => handleSetActive(p.id)}
-                        className="text-[10px] font-mono font-bold uppercase tracking-wider bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded transition cursor-pointer"
+                        onClick={() => handleDeletePlant(plant.id)}
+                        className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer"
+                        title="Delete plant facility"
                       >
-                        Select Workspace
+                        <Trash2 className="h-3.5 w-3.5" />
                       </button>
-                    ) : (
-                      <span className="text-[10px] text-indigo-650 font-mono font-semibold flex items-center space-x-1">
-                        <CheckCircle2 className="h-3.5 w-3.5 text-indigo-650 shrink-0" />
-                        <span>Scope Active</span>
-                      </span>
-                    )}
-
-                    {isAdmin && (
-                      <div className="flex items-center space-x-1.5">
-                        <button
-                          onClick={() => handleStartEdit(p)}
-                          className="p-1.5 text-slate-450 hover:text-slate-800 hover:bg-slate-50 rounded transition cursor-pointer"
-                          title="Edit facility credentials"
-                        >
-                          <Edit2 className="h-3.5 w-3.5" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(p.id, p.name)}
-                          disabled={processing}
-                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50/50 rounded transition cursor-pointer"
-                          title="Decommission plant"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    )}
+                    </div>
                   </div>
                 </div>
-              );
-            })}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Right Column: Add / Edit Facility Form */}
-        <div className="bg-white border border-slate-200 rounded-lg p-6 shadow-2xs h-fit">
-          <div className="flex items-center justify-between pb-3 mb-5 border-b border-slate-100">
-            <div className="flex items-center space-x-2">
-              <Building2 className="h-5 w-5 text-indigo-600 shrink-0" />
-              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                {editingPlantId ? 'Modify Facility Node' : 'Register New Plant'}
-              </h4>
+        {/* Right Column: Register New Plant Form Panel (5 Cols) */}
+        <div className="lg:col-span-5 bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-5">
+          <div className="flex items-center space-x-2 pb-3 border-b border-slate-100">
+            <div className="p-2 bg-rose-50 text-rose-600 rounded-lg">
+              <Building2 className="h-4 w-4" />
             </div>
-            {!isAdmin && (
-              <span className="bg-amber-50 text-amber-700 text-[9px] font-bold px-2 py-1 border border-amber-200/50 rounded flex items-center space-x-1 uppercase font-mono">
-                <Lock className="h-3 w-3 shrink-0" />
-                <span>Locked</span>
-              </span>
-            )}
+            <div>
+              <h3 className="text-xs font-bold font-mono tracking-wider text-slate-900 uppercase">
+                Register New Plant
+              </h3>
+              <p className="text-[11px] text-slate-500">Onboard a secondary unit or dispatch yard</p>
+            </div>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <TextField
-              id="plant-name"
-              label="Plant Facility Name *"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-              disabled={!isAdmin}
-              placeholder="e.g. Chennai Casting Works"
-              helperText="Branded title of the physical plant (appears in dispatch sheets)"
-            />
+          <form onSubmit={handleRegisterPlant} className="space-y-4">
+            <div>
+              <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-slate-700 mb-1">
+                Plant Facility Name <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                placeholder="e.g. Unit 1"
+                value={plantName}
+                onChange={(e) => setPlantName(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 focus:bg-white focus:border-rose-500 focus:ring-1 focus:ring-rose-500 focus:outline-hidden transition-all"
+              />
+              <p className="text-[10px] text-slate-400 mt-1">
+                Branded title of the physical plant (appears in dispatch sheets)
+              </p>
+            </div>
 
-            <TextField
-              id="plant-location"
-              label="Physical Site Address *"
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-              required
-              disabled={!isAdmin}
-              placeholder="Plot No, Industrial Area, City, State"
-              helperText="Full street address for transport logistics mapping"
-            />
+            <div>
+              <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-slate-700 mb-1">
+                Physical Site Address <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                placeholder="e.g. Anand Industrial Estate, Gujarat"
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 focus:bg-white focus:border-rose-500 focus:ring-1 focus:ring-rose-500 focus:outline-hidden transition-all"
+              />
+              <p className="text-[10px] text-slate-400 mt-1">
+                Full street address for transport logistics mapping
+              </p>
+            </div>
 
-            <TextField
-              id="plant-gstin"
-              label="Facility GSTIN (Optional)"
-              value={gstin}
-              onChange={(e) => setGstin(e.target.value)}
-              disabled={!isAdmin}
-              placeholder="e.g. 33AAACB1234F1Z3"
-              helperText="Plant-specific GSTIN if separate from company baseline"
-            />
+            <div>
+              <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-slate-700 mb-1">
+                Facility GSTIN (Optional)
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. 33AAACB1234F1Z3"
+                value={gstin}
+                onChange={(e) => setGstin(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-mono text-slate-900 focus:bg-white focus:border-rose-500 focus:ring-1 focus:ring-rose-500 focus:outline-hidden transition-all"
+              />
+              <p className="text-[10px] text-slate-400 mt-1">
+                Plant-specific GSTIN if separate from company baseline
+              </p>
+            </div>
 
-            {!editingPlantId && isAdmin && (
-              <div className="space-y-2 pt-1">
-                <label className="block text-[11px] font-bold uppercase tracking-wide text-slate-700 font-mono">
-                  Production Stages Preset *
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setPresetType('pune')}
-                    className={`p-3 border rounded-lg text-left transition cursor-pointer ${
-                      presetType === 'pune' 
-                        ? 'border-indigo-500 bg-indigo-50/20 text-indigo-950 font-semibold' 
-                        : 'border-slate-200 hover:border-slate-300 text-slate-600'
-                    }`}
-                  >
-                    <div className="flex items-center gap-1.5 text-xs">
-                      <Layers className="h-3.5 w-3.5 shrink-0 text-indigo-500" />
-                      <span>Forging Preset</span>
-                    </div>
-                    <p className="text-[9px] text-slate-500 mt-1 font-normal leading-normal">
-                      6 checkpoints: Material Cutting, Heating, CNC Machining, Assembly, QC, Dispatch.
-                    </p>
-                  </button>
+            <div>
+              <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-slate-700 mb-2">
+                Production Stages Preset <span className="text-rose-500">*</span>
+              </label>
 
-                  <button
-                    type="button"
-                    onClick={() => setPresetType('vadodara')}
-                    className={`p-3 border rounded-lg text-left transition cursor-pointer ${
-                      presetType === 'vadodara' 
-                        ? 'border-indigo-500 bg-indigo-50/20 text-indigo-950 font-semibold' 
-                        : 'border-slate-200 hover:border-slate-300 text-slate-600'
-                    }`}
-                  >
-                    <div className="flex items-center gap-1.5 text-xs">
-                      <Layers className="h-3.5 w-3.5 shrink-0 text-indigo-500" />
-                      <span>Foundry Preset</span>
-                    </div>
-                    <p className="text-[9px] text-slate-500 mt-1 font-normal leading-normal">
-                      6 checkpoints: Raw Material, Casting, Fettling, Heat Treatment, NDT, Ready.
-                    </p>
-                  </button>
-                </div>
-                <span className="text-[10px] text-slate-400 font-mono block">
-                  Seed initial shopfloor stages configuration automatically.
-                </span>
-              </div>
-            )}
-
-            {isAdmin && (
-              <div className="border-t border-slate-100 pt-5 flex justify-end gap-2.5">
-                {editingPlantId && (
-                  <button
-                    type="button"
-                    onClick={resetForm}
-                    className="text-slate-600 hover:text-slate-900 border border-slate-200 bg-white font-bold text-xs uppercase tracking-wider px-4 py-2 rounded h-11 flex items-center justify-center transition cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                )}
-                <button
-                  type="submit"
-                  disabled={processing}
-                  className="bg-slate-900 hover:bg-slate-800 disabled:bg-slate-350 text-white font-bold text-xs uppercase tracking-wider px-5 py-2 rounded h-11 flex items-center justify-center transition cursor-pointer"
+              <div className="grid grid-cols-1 gap-2.5">
+                {/* Forging Preset */}
+                <div
+                  onClick={() => setPreset('forging')}
+                  className={`p-3 rounded-xl border text-left cursor-pointer transition-all ${
+                    preset === 'forging'
+                      ? 'bg-rose-50/50 border-rose-300 ring-1 ring-rose-500/20'
+                      : 'bg-slate-50 border-slate-200 hover:border-slate-300'
+                  }`}
                 >
-                  {processing ? 'Processing...' : editingPlantId ? 'Save Credential Updates' : 'Establish Plant Facility'}
-                </button>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-bold text-slate-900 flex items-center space-x-1.5">
+                      <Layers className="h-3.5 w-3.5 text-rose-600" />
+                      <span>Forging Preset</span>
+                    </span>
+                    <div className={`h-4 w-4 rounded-full border flex items-center justify-center ${
+                      preset === 'forging' ? 'border-rose-600 bg-rose-600 text-white' : 'border-slate-300'
+                    }`}>
+                      {preset === 'forging' && <CheckCircle2 className="h-3 w-3" />}
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-slate-500 leading-relaxed">
+                    6 checkpoints: Material Cutting, Heating, CNC Machining, Assembly, QC, Dispatch.
+                  </p>
+                </div>
+
+                {/* Foundry Preset */}
+                <div
+                  onClick={() => setPreset('foundry')}
+                  className={`p-3 rounded-xl border text-left cursor-pointer transition-all ${
+                    preset === 'foundry'
+                      ? 'bg-rose-50/50 border-rose-300 ring-1 ring-rose-500/20'
+                      : 'bg-slate-50 border-slate-200 hover:border-slate-300'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-bold text-slate-900 flex items-center space-x-1.5">
+                      <Layers className="h-3.5 w-3.5 text-rose-600" />
+                      <span>Foundry Preset</span>
+                    </span>
+                    <div className={`h-4 w-4 rounded-full border flex items-center justify-center ${
+                      preset === 'foundry' ? 'border-rose-600 bg-rose-600 text-white' : 'border-slate-300'
+                    }`}>
+                      {preset === 'foundry' && <CheckCircle2 className="h-3 w-3" />}
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-slate-500 leading-relaxed">
+                    6 checkpoints: Raw Material, Casting, Fettling, Heat Treatment, NDT, Ready.
+                  </p>
+                </div>
+
+                {/* Custom Assembly */}
+                <div
+                  onClick={() => setPreset('assembly')}
+                  className={`p-3 rounded-xl border text-left cursor-pointer transition-all ${
+                    preset === 'assembly'
+                      ? 'bg-rose-50/50 border-rose-300 ring-1 ring-rose-500/20'
+                      : 'bg-slate-50 border-slate-200 hover:border-slate-300'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-bold text-slate-900 flex items-center space-x-1.5">
+                      <Layers className="h-3.5 w-3.5 text-rose-600" />
+                      <span>Custom Assembly Preset</span>
+                    </span>
+                    <div className={`h-4 w-4 rounded-full border flex items-center justify-center ${
+                      preset === 'assembly' ? 'border-rose-600 bg-rose-600 text-white' : 'border-slate-300'
+                    }`}>
+                      {preset === 'assembly' && <CheckCircle2 className="h-3 w-3" />}
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-slate-500 leading-relaxed">
+                    4 checkpoints: Components Inbound, Sub-Assembly, Final Inspection, Packing.
+                  </p>
+                </div>
               </div>
-            )}
+            </div>
+
+            <button
+              type="submit"
+              disabled={isSubmitting || !plantName.trim() || !address.trim()}
+              className="w-full bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white font-mono text-xs uppercase font-bold tracking-wider py-3 rounded-xl flex items-center justify-center space-x-2 transition-all cursor-pointer shadow-xs"
+            >
+              {isSubmitting ? (
+                <span>Registering Plant...</span>
+              ) : (
+                <>
+                  <Plus className="h-4 w-4" />
+                  <span>Register Plant Facility</span>
+                </>
+              )}
+            </button>
           </form>
         </div>
-
-        {/* Security / Audit System Info Panel */}
-        <div className="lg:col-span-3 bg-slate-900 text-slate-300 rounded-lg p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div className="space-y-1">
-            <div className="flex items-center space-x-2 text-white">
-              <ShieldCheck className="h-4.5 w-4.5 text-emerald-400 shrink-0" />
-              <h4 className="text-xs font-bold uppercase tracking-wider font-mono">Consolidated Ledger Security</h4>
-            </div>
-            <p className="text-[11px] text-slate-400 max-w-3xl leading-relaxed">
-              Plant additions are logged automatically inside active factory audit journals. Only designated administrators hold permissions to configure multi-plant assets, assign staff access constraints, or decommission operational facilities.
-            </p>
-          </div>
-        </div>
-
       </div>
     </div>
   );

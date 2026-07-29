@@ -140,8 +140,17 @@ export const useAllTenants = () => {
   };
 
   const createTenant = async (tenant: Omit<TenantSummary, 'activeUsersCount' | 'rfqsCount' | 'jobsCount' | 'lastActivityAt'>) => {
+    // Ensure unique ID if a collision occurs
+    let candidateId = tenant.id.toLowerCase().trim();
+    let counter = 1;
+    while (tenants.some(t => t.id === candidateId)) {
+      counter++;
+      candidateId = `${tenant.id.toLowerCase().trim()}_${counter}`;
+    }
+
     const newT: TenantSummary = {
       ...tenant,
+      id: candidateId,
       activeUsersCount: 1,
       rfqsCount: 0,
       jobsCount: 0,
@@ -149,22 +158,33 @@ export const useAllTenants = () => {
     };
 
     if (isSandboxMode || !db) {
-      const updated = [...tenants, newT];
+      // Avoid duplicate company entries in local list
+      const existingIdx = tenants.findIndex(t => t.id === candidateId);
+      let updated: TenantSummary[];
+      if (existingIdx !== -1) {
+        updated = [...tenants];
+        updated[existingIdx] = newT;
+      } else {
+        updated = [...tenants, newT];
+      }
       localStorage.setItem('flowops_internal_tenants', JSON.stringify(updated));
       setTenants(updated);
       return true;
     } else {
       try {
-        const tenantRef = doc(db, 'tenants', tenant.id);
+        const tenantRef = doc(db, 'tenants', candidateId);
         const tenantData: Tenant = {
-          id: tenant.id,
+          id: candidateId,
           companyName: tenant.companyName,
           createdAt: tenant.createdAt,
           currency: '₹',
           isActive: tenant.isActive
         };
         await setDoc(tenantRef, tenantData);
-        setTenants(prev => [...prev, newT]);
+        setTenants(prev => {
+          const filtered = prev.filter(t => t.id !== candidateId);
+          return [...filtered, newT];
+        });
         return true;
       } catch (err: any) {
         console.error('Failed to provision tenant in Firestore:', err);
