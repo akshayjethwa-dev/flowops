@@ -21,6 +21,7 @@ export interface UserProfile {
   phone?: string;
   createdAt: any;
   isSuperAdmin?: boolean;
+  plantId?: string;
   assignedPlantIds?: string[]; // Scoped Plant assignments
   assignedStageIds?: string[]; // Scoped Process Stage assignments
 }
@@ -114,6 +115,7 @@ export interface Quote {
   pdfVersions?: QuotationVersion[];
   downloadUrl?: string;
   status: 'draft' | 'sent' | 'approved' | 'rejected';
+  plantId?: string;
   createdBy: string;
   createdAt: any;
 }
@@ -376,6 +378,7 @@ export interface TenantUser {
   lastLogin?: string;
   invitedAt?: string;
   createdAt: any;
+  plantId?: string;
 }
 
 export type ActivityActionType =
@@ -435,7 +438,6 @@ export interface ActivityEvent {
   action?: string;
   entityLabel?: string;
 }
-
 export interface Attachment {
   id: string;
   fileName: string;
@@ -575,6 +577,7 @@ export interface Invoice {
   tenantId: string;
   orderId: string;
   orderNumber: string;
+  plantId?: string; // Scoped Plant
   customerId: string;
   customerName: string;
   customerPhone?: string;

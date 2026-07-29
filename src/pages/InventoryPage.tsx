@@ -9,6 +9,7 @@ import {
   useAddStockEntry,
   SEED_STOCK_ITEMS 
 } from '../hooks/useStockInventory';
+import { usePlants } from '../hooks/usePlants';
 import { ExportButton } from '../components/ExportButton';
 import { StockCategory, StockItem, StockLedgerEntry, AppNotification } from '../types';
 import { 
@@ -45,7 +46,7 @@ export const InventoryPage: React.FC = () => {
 
   // Detail Side Drawer state
   const [activeItemId, setActiveItemId] = useState<string | null>(null);
-  const activeItem = rawItems.find(x => x.id === activeItemId);
+  const activeItem = (rawItems || []).find(x => x.id === activeItemId);
   const { ledgerEntries, loading: ledgerLoading } = useStockLedger(tenant?.id, activeItemId || undefined);
 
   // Trigger B: Low stock automatic notification creator
@@ -135,6 +136,12 @@ export const InventoryPage: React.FC = () => {
   const [txStatusMsg, setTxStatusMsg] = useState<{ type: 'success' | 'err'; text: string } | null>(null);
 
   // Profile creation form states
+  const [selectedPlantId, setSelectedPlantId] = useState<string>(() => {
+    return localStorage.getItem('inventory_selected_plant_id') || 'all';
+  });
+  const { plants } = usePlants(tenant?.id);
+  const [newItemPlantId, setNewItemPlantId] = useState('');
+
   const [newItemName, setNewItemName] = useState('');
   const [newItemCode, setNewItemCode] = useState('');
   const [newItemCategory, setNewItemCategory] = useState<StockCategory>('raw_material');
@@ -224,7 +231,8 @@ export const InventoryPage: React.FC = () => {
         code: newItemCode.trim().toUpperCase(),
         category: newItemCategory,
         unit: newItemUnit.trim().toLowerCase(),
-        reorderLevel: Number(newItemReorder)
+        reorderLevel: Number(newItemReorder),
+        plantId: newItemPlantId || (plants?.[0]?.id || '')
       });
 
       setNewProfileStatusMsg({ type: 'success', text: `Product SKU "${createdItem.code}" registered.` });
@@ -235,6 +243,7 @@ export const InventoryPage: React.FC = () => {
       setNewItemCategory('raw_material');
       setNewItemUnit('units');
       setNewItemReorder('');
+      setNewItemPlantId('');
 
       setTimeout(() => {
         setIsNewProfileOpen(false);
@@ -245,11 +254,19 @@ export const InventoryPage: React.FC = () => {
     }
   };
 
+  // Filter rawItems and filteredItems by plant
+  const plantFilteredRawItems = (rawItems || []).filter(item => {
+    return selectedPlantId === 'all' || item.plantId === selectedPlantId;
+  });
+  const plantFilteredItems = (filteredItems || []).filter(item => {
+    return selectedPlantId === 'all' || item.plantId === selectedPlantId;
+  });
+
   // Dashboard calculations for header dashboard count widgets
-  const totalSKUsCount = rawItems.length;
-  const criticalItemsCount = rawItems.filter(item => getAlertStatusState(item) === 'critical').length;
-  const warningItemsCount = rawItems.filter(item => getAlertStatusState(item) === 'warning').length;
-  const finishedSKUsCount = rawItems.filter(item => item.category === 'finished_goods').length;
+  const totalSKUsCount = plantFilteredRawItems.length;
+  const criticalItemsCount = plantFilteredRawItems.filter(item => getAlertStatusState(item) === 'critical').length;
+  const warningItemsCount = plantFilteredRawItems.filter(item => getAlertStatusState(item) === 'warning').length;
+  const finishedSKUsCount = plantFilteredRawItems.filter(item => item.category === 'finished_goods').length;
 
   return (
     <div id="inventory-pane-root" className="min-h-screen bg-slate-50 p-4 md:p-8 space-y-8 select-none font-sans text-slate-800">
@@ -272,7 +289,7 @@ export const InventoryPage: React.FC = () => {
         {/* Action Controls */}
         <div className="flex gap-2">
           <ExportButton
-            data={filteredItems}
+            data={plantFilteredItems}
             filenamePrefix="inventory_stock_vis"
             headersMap={{
               code: 'Item Code',
@@ -352,8 +369,8 @@ export const InventoryPage: React.FC = () => {
             {(['all', 'raw_material', 'finished_goods', 'consumable', 'spare'] as const).map(tab => {
               const active = selectedCategory === tab;
               const count = tab === 'all' 
-                ? rawItems.length 
-                : rawItems.filter(x => x.category === tab).length;
+                ? (rawItems || []).length 
+                : (rawItems || []).filter(x => x.category === tab).length;
               
               return (
                 <button
@@ -376,24 +393,47 @@ export const InventoryPage: React.FC = () => {
             })}
           </div>
 
-          {/* Search bar */}
-          <div className="relative flex-grow max-w-md">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search items by code or description..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:bg-white text-slate-800"
-            />
-            {searchQuery && (
-              <button 
-                onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-2 text-[10px] text-slate-400 hover:text-slate-600"
+          <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center grow max-w-2xl">
+            {/* Plant Filter Dropdown */}
+            <div className="flex items-center space-x-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 shadow-3xs">
+              <span className="text-[10px] font-mono font-bold uppercase text-slate-400 shrink-0">Plant:</span>
+              <select
+                value={selectedPlantId}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setSelectedPlantId(val);
+                  localStorage.setItem('inventory_selected_plant_id', val);
+                }}
+                className="text-xs font-bold text-slate-705 bg-transparent border-none focus:ring-0 p-0 pr-6 cursor-pointer"
               >
-                Clear
-              </button>
-            )}
+                <option value="all">🌐 All Plants Stock</option>
+                {plants?.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    🏭 {p.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Search bar */}
+            <div className="relative grow">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search items by code or description..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:bg-white text-slate-800"
+              />
+              {searchQuery && (
+                <button 
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-2 text-[10px] text-slate-400 hover:text-slate-600"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
           </div>
 
         </div>
@@ -410,7 +450,7 @@ export const InventoryPage: React.FC = () => {
           <div className="p-8 text-center text-red-500 bg-red-50/50 rounded-lg m-4 text-xs font-mono">
             {error}
           </div>
-        ) : filteredItems.length === 0 ? (
+        ) : plantFilteredItems.length === 0 ? (
           <div className="p-16 text-center text-slate-400">
             <Package className="h-10 w-10 text-slate-300 mx-auto mb-3" />
             <p className="text-sm font-semibold text-slate-600">No SKU inventory profiles found</p>
@@ -435,7 +475,7 @@ export const InventoryPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {filteredItems.map(item => {
+                  {plantFilteredItems.map(item => {
                     const status = getAlertStatusState(item);
                     const rowBgClass = 
                       status === 'critical' ? 'bg-rose-500/5 hover:bg-rose-500/10' :
@@ -524,7 +564,7 @@ export const InventoryPage: React.FC = () => {
 
             {/* Mobile View Card List */}
             <div className="md:hidden divide-y divide-slate-100">
-              {filteredItems.map(item => {
+              {plantFilteredItems.map(item => {
                 const status = getAlertStatusState(item);
                 const cardBorder = 
                   status === 'critical' ? 'border-rose-400' :
@@ -648,7 +688,7 @@ export const InventoryPage: React.FC = () => {
                   </div>
                   <div>
                     <span className="text-slate-400 block text-[9px] uppercase">Reorder Level Alert</span>
-                    <span className="font-semibold text-slate-700 font-bold">
+                    <span className="font-semibold text-slate-700">
                       {activeItem.reorderLevel} <span className="text-[10px] text-slate-400 font-normal">{activeItem.unit}</span>
                     </span>
                   </div>
@@ -961,6 +1001,24 @@ export const InventoryPage: React.FC = () => {
                   onChange={(e) => setNewItemName(e.target.value)}
                   className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-250 rounded font-mono text-slate-800 focus:outline-none focus:ring-1 focus:ring-sky-500 font-semibold"
                 />
+              </div>
+
+              {/* Plant Allocation */}
+              <div>
+                <label className="text-[9px] font-mono uppercase text-slate-400 block mb-1">Target Plant Facility</label>
+                <select
+                  value={newItemPlantId}
+                  onChange={(e) => setNewItemPlantId(e.target.value)}
+                  className="w-full px-2 py-1.5 text-xs bg-slate-50 border border-slate-250 rounded text-slate-800 focus:outline-none focus:ring-1 focus:ring-sky-500 font-semibold"
+                  required
+                >
+                  <option value="">-- Select Plant --</option>
+                  {plants?.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      🏭 {p.name}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               {/* Category & Unit */}

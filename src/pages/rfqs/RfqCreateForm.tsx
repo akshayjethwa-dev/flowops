@@ -1,12 +1,13 @@
 // src/pages/rfqs/RfqCreateForm.tsx
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useRfqsList } from '../../hooks/useRfqsList';
 import { useCustomersList } from '../../hooks/useCustomersList';
 import { useTenantUsers } from '../../hooks/useTenantUsers';
 import { useStockItems } from '../../hooks/useStockInventory';
+import { usePlants } from '../../hooks/usePlants';
 import { RFQItem, Rfq, StockItem } from '../../types';
 import { db } from '../../firebase';
 import { useToast } from '../../context/ToastContext';
@@ -20,7 +21,8 @@ import {
   Plus, 
   Trash2, 
   AlertCircle,
-  UserCheck
+  UserCheck,
+  Factory
 } from 'lucide-react';
 
 export const RfqCreateForm: React.FC = () => {
@@ -32,15 +34,27 @@ export const RfqCreateForm: React.FC = () => {
   // Fetch live staff and inventory using the correct hook mappings
   const { users, loading: loadingUsers } = useTenantUsers();
   const { items: inventory, loading: loadingInventory } = useStockItems(tenant?.id);
+  const { plants } = usePlants(tenant?.id);
   const { toastSuccess, toastError } = useToast();
 
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   // Filter staff for valid estimator roles with explicit 'any' typing to resolve ts(7006)
-  const estimators = users.filter((u: any) => ['admin', 'sales', 'management'].includes(u.role));
+  const estimators = users?.filter((u: any) => ['admin', 'sales', 'management'].includes(u.role)) || [];
 
   // RFQ fields state
+  const [plantId, setPlantId] = useState('');
   const [rfqNumber, setRfqNumber] = useState(`RFQ-2026-${Math.floor(1001 + Math.random() * 8999)}`);
+
+  // Auto-select plant safely handling potential undefined states
+  useEffect(() => {
+    if (profile?.plantId) {
+      setPlantId(profile.plantId);
+    } else if (plants?.length > 0) {
+      setPlantId(plants[0].id);
+    }
+  }, [profile, plants]);
+
   const [dateReceived, setDateReceived] = useState(new Date().toISOString().split('T')[0]);
   const [source, setSource] = useState<'Phone' | 'Email' | 'WhatsApp' | 'Walk-in'>('Email');
   const [priority, setPriority] = useState<'Low' | 'Medium' | 'High'>('Medium');
@@ -83,7 +97,7 @@ export const RfqCreateForm: React.FC = () => {
       }
       
       // Pull directly from live inventory with proper StockItem type
-      const prod = inventory.find((p: StockItem) => p.id === catalogProductId);
+      const prod = inventory?.find((p: StockItem) => p.id === catalogProductId);
       if (!prod) return;
 
       const newItem: RFQItem = {
@@ -138,6 +152,9 @@ export const RfqCreateForm: React.FC = () => {
 
     // Field Validation Form Pattern
     const errors: Record<string, string> = {};
+    if (!plantId) {
+      errors.plantId = 'Please select the target plant facility.';
+    }
     if (customerMode === 'select' && !selectedCustomerId) {
       errors.customerId = 'B2B Client Profile selection is required.';
     }
@@ -166,7 +183,7 @@ export const RfqCreateForm: React.FC = () => {
       let finalEmail = '';
 
       if (customerMode === 'select') {
-        const custRef = customers.find((c: any) => c.id === selectedCustomerId);
+        const custRef = customers?.find((c: any) => c.id === selectedCustomerId);
         if (!custRef) throw new Error('Selected customer profile is invalid');
 
         finalCustomerId = selectedCustomerId;
@@ -202,6 +219,7 @@ export const RfqCreateForm: React.FC = () => {
       // Build RFQ payload
       const rfqPayload: Omit<Rfq, 'id' | 'tenantId' | 'createdAt'> = {
         rfqNumber,
+        plantId,
         customerId: finalCustomerId,
         customerName: finalCustomerName,
         contactName: finalContactName,
@@ -426,13 +444,32 @@ export const RfqCreateForm: React.FC = () => {
                 className="w-full bg-slate-50 border border-slate-205 rounded-lg p-2 font-sans focus:bg-white text-slate-800 focus:outline-hidden"
               >
                 <option value="">{loadingUsers ? 'Loading staff...' : '-- Select Estimator --'}</option>
-                {estimators.map((user: any) => (
+                {estimators?.map((user: any) => (
                   <option key={user.id} value={user.name}>
                     {user.name} ({user.role})
                   </option>
                 ))}
               </select>
               <FieldError message={fieldErrors.assignedTo} />
+            </div>
+
+            {/* Target Plant Facility Selector */}
+            <div className="space-y-1">
+              <label className="text-[9px] font-bold text-slate-450 uppercase tracking-widest block">Target Plant Facility</label>
+              <select
+                required
+                value={plantId}
+                onChange={(e) => setPlantId(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-205 rounded-lg p-2 font-sans focus:bg-white text-slate-800 focus:outline-hidden"
+              >
+                <option value="">-- Choose Target Plant --</option>
+                {plants?.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    🏭 {p.name}
+                  </option>
+                ))}
+              </select>
+              <FieldError message={fieldErrors.plantId} />
             </div>
           </div>
         </div>
@@ -481,7 +518,7 @@ export const RfqCreateForm: React.FC = () => {
                   value={selectedCustomerId}
                   onChange={(e) => {
                     setSelectedCustomerId(e.target.value);
-                    const selected = customers.find((c: any) => c.id === e.target.value);
+                    const selected = customers?.find((c: any) => c.id === e.target.value);
                     if (selected) {
                       setFallbackContactName(selected.contactPerson);
                       setFallbackPhone(selected.phone || '');
@@ -491,7 +528,7 @@ export const RfqCreateForm: React.FC = () => {
                   disabled={loadingCust}
                 >
                   <option value="">{loadingCust ? 'Loading customers...' : '-- Click to search customer rolodex --'}</option>
-                  {customers.map((c: any) => (
+                  {customers?.map((c: any) => (
                     <option key={c.id} value={c.id}>
                       {c.name} {c.city ? `(${c.city})` : ''} - Contact: {c.contactPerson}
                     </option>
@@ -636,7 +673,7 @@ export const RfqCreateForm: React.FC = () => {
                     disabled={loadingInventory}
                   >
                     <option value="">{loadingInventory ? 'Loading inventory...' : '-- Choose Catalogue SKU --'}</option>
-                    {inventory.map((p: StockItem) => (
+                    {inventory?.map((p: StockItem) => (
                       <option key={p.id} value={p.id}>
                         {p.name} {p.code ? `[${p.code}]` : ''} ({p.currentQty || 0} in stock)
                       </option>

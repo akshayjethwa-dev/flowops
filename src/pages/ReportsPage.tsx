@@ -8,6 +8,7 @@ import { useDispatchList } from '../hooks/useDispatch';
 import { useInvoices } from '../hooks/useInvoices';
 import { useStockItems } from '../hooks/useStockInventory';
 import { useCustomersList } from '../hooks/useCustomersList';
+import { usePlants } from '../hooks/usePlants';
 import { exportToCSV, exportReportToPDF } from '../utils/exportUtils';
 import {
   BarChart3,
@@ -37,6 +38,11 @@ export const ReportsPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<ReportType>('rfq');
 
   // Unified Filtering State
+  const [selectedPlantId, setSelectedPlantId] = useState<string>(() => {
+    return localStorage.getItem('reports_selected_plant_id') || 'all';
+  });
+  const { plants = [] } = usePlants(tenantId);
+
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('all');
@@ -93,17 +99,19 @@ export const ReportsPage: React.FC = () => {
 
   // Report 1: RFQ Pipeline Report
   const filteredRfqData = useMemo(() => {
-    return rfqs.filter(rfq => {
+    return (rfqs || []).filter(rfq => {
+      if (selectedPlantId !== 'all' && rfq.plantId !== selectedPlantId) return false;
       if (!isWithinDateRange(rfq.dateReceived || rfq.createdAt)) return false;
       if (selectedCustomerId !== 'all' && rfq.customerId !== selectedCustomerId && rfq.customerName !== selectedCustomerId) return false;
       if (selectedStatus !== 'all' && rfq.status.toLowerCase() !== selectedStatus.toLowerCase()) return false;
       return true;
     });
-  }, [rfqs, startDate, endDate, selectedCustomerId, selectedStatus]);
+  }, [rfqs, startDate, endDate, selectedCustomerId, selectedStatus, selectedPlantId]);
 
   // Report 2: Order Status Report
   const filteredOrderData = useMemo(() => {
-    return orders.filter(order => {
+    return (orders || []).filter(order => {
+      if (selectedPlantId !== 'all' && order.plantId !== selectedPlantId) return false;
       // Created Date is serialized as Firebase timestamp or ISO string
       const dateStr = order.createdAt?.seconds 
         ? new Date(order.createdAt.seconds * 1000).toISOString() 
@@ -114,39 +122,42 @@ export const ReportsPage: React.FC = () => {
       if (selectedStatus !== 'all' && order.status.toLowerCase() !== selectedStatus.toLowerCase()) return false;
       return true;
     });
-  }, [orders, startDate, endDate, selectedCustomerId, selectedStatus]);
+  }, [orders, startDate, endDate, selectedCustomerId, selectedStatus, selectedPlantId]);
 
   // Report 3: Dispatch Summary
   const filteredDispatchData = useMemo(() => {
-    return dispatches.filter(d => {
+    return (dispatches || []).filter(d => {
+      if (selectedPlantId !== 'all' && d.plantId !== selectedPlantId) return false;
       const dateStr = d.dispatchDate || d.dispatchedAt;
       if (!isWithinDateRange(dateStr)) return false;
       if (selectedCustomerId !== 'all' && d.customerName !== selectedCustomerId) return false;
       if (selectedTransporter !== 'all' && d.transporter !== selectedTransporter) return false;
       return true;
     });
-  }, [dispatches, startDate, endDate, selectedCustomerId, selectedTransporter]);
+  }, [dispatches, startDate, endDate, selectedCustomerId, selectedTransporter, selectedPlantId]);
 
   // Report 4: Outstanding & Payments Summary
   const filteredPaymentData = useMemo(() => {
-    return invoices.filter(inv => {
+    return (invoices || []).filter(inv => {
+      if (selectedPlantId !== 'all' && inv.plantId !== selectedPlantId) return false;
       if (!isWithinDateRange(inv.invoiceDate)) return false;
       if (selectedCustomerId !== 'all' && inv.customerName !== selectedCustomerId) return false;
       if (selectedStatus !== 'all' && inv.status.toLowerCase() !== selectedStatus.toLowerCase()) return false;
       return true;
     });
-  }, [invoices, startDate, endDate, selectedCustomerId, selectedStatus]);
+  }, [invoices, startDate, endDate, selectedCustomerId, selectedStatus, selectedPlantId]);
 
   // Report 5: Inventory Valuation Report
   const filteredInventoryData = useMemo(() => {
-    return stockItems.filter(item => {
+    return (stockItems || []).filter(item => {
+      if (selectedPlantId !== 'all' && item.plantId !== selectedPlantId) return false;
       if (selectedCategory !== 'all' && item.category !== selectedCategory) return false;
       if (selectedStatus === 'reorder') {
         return item.currentQty <= item.reorderLevel;
       }
       return true;
     });
-  }, [stockItems, selectedCategory, selectedStatus]);
+  }, [stockItems, selectedCategory, selectedStatus, selectedPlantId]);
 
 
   // ==========================================
@@ -365,11 +376,34 @@ export const ReportsPage: React.FC = () => {
           <Filter className="h-4 w-4 text-sky-600" />
           <h4 className="text-xs font-mono uppercase tracking-wider font-bold">Configure Report Options</h4>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+          {/* Plant scoping filter */}
+          <div>
+            <label className="block text-[10px] font-mono uppercase text-slate-500 font-bold mb-1.5">
+              Plant / Facility Scope
+            </label>
+            <select
+              value={selectedPlantId}
+              onChange={e => {
+                const val = e.target.value;
+                setSelectedPlantId(val);
+                localStorage.setItem('reports_selected_plant_id', val);
+              }}
+              className="w-full bg-slate-50 border border-slate-205 hover:bg-slate-100/50 text-[11px] font-mono rounded px-3 py-1.5 focus:outline-hidden focus:border-sky-500 transition-all text-slate-855 cursor-pointer font-bold"
+            >
+              <option value="all">🌐 ALL FACILITIES</option>
+              {(plants || []).map(p => (
+                <option key={p.id} value={p.id}>
+                  🏭 {p.name.toUpperCase()}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* Start Date */}
           {activeTab !== 'inventory' && (
             <div>
-              <label className="block text-[10px] font-mono uppercase text-slate-500 font-bold mb-1.5 flex items-center space-x-1">
+              <label className="block text-[10px] font-mono uppercase text-slate-500 font-bold mb-1.5 items-center space-x-1">
                 <Calendar className="h-3 w-3 shrink-0 text-slate-450" />
                 <span>Start Date</span>
               </label>
@@ -385,7 +419,7 @@ export const ReportsPage: React.FC = () => {
           {/* End Date */}
           {activeTab !== 'inventory' && (
             <div>
-              <label className="block text-[10px] font-mono uppercase text-slate-500 font-bold mb-1.5 flex items-center space-x-1">
+              <label className="block text-[10px] font-mono uppercase text-slate-500 font-bold mb-1.5 items-center space-x-1">
                 <Calendar className="h-3 w-3 shrink-0 text-slate-450" />
                 <span>End Date</span>
               </label>
@@ -410,7 +444,7 @@ export const ReportsPage: React.FC = () => {
                 className="w-full bg-slate-50 border border-slate-205 hover:bg-slate-100/50 text-[11px] font-mono rounded px-3 py-1.5 focus:outline-hidden focus:border-sky-500 transition-all text-slate-805 cursor-pointer"
               >
                 <option value="all">ALL CUSTOMERS</option>
-                {customers.map(c => (
+                {(customers || []).map(c => (
                   <option key={c.id || c.name} value={c.name}>
                     {c.name}
                   </option>
