@@ -19,6 +19,7 @@ import {
 import { useAuth } from '../../hooks/useAuth';
 import { db } from '../../firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { handleFirestoreError, OperationType } from '../../firebaseErrors';
 
 export interface PlantFacility {
   id: string;
@@ -61,6 +62,7 @@ export const PlantsManagementPage: React.FC = () => {
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [activeScopeId, setActiveScopeId] = useState<string>('plant_main_01');
 
   // Load plants on mount
@@ -70,6 +72,7 @@ export const PlantsManagementPage: React.FC = () => {
 
   const loadPlants = async () => {
     setLoading(true);
+    setErrorMessage(null);
     const storageKey = `flowops_plants_${tenantId}`;
     try {
       if (isSandboxMode || !db) {
@@ -116,17 +119,21 @@ export const PlantsManagementPage: React.FC = () => {
 
   const savePlantsList = async (newList: PlantFacility[]) => {
     const storageKey = `flowops_plants_${tenantId}`;
-    setPlants(newList);
-    localStorage.setItem(storageKey, JSON.stringify(newList));
 
     if (!isSandboxMode && db && tenantId) {
       try {
         const tenantDocRef = doc(db, 'tenants', tenantId);
         await setDoc(tenantDocRef, { plants: newList }, { merge: true });
       } catch (err) {
-        console.error('Error saving plants to Firestore:', err);
+        // Bubble up error to handler for unified display
+        handleFirestoreError(err, OperationType.UPDATE, `tenants/${tenantId}`);
+        throw err; 
       }
     }
+    
+    // Set local state only if DB write succeeded (or if in sandbox mode)
+    setPlants(newList);
+    localStorage.setItem(storageKey, JSON.stringify(newList));
   };
 
   const handleRegisterPlant = async (e: React.FormEvent) => {
@@ -135,20 +142,17 @@ export const PlantsManagementPage: React.FC = () => {
 
     setIsSubmitting(true);
     setSuccessMessage(null);
+    setErrorMessage(null);
 
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    // Handle name duplication seamlessly
     const rawName = plantName.trim();
-    let finalName = rawName;
-    let counter = 1;
 
     // Check if duplicate or similar plant exists
-    const nameExists = (n: string) => plants.some(p => p.name.toLowerCase().trim() === n.toLowerCase().trim());
+    const nameExists = plants.some(p => p.name.toLowerCase().trim() === rawName.toLowerCase());
     
-    while (nameExists(finalName)) {
-      counter++;
-      finalName = `${rawName} (Unit ${counter})`;
+    if (nameExists) {
+      setErrorMessage('Failed to register the plant. Check if a similar name exists.');
+      setIsSubmitting(false);
+      return;
     }
 
     const presetLabels = {
@@ -159,9 +163,10 @@ export const PlantsManagementPage: React.FC = () => {
 
     const newPlant: PlantFacility = {
       id: `plant_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-      name: finalName,
+      name: rawName,
       address: address.trim(),
-      gstin: gstin.trim() || undefined,
+      // FIX: Ensure we save an empty string instead of undefined so Firestore doesn't crash
+      gstin: gstin.trim(), 
       preset,
       presetLabel: presetLabels[preset],
       checkpointsCount: preset === 'assembly' ? 4 : 6,
@@ -169,43 +174,63 @@ export const PlantsManagementPage: React.FC = () => {
       createdAt: new Date().toISOString()
     };
 
-    const updated = [...plants, newPlant];
-    await savePlantsList(updated);
+    try {
+      const updated = [...plants, newPlant];
+      await savePlantsList(updated);
 
-    setIsSubmitting(false);
-    setPlantName('');
-    setAddress('');
-    setGstin('');
-    
-    if (counter > 1) {
-      setSuccessMessage(`Plant registered as "${finalName}" to ensure unique facility identification.`);
-    } else {
-      setSuccessMessage(`Plant facility "${finalName}" successfully registered & integrated into infrastructure.`);
+      setPlantName('');
+      setAddress('');
+      setGstin('');
+      setSuccessMessage(`Plant facility "${rawName}" successfully registered & integrated into infrastructure.`);
+      setTimeout(() => setSuccessMessage(null), 6000);
+      
+    } catch (err: any) {
+      console.error('Error adding plant facility:', err);
+      let displayMsg = err.message || 'Failed to register the plant.';
+      try {
+        const parsed = JSON.parse(err.message);
+        if (parsed.error) {
+           displayMsg = parsed.error;
+        }
+      } catch (e) {
+        // Leave displayMsg as-is
+      }
+      setErrorMessage(displayMsg);
+    } finally {
+      setIsSubmitting(false);
     }
-
-    setTimeout(() => setSuccessMessage(null), 6000);
   };
 
-  const handleSetActiveScope = (plantId: string) => {
+  const handleSetActiveScope = async (plantId: string) => {
     const updated = plants.map(p => ({
       ...p,
       isActiveScope: p.id === plantId
     }));
-    setActiveScopeId(plantId);
-    savePlantsList(updated);
+    try {
+      await savePlantsList(updated);
+      setActiveScopeId(plantId);
+    } catch (err) {
+      console.error('Error setting active scope', err);
+    }
   };
 
-  const handleDeletePlant = (plantId: string) => {
+  const handleDeletePlant = async (plantId: string) => {
     if (plants.length <= 1) {
       alert('You must maintain at least one active plant facility in your workspace.');
       return;
     }
+    
     const updated = plants.filter(p => p.id !== plantId);
     if (!updated.some(p => p.isActiveScope)) {
       updated[0].isActiveScope = true;
       setActiveScopeId(updated[0].id);
     }
-    savePlantsList(updated);
+    
+    try {
+      await savePlantsList(updated);
+    } catch (err) {
+      console.error('Error deleting plant', err);
+    }
   };
 
   return (
@@ -242,8 +267,19 @@ export const PlantsManagementPage: React.FC = () => {
         <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 flex items-start space-x-3 shadow-xs animate-in fade-in slide-in-from-top-2 duration-300">
           <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
           <div className="flex-1">
-            <h5 className="font-semibold text-emerald-900">Plant Registered Successfully</h5>
+            <h5 className="font-semibold text-emerald-900 font-mono uppercase">Plant Registered Successfully</h5>
             <p className="mt-0.5 text-emerald-700 leading-relaxed">{successMessage}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Error Banner */}
+      {errorMessage && (
+        <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 flex items-start space-x-3 shadow-xs animate-in fade-in slide-in-from-top-2 duration-300">
+          <AlertCircle className="h-5 w-5 text-rose-600 shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <h5 className="font-semibold text-rose-900 font-mono uppercase">Operations Alert</h5>
+            <p className="mt-0.5 text-rose-700 leading-relaxed">{errorMessage}</p>
           </div>
         </div>
       )}

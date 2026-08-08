@@ -57,7 +57,6 @@ export const usePlants = (tenantId: string | undefined) => {
         if (cached) {
           setPlants(JSON.parse(cached));
         } else {
-          // Seed two beautiful plants
           const initialPlants: Plant[] = [
             {
               id: 'plant-pune',
@@ -96,7 +95,6 @@ export const usePlants = (tenantId: string | undefined) => {
         });
 
         if (list.length === 0) {
-          // Auto-seed default plants in Firestore
           try {
             const batch = writeBatch(db);
             const initialPlants: Plant[] = [
@@ -139,7 +137,6 @@ export const usePlants = (tenantId: string | undefined) => {
           }
         }
 
-        // Sort by name
         list.sort((a, b) => a.name.localeCompare(b.name));
         setPlants(list);
         setLoading(false);
@@ -158,22 +155,25 @@ export const usePlants = (tenantId: string | undefined) => {
       throw new Error('Only administrator profile owners can establish new plants.');
     }
 
+    const trimmedName = name.trim();
+    const nameExists = plants.some(p => p.name.toLowerCase().trim() === trimmedName.toLowerCase());
+    
+    if (nameExists) {
+      throw new Error('Failed to register the plant. Check if a similar name exists.');
+    }
+
     const isSandbox = localStorage.getItem('isSandboxMode') === 'true' || !db;
-    const plantId = 'plant-' + name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '_');
+    const plantId = 'plant-' + trimmedName.toLowerCase().replace(/[^a-z0-9]+/g, '_');
 
     const newPlant: Plant = {
       id: plantId,
       tenantId,
-      name: name.trim(),
+      name: trimmedName,
       location: location.trim(),
       gstin: gstin.trim(),
       processStages: stages.map((s, idx) => ({ ...s, order: idx })),
       createdAt: new Date().toISOString()
     };
-
-    if (plants.some(p => p.id === plantId)) {
-      throw new Error('A plant with an identical code or name already operates under this company.');
-    }
 
     if (isSandbox) {
       const updated = [...plants, newPlant];
@@ -191,9 +191,14 @@ export const usePlants = (tenantId: string | undefined) => {
           processStages: newPlant.processStages,
           createdAt: newPlant.createdAt
         });
+        
+        // Only update local state if DB operation succeeds
+        const updated = [...plants, newPlant];
+        setPlants(updated);
+        
         return true;
       } catch (err: any) {
-        handleFirestoreError(err, OperationType.WRITE, `tenants/${tenantId}/plants/${plantId}`);
+        handleFirestoreError(err, OperationType.CREATE, `tenants/${tenantId}/plants/${plantId}`);
         return false;
       }
     }
@@ -221,9 +226,14 @@ export const usePlants = (tenantId: string | undefined) => {
       try {
         const docRef = doc(db, 'tenants', tenantId, 'plants', plantId);
         await setDoc(docRef, updates, { merge: true });
+        
+        // Update local state after successful DB write
+        const updated = plants.map(p => p.id === plantId ? { ...p, ...updates } : p);
+        setPlants(updated);
+        
         return true;
       } catch (err: any) {
-        handleFirestoreError(err, OperationType.WRITE, `tenants/${tenantId}/plants/${plantId}`);
+        handleFirestoreError(err, OperationType.UPDATE, `tenants/${tenantId}/plants/${plantId}`);
         return false;
       }
     }
@@ -246,9 +256,14 @@ export const usePlants = (tenantId: string | undefined) => {
       try {
         const docRef = doc(db, 'tenants', tenantId, 'plants', plantId);
         await deleteDoc(docRef);
+        
+        // Update local state after successful DB write
+        const updated = plants.filter(p => p.id !== plantId);
+        setPlants(updated);
+        
         return true;
       } catch (err: any) {
-        handleFirestoreError(err, OperationType.WRITE, `tenants/${tenantId}/plants/${plantId}`);
+        handleFirestoreError(err, OperationType.DELETE, `tenants/${tenantId}/plants/${plantId}`);
         return false;
       }
     }
