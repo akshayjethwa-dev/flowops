@@ -46,6 +46,11 @@ export interface Tenant {
   isActive?: boolean; // soft lockout
 }
 
+// ═════════════════════════════════════════════════════════════
+// STEP 2 CHANGE #1 + #2 — UserProfile
+//   • assignedPlantIds  → required (was optional)
+//   • defaultPlantId    → new required field
+// ═════════════════════════════════════════════════════════════
 export interface UserProfile {
   uid: string;
   email: string;
@@ -56,7 +61,13 @@ export interface UserProfile {
   createdAt: any;
   isSuperAdmin?: boolean;
   plantId?: string;
-  assignedPlantIds?: string[]; // Scoped Plant assignments
+
+  /** Plants this user may access. Empty array = all plants in the tenant. */
+  assignedPlantIds: string[];
+
+  /** Plant the user lands on after sign-in. Must be in assignedPlantIds (if non-empty). */
+  defaultPlantId: string;
+
   assignedStageIds?: string[]; // Scoped Process Stage assignments
   customClaims?: CustomClaims;
 }
@@ -478,6 +489,7 @@ export interface ActivityEvent {
   action?: string;
   entityLabel?: string;
 }
+
 export interface Attachment {
   id: string;
   fileName: string;
@@ -741,6 +753,11 @@ export interface AppNotification {
   createdAt: any;
 }
 
+/**
+ * @deprecated Use `PlantExtended` (re-exported below and defined in ./types/plant).
+ *             The two types overlap but `PlantExtended` adds `timezone` and
+ *             `shiftPatterns`. Kept for backward compatibility with existing code.
+ */
 export interface Plant {
   id: string;
   tenantId: string;
@@ -750,3 +767,15 @@ export interface Plant {
   processStages: ProductionStageConfig[];
   createdAt: string;
 }
+
+// ═════════════════════════════════════════════════════════════
+// STEP 2 CHANGE #3 — Re-exports from ./types/plant
+//   Lets AuthContext (and any future code) import PlantExtended,
+//   WorkCenter, ShiftPattern, and Organization from a single place.
+// ═════════════════════════════════════════════════════════════
+export type {
+  PlantExtended,
+  WorkCenter,
+  ShiftPattern,
+  Organization,
+} from './types/plant';

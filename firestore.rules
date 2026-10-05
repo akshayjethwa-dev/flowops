@@ -1,15 +1,19 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // ─────────────────────────────────────────────────────────
     // Global default-deny safety net
+    // ─────────────────────────────────────────────────────────
     match /{document=**} {
       allow read, write: if false;
     }
 
-    // --- Helper Primitives & Auth ---
+    // ═════════════════════════════════════════════════════════
+    // Helper primitives
+    // ═════════════════════════════════════════════════════════
     function isSignedIn() {
-      // Relaxed requirement: Allows test accounts without verified emails to perform operations
       return request.auth != null;
     }
 
@@ -25,7 +29,6 @@ service cloud.firestore {
       return resource.data;
     }
 
-    // Helper to fetch user profiles safely (prevents null reference errors during onboarding)
     function getUser() {
       let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
       return userDoc != null ? userDoc.data : {};
@@ -51,20 +54,56 @@ service cloud.firestore {
     }
 
     function isTenantMember(tenantId) {
-      // Safely checks custom claims, falls back to DB, AND explicitly allows Sandbox/Demo tenants
       return isSignedIn() && (
-        tenantId == 'default_tenant' || 
+        tenantId == 'default_tenant' ||
         tenantId == 'demo' ||
-        request.auth.token.get('tenantId', null) == tenantId || 
+        request.auth.token.get('tenantId', null) == tenantId ||
         getUserTenantId() == tenantId
       );
     }
 
-    // --- Entity Specific Validation Helpers ---
+    // ═════════════════════════════════════════════════════════
+    // NEW — Plant scoping helpers
+    // ═════════════════════════════════════════════════════════
+    function assignedPlantIds() {
+      let userData = getUser();
+      return userData.keys().hasAny(['assignedPlantIds']) ? userData.assignedPlantIds : [];
+    }
+
+    function isUnrestrictedPlantUser() {
+      return assignedPlantIds().size() == 0;
+    }
+
+    /**
+     * canAccessPlant — returns true when the caller may see data for the given plant.
+     *
+     * Rules:
+     *   • Must be a member of the tenant
+     *   • If assignedPlantIds is empty/missing → unrestricted (all plants)
+     *   • If assignedPlantIds is non-empty → plantId must be in the list
+     */
+    function canAccessPlant(tenantId, plantId) {
+      return isTenantMember(tenantId) && (
+        isUnrestrictedPlantUser() ||
+        plantId in assignedPlantIds()
+      );
+    }
+
+    /**
+     * plantScopedWrite — can the caller WRITE to this plant's data?
+     * Requires both role authorization AND plant access.
+     */
+    function plantScopedWrite(tenantId, plantId, roles) {
+      return canAccessPlant(tenantId, plantId) && getUserRole() in roles;
+    }
+
+    // ═════════════════════════════════════════════════════════
+    // Entity-specific validation helpers
+    // ═════════════════════════════════════════════════════════
     function isValidTenant(data) {
-      return data.keys().hasAll(['id', 'companyName']) 
-        && data.keys().size() >= 2 
-        && data.companyName is string 
+      return data.keys().hasAll(['id', 'companyName'])
+        && data.keys().size() >= 2
+        && data.companyName is string
         && data.companyName.size() <= 150;
     }
 
@@ -78,6 +117,58 @@ service cloud.firestore {
         && data.role in ['admin', 'manager', 'operator', 'quality_inspector', 'store_keeper', 'viewer', 'sales', 'production', 'dispatch', 'management'];
     }
 
+    // ── NEW — plant validation ────────────────────────────────
+    function isValidPlant(data) {
+      return data.keys().hasAll(['tenantId', 'name', 'location'])
+        && data.tenantId is string
+        && data.name is string && data.name.size() <= 150
+        && data.location is string && data.location.size() <= 300;
+    }
+
+    function isValidWorkCenter(data) {
+      return data.keys().hasAll(['tenantId', 'plantId', 'name', 'code', 'type'])
+        && data.tenantId is string
+        && data.plantId is string
+        && data.name is string && data.name.size() <= 150
+        && data.code is string && data.code.size() <= 50
+        && data.type in ['machine', 'assembly', 'inspection', 'storage']
+        && data.status in ['active', 'maintenance', 'idle'];
+    }
+
+    function isValidRawMaterial(data) {
+      return data.keys().hasAll(['tenantId', 'name', 'code', 'category'])
+        && data.tenantId is string
+        && data.name is string && data.name.size() <= 200
+        && data.code is string && data.code.size() <= 50
+        && data.category in ['raw_material', 'finished_goods', 'consumable', 'spare'];
+    }
+
+    function isValidWorkOrder(data) {
+      return data.keys().hasAll(['tenantId', 'orderNumber', 'partName', 'quantity', 'priority', 'status', 'operations'])
+        && data.tenantId is string
+        && data.orderNumber is string && data.orderNumber.size() <= 50
+        && data.partName is string && data.partName.size() <= 200
+        && data.quantity is number && data.quantity >= 0
+        && data.priority in ['low', 'medium', 'high', 'urgent']
+        && data.status in ['pending', 'ready', 'in_progress', 'paused', 'completed', 'cancelled']
+        && data.operations is list;
+    }
+
+    function isValidLot(data) {
+      return data.keys().hasAll(['tenantId', 'lotNumber', 'materialCode'])
+        && data.tenantId is string
+        && data.lotNumber is string && data.lotNumber.size() <= 80
+        && data.materialCode is string;
+    }
+
+    function isValidQualityRecord(data) {
+      return data.keys().hasAll(['tenantId', 'workOrderId', 'result'])
+        && data.tenantId is string
+        && data.workOrderId is string
+        && data.result in ['pass', 'fail', 'rework', 'pending'];
+    }
+
+    // ── Existing entity validators (unchanged) ────────────────
     function isValidRFQ(data) {
       return data.keys().hasAll(['id', 'tenantId', 'customerName', 'status', 'createdAt', 'createdBy'])
         && data.id is string
@@ -232,13 +323,136 @@ service cloud.firestore {
         && data.createdAt == request.time;
     }
 
-    // --- Match Rules for Collections ---
+    // ═════════════════════════════════════════════════════════
+    // Collection match rules
+    // ═════════════════════════════════════════════════════════
 
     // 1. Tenants Collection
     match /tenants/{tenantId} {
       allow read, write: if request.auth != null;
 
-      // Subcollections under tenants
+      // ═══════════════════════════════════════════════════════
+      // NEW — Plants subcollection (US-1.2)
+      // ═══════════════════════════════════════════════════════
+      match /plants/{plantId} {
+        // READ — any tenant member with access to this specific plant
+        allow read: if canAccessPlant(tenantId, plantId);
+
+        // CREATE — admin/management only, plant validation enforced
+        allow create: if isTenantMember(tenantId)
+          && getUserRole() in ['admin', 'management']
+          && isValidId(plantId)
+          && isValidPlant(incoming())
+          && incoming().tenantId == tenantId;
+
+        // UPDATE — admin/management, and the plantId can't be smuggled to another tenant
+        allow update: if isTenantMember(tenantId)
+          && getUserRole() in ['admin', 'management']
+          && isValidPlant(incoming())
+          && incoming().tenantId == tenantId
+          && existing().tenantId == tenantId;
+
+        // DELETE — admin only (higher privilege than update)
+        allow delete: if isTenantMember(tenantId)
+          && getUserRole() == 'admin';
+
+        // ── Work Centers subcollection ─────────────────────
+        match /workCenters/{workCenterId} {
+          allow read: if canAccessPlant(tenantId, plantId);
+
+          allow create: if plantScopedWrite(tenantId, plantId, ['admin', 'management', 'production'])
+            && isValidId(workCenterId)
+            && isValidWorkCenter(incoming())
+            && incoming().tenantId == tenantId
+            && incoming().plantId == plantId;
+
+          allow update: if plantScopedWrite(tenantId, plantId, ['admin', 'management', 'production'])
+            && isValidWorkCenter(incoming())
+            && incoming().tenantId == tenantId
+            && incoming().plantId == plantId;
+
+          allow delete: if canAccessPlant(tenantId, plantId)
+            && getUserRole() == 'admin';
+        }
+
+        // ── Storage Locations subcollection ────────────────
+        match /locations/{locationId} {
+          allow read: if canAccessPlant(tenantId, plantId);
+
+          allow create, update: if plantScopedWrite(tenantId, plantId, ['admin', 'management', 'store_keeper'])
+            && isValidId(locationId);
+
+          allow delete: if canAccessPlant(tenantId, plantId)
+            && getUserRole() == 'admin';
+        }
+      }
+
+      // ═══════════════════════════════════════════════════════
+      // NEW — Raw Materials subcollection
+      // ═══════════════════════════════════════════════════════
+      match /rawMaterials/{materialId} {
+        allow read: if isTenantMember(tenantId);
+
+        allow create: if isTenantMember(tenantId)
+          && getUserRole() in ['admin', 'management', 'store_keeper', 'production']
+          && isValidId(materialId)
+          && isValidRawMaterial(incoming())
+          && incoming().tenantId == tenantId;
+
+        allow update: if isTenantMember(tenantId)
+          && getUserRole() in ['admin', 'management', 'store_keeper', 'production']
+          && isValidRawMaterial(incoming())
+          && incoming().tenantId == tenantId;
+
+        allow delete: if isTenantMember(tenantId)
+          && getUserRole() == 'admin';
+      }
+
+      // ═══════════════════════════════════════════════════════
+      // NEW — Lots / Batch traceability
+      // ═══════════════════════════════════════════════════════
+      match /lots/{lotId} {
+        allow read: if isTenantMember(tenantId);
+        allow create, update: if isTenantMember(tenantId)
+          && getUserRole() in ['admin', 'management', 'store_keeper', 'production', 'quality']
+          && isValidLot(incoming())
+          && incoming().tenantId == tenantId;
+        allow delete: if isTenantMember(tenantId) && getUserRole() == 'admin';
+      }
+
+      // ═══════════════════════════════════════════════════════
+      // NEW — Work Orders (used by Step 4.4 ProductionPage)
+      // ═══════════════════════════════════════════════════════
+      match /workOrders/{workOrderId} {
+        allow read: if isTenantMember(tenantId);
+
+        allow create: if isTenantMember(tenantId)
+          && getUserRole() in ['admin', 'management', 'production']
+          && isValidId(workOrderId)
+          && isValidWorkOrder(incoming())
+          && incoming().tenantId == tenantId;
+
+        allow update: if isTenantMember(tenantId)
+          && getUserRole() in ['admin', 'management', 'production']
+          && isValidWorkOrder(incoming())
+          && incoming().tenantId == tenantId;
+
+        allow delete: if isTenantMember(tenantId) && getUserRole() == 'admin';
+      }
+
+      // ═══════════════════════════════════════════════════════
+      // NEW — Quality Records
+      // ═══════════════════════════════════════════════════════
+      match /qualityRecords/{qrId} {
+        allow read: if isTenantMember(tenantId);
+        allow create, update: if isTenantMember(tenantId)
+          && getUserRole() in ['admin', 'management', 'quality', 'production']
+          && isValidQualityRecord(incoming())
+          && incoming().tenantId == tenantId;
+        allow delete: if isTenantMember(tenantId) && getUserRole() == 'admin';
+      }
+
+      // ── Existing subcollections (preserved) ────────────────
       match /productionStages/{stageId} {
         allow read, write: if request.auth != null;
       }
@@ -301,13 +515,14 @@ service cloud.firestore {
       }
     }
 
+    // ── Root-level login audit (unchanged) ─────────────────────
     match /loginAuditLogs/{logId} {
       allow read: if isSignedIn() && (getUserRole() in ['admin', 'manager', 'management'] || isSuperAdmin());
       allow create: if isSignedIn();
       allow update, delete: if false;
     }
 
-    // 2. Users Collection
+    // 2. Users Collection (unchanged)
     match /users/{userId} {
       allow get: if request.auth != null && (request.auth.uid == userId || (resource != null && resource.data.tenantId == getUserTenantId()));
       allow list: if isSignedIn() && resource.data.tenantId == getUserTenantId();
@@ -319,62 +534,62 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // 3. RFQs Collection
+    // 3. RFQs Collection (unchanged)
     match /rfqs/{rfqId} {
       allow get: if isTenantMember(resource.data.tenantId);
       allow list: if isSignedIn() && resource.data.tenantId == getUserTenantId();
       allow create: if isSignedIn() && isValidId(rfqId) && isTenantMember(incoming().tenantId) && getUserRole() in ['admin', 'sales', 'management'] && isValidRFQ(incoming());
-      allow update: if isSignedIn() && isValidId(rfqId) && isTenantMember(existing().tenantId) && getUserRole() in ['admin', 'sales', 'management'] && isValidRFQ(incoming()) 
+      allow update: if isSignedIn() && isValidId(rfqId) && isTenantMember(existing().tenantId) && getUserRole() in ['admin', 'sales', 'management'] && isValidRFQ(incoming())
         && incoming().tenantId == existing().tenantId;
       allow delete: if false;
     }
 
-    // 4. Quotes Collection
+    // 4. Quotes Collection (unchanged)
     match /quotes/{quoteId} {
       allow get: if isTenantMember(resource.data.tenantId);
       allow list: if isSignedIn() && resource.data.tenantId == getUserTenantId();
-      allow create: if isSignedIn() && isValidId(quoteId) && isTenantMember(incoming().tenantId) && getUserRole() in ['admin', 'sales', 'management'] 
+      allow create: if isSignedIn() && isValidId(quoteId) && isTenantMember(incoming().tenantId) && getUserRole() in ['admin', 'sales', 'management']
         && exists(/databases/$(database)/documents/rfqs/$(incoming().rfqId)) && isValidQuote(incoming());
-      allow update: if isSignedIn() && isValidId(quoteId) && isTenantMember(existing().tenantId) && getUserRole() in ['admin', 'sales', 'management'] 
+      allow update: if isSignedIn() && isValidId(quoteId) && isTenantMember(existing().tenantId) && getUserRole() in ['admin', 'sales', 'management']
         && isValidQuote(incoming()) && incoming().tenantId == existing().tenantId && incoming().rfqId == existing().rfqId;
       allow delete: if false;
     }
 
-    // 5. Orders Collection
+    // 5. Orders Collection (unchanged)
     match /orders/{orderId} {
       allow get: if isTenantMember(resource.data.tenantId);
       allow list: if isSignedIn() && resource.data.tenantId == getUserTenantId();
-      allow create: if isSignedIn() && isValidId(orderId) && isTenantMember(incoming().tenantId) && getUserRole() in ['admin', 'sales', 'management'] 
+      allow create: if isSignedIn() && isValidId(orderId) && isTenantMember(incoming().tenantId) && getUserRole() in ['admin', 'sales', 'management']
         && exists(/databases/$(database)/documents/quotes/$(incoming().quoteId)) && isValidOrder(incoming());
-      allow update: if isSignedIn() && isValidId(orderId) && isTenantMember(existing().tenantId) 
+      allow update: if isSignedIn() && isValidId(orderId) && isTenantMember(existing().tenantId)
         && (getUserRole() in ['admin', 'sales', 'management'] || (getUserRole() == 'production' && incoming().diff(existing()).affectedKeys().hasOnly(['status'])))
         && isValidOrder(incoming()) && incoming().tenantId == existing().tenantId && incoming().quoteId == existing().quoteId;
       allow delete: if false;
     }
 
-    // 6. ProductionJobs Collection
+    // 6. ProductionJobs Collection (unchanged)
     match /productionJobs/{jobId} {
       allow get: if isTenantMember(resource.data.tenantId);
       allow list: if isSignedIn() && resource.data.tenantId == getUserTenantId();
-      allow create: if isSignedIn() && isValidId(jobId) && isTenantMember(incoming().tenantId) && getUserRole() in ['admin', 'sales', 'production', 'management'] 
+      allow create: if isSignedIn() && isValidId(jobId) && isTenantMember(incoming().tenantId) && getUserRole() in ['admin', 'sales', 'production', 'management']
         && exists(/databases/$(database)/documents/orders/$(incoming().orderId)) && isValidProductionJob(incoming());
-      allow update: if isSignedIn() && isValidId(jobId) && isTenantMember(existing().tenantId) && getUserRole() in ['admin', 'production', 'management'] 
+      allow update: if isSignedIn() && isValidId(jobId) && isTenantMember(existing().tenantId) && getUserRole() in ['admin', 'production', 'management']
         && isValidProductionJob(incoming()) && incoming().tenantId == existing().tenantId && incoming().orderId == existing().orderId;
       allow delete: if false;
     }
 
-    // 7. Dispatches Collection
+    // 7. Dispatches Collection (unchanged)
     match /dispatches/{dispatchId} {
       allow get: if isTenantMember(resource.data.tenantId);
       allow list: if isSignedIn() && resource.data.tenantId == getUserTenantId();
-      allow create: if isSignedIn() && isValidId(dispatchId) && isTenantMember(incoming().tenantId) && getUserRole() in ['admin', 'dispatch', 'management'] 
+      allow create: if isSignedIn() && isValidId(dispatchId) && isTenantMember(incoming().tenantId) && getUserRole() in ['admin', 'dispatch', 'management']
         && exists(/databases/$(database)/documents/orders/$(incoming().orderId)) && isValidDispatch(incoming());
-      allow update: if isSignedIn() && isValidId(dispatchId) && isTenantMember(existing().tenantId) && getUserRole() in ['admin', 'dispatch', 'management'] 
+      allow update: if isSignedIn() && isValidId(dispatchId) && isTenantMember(existing().tenantId) && getUserRole() in ['admin', 'dispatch', 'management']
         && isValidDispatch(incoming()) && incoming().tenantId == existing().tenantId && incoming().orderId == existing().orderId;
       allow delete: if false;
     }
 
-    // 8. WhatsAppLogs Collection
+    // 8. WhatsAppLogs Collection (unchanged)
     match /whatsappLogs/{logId} {
       allow get: if isTenantMember(resource.data.tenantId);
       allow list: if isSignedIn() && resource.data.tenantId == getUserTenantId();
@@ -383,30 +598,30 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // 9. Invoices & Payments Collection
+    // 9. Invoices & Payments (unchanged)
     match /invoices/{invoiceId} {
       allow get: if isTenantMember(resource.data.tenantId);
       allow list: if isSignedIn() && resource.data.tenantId == getUserTenantId();
       allow create: if isSignedIn() && isValidId(invoiceId) && isTenantMember(incoming().tenantId) && getUserRole() in ['admin', 'sales', 'management'] && isValidInvoice(incoming());
-      allow update: if isSignedIn() && isValidId(invoiceId) && isTenantMember(existing().tenantId) && getUserRole() in ['admin', 'sales', 'management'] 
+      allow update: if isSignedIn() && isValidId(invoiceId) && isTenantMember(existing().tenantId) && getUserRole() in ['admin', 'sales', 'management']
         && incoming().tenantId == existing().tenantId && incoming().orderId == existing().orderId && incoming().createdBy == existing().createdBy;
       allow delete: if false;
 
       match /payments/{paymentId} {
         allow read: if isTenantMember(get(/databases/$(database)/documents/invoices/$(invoiceId)).data.tenantId);
-        allow create: if isSignedIn() && isValidId(paymentId) && isTenantMember(get(/databases/$(database)/documents/invoices/$(invoiceId)).data.tenantId) 
+        allow create: if isSignedIn() && isValidId(paymentId) && isTenantMember(get(/databases/$(database)/documents/invoices/$(invoiceId)).data.tenantId)
           && getUserRole() in ['admin', 'sales', 'management'] && isValidInvoicePayment(incoming());
         allow update, delete: if false;
       }
     }
 
-    // 10. Stock Alerts Collection
+    // 10. Stock Alerts (unchanged)
     match /stockAlerts/{alertId} {
       allow read: if isSignedIn() && isTenantMember(resource.data.tenantId);
       allow write: if isSignedIn() && isTenantMember(incoming().tenantId);
     }
 
-    // 11. Notifications Collection
+    // 11. Notifications (unchanged)
     match /notifications/{notificationId} {
       allow read: if isSignedIn() && isTenantMember(resource.data.tenantId) && (resource.data.userId == request.auth.uid || resource.data.userId == 'all');
       allow create: if isSignedIn() && isValidId(notificationId) && isTenantMember(incoming().tenantId) && isValidNotification(incoming());
@@ -414,19 +629,19 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // 12. Invites Collection
+    // 12. Invites (unchanged)
     match /invites/{inviteId} {
-       allow read: if request.auth != null && resource.data.email == request.auth.token.email;
-       allow list: if request.auth != null && request.query.limit <= 1; 
-       allow create: if isSignedIn() && isTenantMember(incoming().tenantId) && getUserRole() == 'admin' 
-                     && incoming().keys().hasAll(['email', 'name', 'role', 'tenantId', 'status', 'invitedBy', 'createdAt']);
-       allow update: if request.auth != null && existing().email == request.auth.token.email 
-                     && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'acceptedAt', 'acceptedByUid'])
-                     && incoming().status == 'accepted';
-       allow delete: if false;
+      allow read: if request.auth != null && resource.data.email == request.auth.token.email;
+      allow list: if request.auth != null && request.query.limit <= 1;
+      allow create: if isSignedIn() && isTenantMember(incoming().tenantId) && getUserRole() == 'admin'
+        && incoming().keys().hasAll(['email', 'name', 'role', 'tenantId', 'status', 'invitedBy', 'createdAt']);
+      allow update: if request.auth != null && existing().email == request.auth.token.email
+        && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'acceptedAt', 'acceptedByUid'])
+        && incoming().status == 'accepted';
+      allow delete: if false;
     }
-    
-    // 13. Activity Logs Collection (Root Level Audit Trail)
+
+    // 13. Activity Logs (unchanged)
     match /activityLog/{logId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn() && isValidActivityLog(incoming());

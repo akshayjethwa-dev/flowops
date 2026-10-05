@@ -1,14 +1,11 @@
-node_modules/
-build/
-dist/
-coverage/
-.DS_Store
-*.log
-.env*
-!.env.example
-<<<<<<< HEAD
+# Environment files — never commit real secrets
+.env.local
+.env*.local
+.env.development.local
+.env.test.local
+.env.production.local
 
-/src/generated/prisma
-=======
+# But DO commit the template
+!.env.example
+
 .env
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
