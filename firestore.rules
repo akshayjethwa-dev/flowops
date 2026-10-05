@@ -1,0 +1,401 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helper Primitives & Auth ---
+    function isSignedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Helper to fetch user profiles
+    function getUser() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function getUserTenantId() {
+      return getUser().tenantId;
+    }
+
+    function getUserRole() {
+      return getUser().role;
+    }
+
+    function isSuperAdmin() {
+      return isSignedIn() && getUser().get('isSuperAdmin', false) == true;
+    }
+
+    function isTenantMember(tenantId) {
+      return isSignedIn() && getUserTenantId() == tenantId;
+    }
+
+    // --- Entity Specific Validation Helpers ---
+    function isValidTenant(data) {
+      return data.keys().hasAll(['id', 'companyName']) 
+        && data.keys().size() >= 2 
+        && data.companyName is string 
+        && data.companyName.size() <= 150;
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'email', 'name', 'tenantId', 'role'])
+        && data.uid == request.auth.uid
+        && data.email is string
+        && data.name is string
+        && data.name.size() <= 150
+        && data.tenantId is string
+        && data.role in ['admin', 'sales', 'production', 'dispatch', 'management'];
+    }
+
+    function isValidRFQ(data) {
+      return data.keys().hasAll(['id', 'tenantId', 'customerName', 'status', 'createdAt', 'createdBy'])
+        && data.id is string
+        && data.tenantId is string
+        && data.customerName is string
+        && data.customerName.size() <= 200
+        && data.status in ['pending', 'quoted', 'declined']
+        && data.createdBy == request.auth.uid
+        && data.createdAt == request.time;
+    }
+
+    function isValidQuote(data) {
+      return data.keys().hasAll(['id', 'tenantId', 'rfqId', 'quoteNumber', 'customerName', 'status', 'total', 'createdAt', 'createdBy'])
+        && data.id is string
+        && data.tenantId is string
+        && data.rfqId is string
+        && data.quoteNumber is string
+        && data.customerName is string
+        && data.customerName.size() <= 200
+        && data.status in ['draft', 'sent', 'approved', 'rejected']
+        && data.total is number
+        && data.createdBy == request.auth.uid
+        && data.createdAt == request.time;
+    }
+
+    function isValidOrder(data) {
+      return data.keys().hasAll(['id', 'tenantId', 'orderNumber', 'customerName', 'status', 'totalAmount', 'createdAt', 'createdBy'])
+        && data.id is string
+        && data.tenantId is string
+        && data.orderNumber is string
+        && data.customerName is string
+        && data.customerName.size() <= 200
+        && data.status in ['pending', 'in-production', 'produced', 'dispatched', 'completed', 'cancelled']
+        && data.totalAmount is number
+        && data.createdBy == request.auth.uid
+        && data.createdAt == request.time;
+    }
+
+    function isValidProductionJob(data) {
+      return data.keys().hasAll(['id', 'tenantId', 'orderId', 'itemName', 'quantity', 'currentStage', 'updatedAt', 'updatedBy'])
+        && data.id is string
+        && data.tenantId is string
+        && data.orderId is string
+        && data.itemName is string
+        && data.itemName.size() <= 200
+        && data.quantity is number
+        && data.currentStage in ['cutting', 'welding', 'machining', 'assembly', 'quality_check', 'ready']
+        && data.updatedBy == request.auth.uid
+        && data.updatedAt == request.time;
+    }
+
+    function isValidDispatch(data) {
+      return data.keys().hasAll(['id', 'tenantId', 'orderId', 'invoiceNumber', 'status', 'dispatchedAt'])
+        && data.id is string
+        && data.tenantId is string
+        && data.orderId is string
+        && data.invoiceNumber is string
+        && data.status in ['shipped', 'delivered']
+        && data.dispatchedAt == request.time;
+    }
+
+    function isValidWhatsAppLog(data) {
+      return data.keys().hasAll(['id', 'tenantId', 'recipientPhone', 'message', 'status', 'sentAt'])
+        && data.id is string
+        && data.tenantId is string
+        && data.recipientPhone is string
+        && data.recipientPhone.size() <= 20
+        && data.message is string
+        && data.status in ['sent', 'failed', 'pending']
+        && data.sentAt == request.time;
+    }
+
+    function isValidProductionStage(data) {
+      return data.keys().hasAll(['name', 'color', 'isFinalStage', 'order'])
+        && data.keys().size() == 4
+        && data.name is string && data.name.size() <= 150
+        && data.color is string && data.color.size() <= 50
+        && data.isFinalStage is bool
+        && data.order is number;
+    }
+
+    function isValidWhatsappConfig(data) {
+      return data.keys().hasAll(['bspType', 'apiKey', 'senderPhoneNumber', 'status'])
+        && data.keys().size() == 4
+        && data.bspType is string && data.bspType.size() <= 50
+        && data.apiKey is string && data.apiKey.size() <= 200
+        && data.senderPhoneNumber is string && data.senderPhoneNumber.size() <= 30
+        && data.status is string && data.status.size() <= 30;
+    }
+
+    function isValidTenantUser(data) {
+      return data.keys().hasAll(['name', 'email', 'role', 'status'])
+        && data.name is string && data.name.size() <= 150
+        && data.email is string && data.email.size() <= 200
+        && data.role is string && data.role.size() <= 50
+        && data.status is string && data.status.size() <= 30;
+    }
+
+    function isValidActivityLog(data) {
+      return data.keys().hasAll(['id', 'actionType', 'entityType', 'entityId', 'tenantId', 'actor', 'timestamp', 'description'])
+        && data.id is string
+        && data.actionType is string
+        && data.entityType is string
+        && data.entityId is string
+        && data.tenantId is string
+        && data.actor is map
+        && data.actor.userId == request.auth.uid
+        && data.timestamp is string
+        && data.description is string;
+    }
+
+    function isValidInvoice(data) {
+      return data.keys().hasAll(['id', 'invoiceNumber', 'tenantId', 'orderId', 'orderNumber', 'customerId', 'customerName', 'total', 'totalPaid', 'outstanding', 'status', 'createdByName', 'createdBy', 'createdAt'])
+        && data.id is string
+        && data.invoiceNumber is string
+        && data.tenantId is string
+        && data.orderId is string
+        && data.orderNumber is string
+        && data.customerId is string
+        && data.customerName is string
+        && data.total is number
+        && data.totalPaid is number
+        && data.outstanding is number
+        && data.status in ['draft', 'sent', 'partial', 'paid', 'overdue']
+        && data.createdBy == request.auth.uid
+        && data.createdAt == request.time;
+    }
+
+    function isValidInvoicePayment(data) {
+      return data.keys().hasAll(['id', 'invoiceId', 'amount', 'date', 'paymentMode', 'recordedBy', 'recordedByName'])
+        && data.id is string
+        && data.invoiceId is string
+        && data.amount is number
+        && data.paymentMode in ['cash', 'bank_transfer', 'cheque', 'upi', 'other']
+        && data.recordedBy == request.auth.uid;
+    }
+
+    function isValidNotification(data) {
+      return data.keys().hasAll(['id', 'tenantId', 'userId', 'type', 'title', 'message', 'entityId', 'entityType', 'link', 'read', 'createdAt'])
+        && data.id is string
+        && data.tenantId is string
+        && data.userId is string
+        && data.type in ['payment_overdue', 'low_stock', 'order_delayed', 'new_rfq', 'dispatch_sent', 'stage_changed', 'reminder_sent']
+        && data.title is string
+        && data.title.size() <= 200
+        && data.message is string
+        && data.message.size() <= 1000
+        && data.entityId is string
+        && data.entityType in ['payment', 'order', 'rfq', 'inventory']
+        && data.link is string
+        && data.read is bool
+        && data.createdAt == request.time;
+    }
+
+    // --- Match Rules for Collections ---
+
+    // 1. Tenants Collection
+    match /tenants/{tenantId} {
+      allow read, write: if isSuperAdmin();
+      allow get: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(tenantId) && isValidTenant(incoming());
+      allow update: if isSignedIn() && isValidId(tenantId) && isTenantMember(tenantId) && getUserRole() == 'admin' && isValidTenant(incoming());
+      allow delete: if false;
+
+      // Subcollections under tenants
+      match /productionStages/{stageId} {
+        allow read: if isTenantMember(tenantId);
+        allow write: if isTenantMember(tenantId) && getUserRole() == 'admin' && isValidProductionStage(incoming());
+      }
+
+      match /config/{configId} {
+        allow read: if isTenantMember(tenantId);
+        allow write: if isTenantMember(tenantId) && (getUserRole() == 'admin' || getUserRole() == 'sales') && (
+          configId == 'whatsapp' ? isValidWhatsappConfig(incoming()) : true
+        );
+      }
+
+      match /users/{userId} {
+        allow read: if isTenantMember(tenantId);
+        allow write: if isTenantMember(tenantId) && getUserRole() == 'admin' && isValidTenantUser(incoming());
+      }
+
+      match /customers/{customerId} {
+        allow read, write: if isTenantMember(tenantId);
+
+        match /communicationLog/{logId} {
+          allow read, write: if isTenantMember(tenantId);
+        }
+      }
+
+      match /whatsappConversations/{conversationId} {
+        allow read, write: if isTenantMember(tenantId);
+
+        match /messages/{messageId} {
+          allow read, write: if isTenantMember(tenantId);
+        }
+      }
+
+      match /whatsappTemplates/{templateId} {
+        allow read: if isTenantMember(tenantId);
+        allow write: if isTenantMember(tenantId) && (getUserRole() == 'admin' || getUserRole() == 'sales');
+      }
+
+      match /activity/{activityId} {
+        allow read: if isTenantMember(tenantId);
+        allow create: if isTenantMember(tenantId) && isValidId(activityId) && isValidActivityLog(incoming());
+        allow update, delete: if false;
+      }
+
+      match /stockItems/{itemId} {
+        allow read: if isTenantMember(tenantId);
+        allow write: if isTenantMember(tenantId);
+
+        match /ledger/{ledgerId} {
+          allow read: if isTenantMember(tenantId);
+          allow create: if isTenantMember(tenantId);
+          allow update, delete: if false;
+        }
+      }
+
+      match /serviceTickets/{ticketId} {
+        allow read, write: if isTenantMember(tenantId);
+      }
+    }
+
+    // 2. Users Collection
+    match /users/{userId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn() && resource.data.tenantId == getUserTenantId();
+      // Allow a user to create their own first profile registration
+      allow create: if request.auth != null && request.auth.uid == userId && isValidUser(incoming());
+      allow update: if isSignedIn() && (
+        // Allow updating own name/phone (blocking self-elevating role changes)
+        (request.auth.uid == userId && incoming().tenantId == existing().tenantId && incoming().role == existing().role && isValidUser(incoming())) ||
+        // Allow Admins to update user fields
+        (getUserTenantId() == existing().tenantId && getUserRole() == 'admin' && incoming().tenantId == existing().tenantId && isValidUser(incoming()))
+      );
+      allow delete: if false;
+    }
+
+    // 3. RFQs Collection
+    match /rfqs/{rfqId} {
+      allow get: if isTenantMember(resource.data.tenantId);
+      allow list: if isSignedIn() && resource.data.tenantId == getUserTenantId();
+      allow create: if isSignedIn() && isValidId(rfqId) && isTenantMember(incoming().tenantId) && getUserRole() in ['admin', 'sales', 'management'] && isValidRFQ(incoming());
+      allow update: if isSignedIn() && isValidId(rfqId) && isTenantMember(existing().tenantId) && getUserRole() in ['admin', 'sales', 'management'] && isValidRFQ(incoming()) 
+        && incoming().tenantId == existing().tenantId;
+      allow delete: if false;
+    }
+
+    // 4. Quotes Collection
+    match /quotes/{quoteId} {
+      allow get: if isTenantMember(resource.data.tenantId);
+      allow list: if isSignedIn() && resource.data.tenantId == getUserTenantId();
+      allow create: if isSignedIn() && isValidId(quoteId) && isTenantMember(incoming().tenantId) && getUserRole() in ['admin', 'sales', 'management'] 
+        && exists(/databases/$(database)/documents/rfqs/$(incoming().rfqId)) && isValidQuote(incoming());
+      allow update: if isSignedIn() && isValidId(quoteId) && isTenantMember(existing().tenantId) && getUserRole() in ['admin', 'sales', 'management'] 
+        && isValidQuote(incoming()) && incoming().tenantId == existing().tenantId && incoming().rfqId == existing().rfqId;
+      allow delete: if false;
+    }
+
+    // 5. Orders Collection
+    match /orders/{orderId} {
+      allow get: if isTenantMember(resource.data.tenantId);
+      allow list: if isSignedIn() && resource.data.tenantId == getUserTenantId();
+      allow create: if isSignedIn() && isValidId(orderId) && isTenantMember(incoming().tenantId) && getUserRole() in ['admin', 'sales', 'management'] 
+        && exists(/databases/$(database)/documents/quotes/$(incoming().quoteId)) && isValidOrder(incoming());
+      allow update: if isSignedIn() && isValidId(orderId) && isTenantMember(existing().tenantId) 
+        && (getUserRole() in ['admin', 'sales', 'management'] || (getUserRole() == 'production' && incoming().diff(existing()).affectedKeys().hasOnly(['status'])))
+        && isValidOrder(incoming()) && incoming().tenantId == existing().tenantId && incoming().quoteId == existing().quoteId;
+      allow delete: if false;
+    }
+
+    // 6. ProductionJobs Collection
+    match /productionJobs/{jobId} {
+      allow get: if isTenantMember(resource.data.tenantId);
+      allow list: if isSignedIn() && resource.data.tenantId == getUserTenantId();
+      allow create: if isSignedIn() && isValidId(jobId) && isTenantMember(incoming().tenantId) && getUserRole() in ['admin', 'sales', 'production', 'management'] 
+        && exists(/databases/$(database)/documents/orders/$(incoming().orderId)) && isValidProductionJob(incoming());
+      allow update: if isSignedIn() && isValidId(jobId) && isTenantMember(existing().tenantId) && getUserRole() in ['admin', 'production', 'management'] 
+        && isValidProductionJob(incoming()) && incoming().tenantId == existing().tenantId && incoming().orderId == existing().orderId;
+      allow delete: if false;
+    }
+
+    // 7. Dispatches Collection
+    match /dispatches/{dispatchId} {
+      allow get: if isTenantMember(resource.data.tenantId);
+      allow list: if isSignedIn() && resource.data.tenantId == getUserTenantId();
+      allow create: if isSignedIn() && isValidId(dispatchId) && isTenantMember(incoming().tenantId) && getUserRole() in ['admin', 'dispatch', 'management'] 
+        && exists(/databases/$(database)/documents/orders/$(incoming().orderId)) && isValidDispatch(incoming());
+      allow update: if isSignedIn() && isValidId(dispatchId) && isTenantMember(existing().tenantId) && getUserRole() in ['admin', 'dispatch', 'management'] 
+        && isValidDispatch(incoming()) && incoming().tenantId == existing().tenantId && incoming().orderId == existing().orderId;
+      allow delete: if false;
+    }
+
+    // 8. WhatsAppLogs Collection
+    match /whatsappLogs/{logId} {
+      allow get: if isTenantMember(resource.data.tenantId);
+      allow list: if isSignedIn() && resource.data.tenantId == getUserTenantId();
+      allow create: if isSignedIn() && isValidId(logId) && isTenantMember(incoming().tenantId) && isValidWhatsAppLog(incoming());
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // 9. Invoices & Payments Collection
+    match /invoices/{invoiceId} {
+      allow get: if isTenantMember(resource.data.tenantId);
+      allow list: if isSignedIn() && resource.data.tenantId == getUserTenantId();
+      allow create: if isSignedIn() && isValidId(invoiceId) && isTenantMember(incoming().tenantId) && getUserRole() in ['admin', 'sales', 'management'] && isValidInvoice(incoming());
+      allow update: if isSignedIn() && isValidId(invoiceId) && isTenantMember(existing().tenantId) && getUserRole() in ['admin', 'sales', 'management'] 
+        && incoming().tenantId == existing().tenantId && incoming().orderId == existing().orderId && incoming().createdBy == existing().createdBy;
+      allow delete: if false;
+
+      match /payments/{paymentId} {
+        allow read: if isTenantMember(get(/databases/$(database)/documents/invoices/$(invoiceId)).data.tenantId);
+        allow create: if isSignedIn() && isValidId(paymentId) && isTenantMember(get(/databases/$(database)/documents/invoices/$(invoiceId)).data.tenantId) 
+          && getUserRole() in ['admin', 'sales', 'management'] && isValidInvoicePayment(incoming());
+        allow update, delete: if false;
+      }
+    }
+
+    // 10. Stock Alerts Collection
+    match /stockAlerts/{alertId} {
+      allow read: if isSignedIn() && isTenantMember(resource.data.tenantId);
+      allow write: if isSignedIn() && isTenantMember(incoming().tenantId);
+    }
+
+    // 11. Notifications Collection
+    match /notifications/{notificationId} {
+      allow read: if isSignedIn() && isTenantMember(resource.data.tenantId) && (resource.data.userId == request.auth.uid || resource.data.userId == 'all');
+      allow create: if isSignedIn() && isValidId(notificationId) && isTenantMember(incoming().tenantId) && isValidNotification(incoming());
+      allow update: if isSignedIn() && isValidId(notificationId) && isTenantMember(existing().tenantId) && (existing().userId == request.auth.uid || existing().userId == 'all') && incoming().diff(existing()).affectedKeys().hasOnly(['read']);
+      allow delete: if false;
+    }
+  }
+}

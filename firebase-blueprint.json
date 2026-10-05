@@ -1,0 +1,415 @@
+{
+  "entities": {
+    "Tenant": {
+      "title": "Tenant",
+      "description": "Tenant/Company representing a manufacturing unit",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique tenant ID" },
+        "companyName": { "type": "string", "description": "Name of the manufacturing unit" },
+        "gstin": { "type": "string", "description": "Indian GSTIN number" },
+        "address": { "type": "string", "description": "Office/factory address" },
+        "currency": { "type": "string", "description": "Default currency" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "companyName"]
+    },
+    "User": {
+      "title": "User",
+      "description": "User profile inside a tenant",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "name": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "sales", "production", "dispatch", "management"] },
+        "phone": { "type": "string" },
+        "emailVerified": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "name", "tenantId", "role"]
+    },
+    "RFQ": {
+      "title": "RFQ",
+      "description": "Request for Quotation from dynamic customers or dealers",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "customerName": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "requirements": { "type": "string" },
+        "items": { "type": "array" },
+        "status": { "type": "string", "enum": ["pending", "quoted", "declined"] },
+        "createdBy": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "tenantId", "customerName", "status", "createdAt"]
+    },
+    "Quote": {
+      "title": "Quote",
+      "description": "Product Quotation generated for an RFQ",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "rfqId": { "type": "string" },
+        "quoteNumber": { "type": "string" },
+        "customerName": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "items": { "type": "array" },
+        "subtotal": { "type": "number" },
+        "gstAmount": { "type": "number" },
+        "total": { "type": "number" },
+        "validUntil": { "type": "string" },
+        "status": { "type": "string", "enum": ["draft", "sent", "approved", "rejected"] },
+        "createdBy": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "tenantId", "quoteNumber", "customerName", "status", "total", "createdAt"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Confirmed production order derived from approved quotation",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "quoteId": { "type": "string" },
+        "orderNumber": { "type": "string" },
+        "customerName": { "type": "string" },
+        "phone": { "type": "string" },
+        "items": { "type": "array" },
+        "totalAmount": { "type": "number" },
+        "deliveryDate": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "in-production", "produced", "dispatched", "completed", "cancelled"] },
+        "createdBy": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "tenantId", "orderNumber", "customerName", "status", "totalAmount", "createdAt"]
+    },
+    "ProductionJob": {
+      "title": "ProductionJob",
+      "description": "Production stage tracker for order line items",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "orderId": { "type": "string" },
+        "itemName": { "type": "string" },
+        "quantity": { "type": "number" },
+        "currentStage": { "type": "string", "enum": ["cutting", "welding", "machining", "assembly", "quality_check", "ready"] },
+        "stagesHistory": { "type": "array" },
+        "notes": { "type": "string" },
+        "updatedBy": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "tenantId", "orderId", "itemName", "quantity", "currentStage", "updatedAt"]
+    },
+    "Dispatch": {
+      "title": "Dispatch",
+      "description": "Dispatch record detailing delivery details and transporter Lorry Receipt",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "orderId": { "type": "string" },
+        "invoiceNumber": { "type": "string" },
+        "vehicleNumber": { "type": "string" },
+        "driverName": { "type": "string" },
+        "driverPhone": { "type": "string" },
+        "lrNumber": { "type": "string" },
+        "transporter": { "type": "string" },
+        "items": { "type": "array" },
+        "status": { "type": "string", "enum": ["shipped", "delivered"] },
+        "dispatchedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "tenantId", "orderId", "invoiceNumber", "status", "dispatchedAt"]
+    },
+    "WhatsAppLog": {
+      "title": "WhatsAppLog",
+      "description": "Automated WhatsApp notifications logged from status updates",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "recipientName": { "type": "string" },
+        "recipientPhone": { "type": "string" },
+        "message": { "type": "string" },
+        "status": { "type": "string", "enum": ["sent", "failed", "pending"] },
+        "type": { "type": "string" },
+        "sentAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "tenantId", "recipientPhone", "message", "status", "sentAt"]
+    },
+    "ActivityLog": {
+      "title": "ActivityLog",
+      "description": "Trace and audit events inside a tenant",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "actionType": { "type": "string" },
+        "entityType": { "type": "string" },
+        "entityId": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "actor": { "type": "object" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "description": { "type": "string" },
+        "metadata": { "type": "object" }
+      },
+      "required": ["id", "actionType", "entityType", "entityId", "tenantId", "actor", "timestamp", "description"]
+    },
+    "Customer": {
+      "title": "Customer",
+      "description": "B2B Customer/Dealer profile under a tenant",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "name": { "type": "string" },
+        "type": { "type": "string", "enum": ["customer", "dealer"] },
+        "contactPerson": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "gstNumber": { "type": "string" },
+        "billingAddress": { "type": "string" },
+        "shippingAddress": { "type": "string" },
+        "city": { "type": "string" },
+        "notes": { "type": "string" },
+        "tags": { "type": "array" },
+        "assignedSalesUserId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "tenantId", "name", "type", "contactPerson", "phone", "email", "city", "createdAt"]
+    },
+    "CommunicationLogEntry": {
+      "title": "CommunicationLogEntry",
+      "description": "Chronological CRM contact logged under a specific customer",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "customerId": { "type": "string" },
+        "channel": { "type": "string", "enum": ["whatsapp", "email", "call", "note"] },
+        "direction": { "type": "string", "enum": ["inbound", "outbound", "internal"] },
+        "message": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "author": { "type": "object" },
+        "linkedEntityId": { "type": "string" },
+        "linkedEntityType": { "type": "string", "enum": ["rfq", "order", "quote", "dispatch", "payment"] }
+      },
+      "required": ["id", "tenantId", "customerId", "channel", "direction", "message", "timestamp"]
+    },
+    "WhatsAppMessage": {
+      "title": "WhatsAppMessage",
+      "description": "Granular whatsapp message event details, inbound or outbound",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "conversationId": { "type": "string" },
+        "customerId": { "type": "string" },
+        "customerName": { "type": "string" },
+        "senderPhone": { "type": "string" },
+        "recipientPhone": { "type": "string" },
+        "direction": { "type": "string", "enum": ["inbound", "outbound"] },
+        "message": { "type": "string" },
+        "mediaUrl": { "type": "string" },
+        "mediaType": { "type": "string" },
+        "mediaName": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["sent", "delivered", "read", "failed", "pending"] },
+        "templateName": { "type": "string" },
+        "templateVariables": { "type": "array" }
+      },
+      "required": ["id", "tenantId", "conversationId", "senderPhone", "recipientPhone", "direction", "message", "timestamp", "status"]
+    },
+    "WhatsAppConversation": {
+      "title": "WhatsAppConversation",
+      "description": "A grouped conversation with a potential helper contact, dealer or customer",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "customerId": { "type": "string" },
+        "customerName": { "type": "string" },
+        "phone": { "type": "string" },
+        "lastMessage": { "type": "string" },
+        "lastTimestamp": { "type": "string", "format": "date-time" },
+        "unreadCount": { "type": "number" },
+        "status": { "type": "string", "enum": ["unread", "unassigned", "resolved", "active"] },
+        "assignedSalesUserId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "tenantId", "phone", "lastMessage", "lastTimestamp", "unreadCount", "status", "createdAt"]
+    },
+    "WhatsAppTemplate": {
+      "title": "WhatsAppTemplate",
+      "description": "Pre-approved templates stored in firestore for quick sending",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "name": { "type": "string" },
+        "category": { "type": "string" },
+        "body": { "type": "string" },
+        "variables": { "type": "array" }
+      },
+      "required": ["id", "tenantId", "name", "category", "body", "variables"]
+    },
+    "StockItem": {
+      "title": "StockItem",
+      "description": "Inventory stock item register definition for raw materials or finished goods",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "name": { "type": "string" },
+        "code": { "type": "string" },
+        "category": { "type": "string", "enum": ["raw_material", "finished_goods", "consumable", "spare"] },
+        "currentQty": { "type": "number" },
+        "unit": { "type": "string" },
+        "reorderLevel": { "type": "number" },
+        "lastUpdated": { "type": "string", "format": "date-time" },
+        "updatedBy": { "type": "string" },
+        "updatedByName": { "type": "string" }
+      },
+      "required": ["id", "tenantId", "name", "code", "category", "currentQty", "unit", "reorderLevel", "lastUpdated"]
+    },
+    "StockLedgerEntry": {
+      "title": "StockLedgerEntry",
+      "description": "Chronological stock ledger transaction journal entry",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "itemId": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "type": { "type": "string", "enum": ["inward", "outward", "adjustment"] },
+        "qty": { "type": "number" },
+        "reason": { "type": "string" },
+        "updatedBy": { "type": "string" },
+        "updatedByName": { "type": "string" },
+        "qtyAfter": { "type": "number" }
+      },
+      "required": ["id", "tenantId", "itemId", "timestamp", "type", "qty", "reason", "updatedBy", "updatedByName", "qtyAfter"]
+    },
+    "StockAlert": {
+      "title": "StockAlert",
+      "description": "Emergency low-stock alerts created when items drop below reorder/minimumStock threshold",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "itemId": { "type": "string" },
+        "itemName": { "type": "string" },
+        "itemCode": { "type": "string" },
+        "currentQty": { "type": "number" },
+        "minimumStock": { "type": "number" },
+        "reorderLevel": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["active", "resolved"] },
+        "message": { "type": "string" }
+      },
+      "required": ["tenantId", "itemId", "itemName", "currentQty", "minimumStock", "status", "message"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "In-app notifications and alerts for users within a tenant",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "userId": { "type": "string" },
+        "type": { "type": "string", "enum": ["payment_overdue", "low_stock", "order_delayed", "new_rfq", "dispatch_sent", "stage_changed", "reminder_sent"] },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "entityId": { "type": "string" },
+        "entityType": { "type": "string" },
+        "link": { "type": "string" },
+        "read": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "tenantId", "userId", "type", "title", "message", "entityId", "entityType", "link", "read", "createdAt"]
+    }
+  },
+  "firestore": {
+    "tenants": {
+      "schema": "Tenant",
+      "description": "Store manufacturing companies using the platform"
+    },
+    "tenants/{tenantId}/activity": {
+      "schema": "ActivityLog",
+      "description": "Tenant-scoped activity timeline and audit log"
+    },
+    "tenants/{tenantId}/customers": {
+      "schema": "Customer",
+      "description": "Tenant-scoped B2B Customer and Dealer database records"
+    },
+    "tenants/{tenantId}/customers/{customerId}/communicationLog": {
+      "schema": "CommunicationLogEntry",
+      "description": "Subcollection store of live synced interaction timelines"
+    },
+    "tenants/{tenantId}/whatsappConversations": {
+      "schema": "WhatsAppConversation",
+      "description": "CRM WhatsApp structured conversations threads list"
+    },
+    "tenants/{tenantId}/whatsappConversations/{conversationId}/messages": {
+      "schema": "WhatsAppMessage",
+      "description": "Granular thread messages subcollection"
+    },
+    "tenants/{tenantId}/whatsappTemplates": {
+      "schema": "WhatsAppTemplate",
+      "description": "Approved and custom pre-defined WhatsApp templates list"
+    },
+    "tenants/{tenantId}/stockItems": {
+      "schema": "StockItem",
+      "description": "Inventory stock visibility items database scoped to tenant"
+    },
+    "tenants/{tenantId}/stockItems/{itemId}/ledger": {
+      "schema": "StockLedgerEntry",
+      "description": "Grand chronological manual ledger entries for each inventory item"
+    },
+
+    "users": {
+      "schema": "User",
+      "description": "Platform users with tenant-scoped roles"
+    },
+    "rfqs": {
+      "schema": "RFQ",
+      "description": "Inquiries, RFQs sent by dealers or captured by sales"
+    },
+    "quotes": {
+      "schema": "Quote",
+      "description": "Quotations generated by sales with items, tax and total costing"
+    },
+    "orders": {
+      "schema": "Order",
+      "description": "Manufacturing orders with scheduling and production statuses"
+    },
+    "productionJobs": {
+      "schema": "ProductionJob",
+      "description": "Track the assembly/manufacturing stage of products"
+    },
+    "dispatches": {
+      "schema": "Dispatch",
+      "description": "Logistics and dispatch detailed with driver details and LR tracking"
+    },
+    "whatsappLogs": {
+      "schema": "WhatsAppLog",
+      "description": "Track BSP notification delivery state"
+    },
+    "stockAlerts": {
+      "schema": "StockAlert",
+      "description": "Emergency low stock alerts triggered automatically"
+    },
+    "notifications": {
+      "schema": "Notification",
+      "description": "In-app alerts and notifications about events scoped to user or tenant"
+    }
+  }
+}

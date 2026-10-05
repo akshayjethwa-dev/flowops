@@ -1,0 +1,61 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&family=Fira+Code:wght@400;500;600&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Outfit", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Space Grotesk", sans-serif;
+  --font-mono: "Fira Code", ui-monospace, SFMono-Regular, monospace;
+}
+
+@media print {
+  /* Hide sidebar, topbar, footer, interactive action items, and uploaders */
+  aside, 
+  header, 
+  footer,
+  .topbar-wrapper,
+  .sidebar-wrapper,
+  .print-hide,
+  button,
+  .btn,
+  .file-uploader-box,
+  .interactive-notes-section,
+  .whatsapp-simulation-section,
+  .no-print {
+    display: none !important;
+  }
+
+  /* Reset layout constraints so elements span the printed page beautifully */
+  body, 
+  html, 
+  #root,
+  .min-h-screen,
+  .flex-growMain {
+    background: white !important;
+    color: #0f172a !important; /* deep slate for clean ink contrast */
+    overflow: visible !important;
+    height: auto !important;
+    min-height: 0 !important;
+    position: static !important;
+  }
+
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    overflow: visible !important;
+  }
+
+  /* Force background colors to print correctly in modern browsers */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Page breaks optimization */
+  .card, .p-5, .bg-white {
+    page-break-inside: avoid;
+    border: 1px solid #e2e8f0 !important;
+    box-shadow: none !important;
+  }
+}
+

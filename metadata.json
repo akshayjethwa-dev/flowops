@@ -1,0 +1,6 @@
+{
+  "name": "Ashrey FlowOps",
+  "description": "Manufacturing Operations CRM for B2B Indian SMEs to streamline RFQ, costing estimation, CNC/welding shopfloor tracking, Lorry Dispatch, and automated WhatsApp status notifications.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

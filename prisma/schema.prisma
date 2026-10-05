@@ -1,0 +1,80 @@
+// /prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql" // Update this if you are using mysql or sqlite
+}
+
+model UomMaster {
+  id        String  @id @default(uuid())
+  name      String
+  base_unit String?
+  category  String?
+
+  // Relations
+  raw_materials   RawMaterial[]
+  conversionsFrom UomConversion[] @relation("FromUom")
+  conversionsTo   UomConversion[] @relation("ToUom")
+
+  @@map("uom_master")
+}
+
+model UomConversion {
+  id          String @id @default(uuid())
+  from_uom_id String
+  to_uom_id   String
+  multiplier  Float
+
+  // Relations
+  from_uom UomMaster @relation("FromUom", fields: [from_uom_id], references: [id])
+  to_uom   UomMaster @relation("ToUom", fields: [to_uom_id], references: [id])
+
+  @@map("uom_conversions")
+}
+
+model Supplier {
+  id            String  @id @default(uuid())
+  name          String
+  gst           String?
+  contact       String?
+  payment_terms String?
+
+  // Relations
+  raw_materials RawMaterial[]
+
+  @@map("suppliers")
+}
+
+model RawMaterial {
+  id             String  @id @default(uuid())
+  name           String
+  sku            String  @unique
+  default_uom_id String
+  standard_cost  Float
+  reorder_level  Float
+  supplier_id    String?
+
+  // Relations
+  uom      UomMaster         @relation(fields: [default_uom_id], references: [id])
+  supplier Supplier?         @relation(fields: [supplier_id], references: [id])
+  products ProductMaterial[]
+
+  @@map("raw_materials")
+}
+
+model ProductMaterial {
+  id                   String  @id @default(uuid())
+  product_id           String // Note: Add a @relation here if you create a Product model later
+  raw_material_id      String
+  quantity_per_unit    Float
+  wastage_percent      Float   @default(0)
+  consumption_stage_id String? // Note: Add a @relation here if you create a ConsumptionStage model later
+
+  // Relations
+  raw_material RawMaterial @relation(fields: [raw_material_id], references: [id])
+
+  @@map("product_materials")
+}
