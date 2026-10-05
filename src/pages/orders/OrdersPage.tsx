@@ -7,6 +7,10 @@ import { useProductionBoard } from '../../hooks/useProduction';
 import { ProductionSection } from '../../components/ProductionSection';
 import { OrdersBoardPage } from './OrdersBoardPage';
 import { ExportButton } from '../../components/ExportButton';
+<<<<<<< HEAD
+=======
+import { GuardedAction } from '../../components/layout/GuardedAction';
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
 import { Order } from '../../types';
 import { Layers, Kanban, TableProperties } from 'lucide-react';
 
@@ -55,6 +59,7 @@ export const OrdersPage: React.FC = () => {
         </div>
 
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 shrink-0">
+<<<<<<< HEAD
           {/* Export Buttons */}
           <div className="flex items-center space-x-1">
             <ExportButton
@@ -113,6 +118,68 @@ export const OrdersPage: React.FC = () => {
         </div>
       </div>
     </div>
+=======
+          {/* 🔒 RBAC Guard: Bulk Data Exports */}
+          <GuardedAction action="view:reports">
+            <div className="flex items-center space-x-1">
+              <ExportButton
+                data={orders}
+                filenamePrefix="orders_master"
+                headersMap={{
+                  orderNumber: 'Order Number',
+                  customerName: 'Customer Name',
+                  phone: 'Phone',
+                  totalAmount: 'Total Amount',
+                  deliveryDate: 'Delivery Date',
+                  status: 'Status',
+                  createdAt: 'Created At'
+                }}
+                label="Orders CSV"
+              />
+              <ExportButton
+                data={jobs}
+                filenamePrefix="jobs_production"
+                headersMap={{
+                  id: 'Job ID',
+                  itemName: 'Component Name',
+                  quantity: 'Quantity',
+                  currentStage: 'Current Production Stage',
+                  updatedBy: 'Handler ID',
+                  updatedAt: 'Last Updated'
+                }}
+                label="Jobs CSV"
+              />
+            </div>
+          </GuardedAction>
+
+          {/* Tab Selection controller */}
+          <div className="flex items-center space-x-1.5 bg-slate-100 p-1.5 rounded-lg border border-slate-200 shadow-3xs shrink-0 select-none">
+            <button
+              onClick={() => setActiveTab('kanban')}
+              className={`px-3 py-1.5 rounded-md text-[10px] uppercase font-mono tracking-wider font-extrabold cursor-pointer transition-colors flex items-center space-x-1.5 ${
+                activeTab === 'kanban' 
+                  ? 'bg-white text-indigo-650 shadow-2xs font-bold' 
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <Kanban className="h-3.5 w-3.5" />
+              <span>Kanban Board</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('analytical')}
+              className={`px-3 py-1.5 rounded-md text-[10px] uppercase font-mono tracking-wider font-extrabold cursor-pointer transition-colors flex items-center space-x-1.5 ${
+                activeTab === 'analytical' 
+                  ? 'bg-white text-indigo-650 shadow-2xs font-bold' 
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <TableProperties className="h-3.5 w-3.5" />
+              <span>Analytical Grid</span>
+            </button>
+          </div>
+        </div>
+      </div>
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
 
       {activeTab === 'kanban' ? (
         <OrdersBoardPage />
@@ -125,5 +192,9 @@ export const OrdersPage: React.FC = () => {
       )}
     </div>
   );
+<<<<<<< HEAD
 };
 
+=======
+};
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145

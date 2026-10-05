@@ -12,6 +12,10 @@ import {
   useUpdateInvoiceStatus, 
   usePayments 
 } from '../hooks/useInvoices';
+<<<<<<< HEAD
+=======
+import { usePlants } from '../hooks/usePlants';
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
 import { sendWhatsAppNotification } from '../utils/whatsapp';
 import { ExportButton } from '../components/ExportButton';
 import { Invoice, PaymentRecord, InvoiceStatus, Order, AppNotification } from '../types';
@@ -52,7 +56,11 @@ const OutstandingSummaryWidget: React.FC<{ invoices: Invoice[] }> = ({ invoices 
     const currentMonth = new Date().getMonth();
     const currentYear = new Date().getFullYear();
 
+<<<<<<< HEAD
     invoices.forEach(inv => {
+=======
+    (invoices || []).forEach(inv => {
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
       totalBilled += inv.total;
       totalOutstanding += inv.outstanding;
 
@@ -80,11 +88,19 @@ const OutstandingSummaryWidget: React.FC<{ invoices: Invoice[] }> = ({ invoices 
 
     if (isSandbox) {
       // In sandbox mode, aggregate from all availablepayments cache
+<<<<<<< HEAD
       invoices.forEach(inv => {
         const cached = localStorage.getItem(`payments_${inv.id}`);
         if (cached) {
           const payments: PaymentRecord[] = JSON.parse(cached);
           payments.forEach(p => {
+=======
+      (invoices || []).forEach(inv => {
+        const cached = localStorage.getItem(`payments_${inv.id}`);
+        if (cached) {
+          const payments: PaymentRecord[] = JSON.parse(cached);
+          (payments || []).forEach(p => {
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
             const pDate = new Date(p.date);
             if (pDate >= startOfMonth) {
               totalPaidThisMonth += Number(p.amount);
@@ -103,7 +119,11 @@ const OutstandingSummaryWidget: React.FC<{ invoices: Invoice[] }> = ({ invoices 
     } else {
       // For online mode, can sum paid amounts on the-fly or aggregate
       let total = 0;
+<<<<<<< HEAD
       invoices.forEach(inv => {
+=======
+      (invoices || []).forEach(inv => {
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
         // Simple approximation for live mode based on invoice payments if precise collections query not run
         if (inv.totalPaid > 0) {
           total += inv.totalPaid;
@@ -169,7 +189,11 @@ const OutstandingSummaryWidget: React.FC<{ invoices: Invoice[] }> = ({ invoices 
 const TopOverdueWidget: React.FC<{ invoices: Invoice[]; onSelectInvoice: (invoice: Invoice) => void }> = ({ invoices, onSelectInvoice }) => {
   const topOverdue = useMemo(() => {
     const nowStr = new Date().toISOString().split('T')[0];
+<<<<<<< HEAD
     return invoices
+=======
+    return (invoices || [])
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
       .filter(inv => inv.status !== 'paid' && inv.dueDate < nowStr && inv.status !== 'draft')
       .sort((a, b) => b.outstanding - a.outstanding)
       .slice(0, 5);
@@ -217,7 +241,11 @@ const PaymentHistoryTable: React.FC<{ invoiceId: string }> = ({ invoiceId }) => 
     return <div className="text-center py-4 text-xs font-mono text-slate-400 animate-pulse">Syncing collections...</div>;
   }
 
+<<<<<<< HEAD
   if (payments.length === 0) {
+=======
+  if (!payments || payments.length === 0) {
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
     return (
       <div className="text-center py-4 text-xs text-slate-400 font-mono bg-slate-50 rounded-lg border border-dashed border-slate-200">
         No payments recorded yet for this invoice.
@@ -237,11 +265,19 @@ const PaymentHistoryTable: React.FC<{ invoiceId: string }> = ({ invoiceId }) => 
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100 font-mono">
+<<<<<<< HEAD
           {payments.map(p => (
             <tr key={p.id} className="hover:bg-slate-50/40 text-[11px] text-slate-650">
               <td className="p-2 font-mono whitespace-nowrap">{new Date(p.date).toLocaleDateString()}</td>
               <td className="p-2 uppercase font-semibold text-[9px] tracking-wide text-slate-500">{p.paymentMode.replace('_', ' ')}</td>
               <td className="p-2 truncate max-w-[100px]" title={p.referenceNo || 'None'}>{p.referenceNo || '—'}</td>
+=======
+          {(payments || []).map(p => (
+            <tr key={p.id} className="hover:bg-slate-50/40 text-[11px] text-slate-650">
+              <td className="p-2 font-mono whitespace-nowrap">{new Date(p.date).toLocaleDateString()}</td>
+              <td className="p-2 uppercase font-semibold text-[9px] tracking-wide text-slate-500">{p.paymentMode.replace('_', ' ')}</td>
+              <td className="p-2 truncate max-w-25" title={p.referenceNo || 'None'}>{p.referenceNo || '—'}</td>
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
               <td className="p-2 text-right font-bold text-slate-800">₹{p.amount.toLocaleString('en-IN')}</td>
             </tr>
           ))}
@@ -257,6 +293,15 @@ export const PaymentsTrackerPage: React.FC = () => {
   const navigate = useNavigate();
   const toast = useToast();
 
+<<<<<<< HEAD
+=======
+  const [selectedPlantId, setSelectedPlantId] = useState<string>(() => {
+    return localStorage.getItem('payments_selected_plant_id') || 'all';
+  });
+  const { plants = [] } = usePlants(tenant?.id);
+  const [newInvPlantId, setNewInvPlantId] = useState('');
+
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
   const [activeStatusFilter, setActiveStatusFilter] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [sortField, setSortField] = useState<'dueDate' | 'outstanding'>('dueDate');
@@ -268,6 +313,13 @@ export const PaymentsTrackerPage: React.FC = () => {
     search: searchTerm
   });
 
+<<<<<<< HEAD
+=======
+  const plantFilteredInvoices = useMemo(() => {
+    return (invoices || []).filter(inv => selectedPlantId === 'all' || inv.plantId === selectedPlantId);
+  }, [invoices, selectedPlantId]);
+
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
   const { createInvoice, loading: creatingInvoice } = useCreateInvoice();
   const { recordPayment, loading: recordingPayment } = useRecordPayment();
   const { updateInvoiceStatus, sendReminder, loading: sendingReminders } = useUpdateInvoiceStatus();
@@ -427,6 +479,10 @@ export const PaymentsTrackerPage: React.FC = () => {
     thirtyDaysLater.setDate(thirtyDaysLater.getDate() + 30);
     setNewInvDueDate(thirtyDaysLater.toISOString().split('T')[0]);
     setNewInvAmount(0);
+<<<<<<< HEAD
+=======
+    setNewInvPlantId('');
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
     setCreateDrawerOpen(true);
   };
 
@@ -452,9 +508,17 @@ export const PaymentsTrackerPage: React.FC = () => {
         amount: Number(newInvAmount),
         taxAmount: Number(newInvTaxAmount),
         total: Number(newInvTotal),
+<<<<<<< HEAD
       });
 
       toast.toastSuccess(`Invoice ${newInvInvoiceNumber} created successfully in draft mode.`);
+=======
+        plantId: newInvPlantId || (plants?.[0]?.id || '')
+      });
+
+      toast.toastSuccess(`Invoice ${newInvInvoiceNumber} created successfully in draft mode.`);
+      setNewInvPlantId('');
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
       setCreateDrawerOpen(false);
     } catch (err: any) {
       toast.toastError(err.message || 'Duplicate invoice number or creation error');
@@ -565,7 +629,11 @@ export const PaymentsTrackerPage: React.FC = () => {
 
   // Sorting
   const sortedInvoices = useMemo(() => {
+<<<<<<< HEAD
     const listCopy = [...invoices];
+=======
+    const listCopy = [...plantFilteredInvoices];
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
     listCopy.sort((a, b) => {
       if (sortField === 'dueDate') {
         const dateA = new Date(a.dueDate).getTime();
@@ -576,7 +644,11 @@ export const PaymentsTrackerPage: React.FC = () => {
       }
     });
     return listCopy;
+<<<<<<< HEAD
   }, [invoices, sortField, sortOrder]);
+=======
+  }, [plantFilteredInvoices, sortField, sortOrder]);
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
 
   const toggleSort = (field: 'dueDate' | 'outstanding') => {
     if (sortField === field) {
@@ -623,7 +695,11 @@ export const PaymentsTrackerPage: React.FC = () => {
 
         <div className="flex items-center space-x-2 self-start sm:self-center shrink-0">
           <ExportButton
+<<<<<<< HEAD
             data={invoices}
+=======
+            data={plantFilteredInvoices}
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
             filenamePrefix="payments_outstanding_master"
             headersMap={{
               invoiceNumber: 'Invoice Number',
@@ -653,7 +729,11 @@ export const PaymentsTrackerPage: React.FC = () => {
         </div>
       ) : (
         <div className="space-y-6">
+<<<<<<< HEAD
           <OutstandingSummaryWidget invoices={invoices} />
+=======
+          <OutstandingSummaryWidget invoices={plantFilteredInvoices} />
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
           
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             
@@ -681,6 +761,7 @@ export const PaymentsTrackerPage: React.FC = () => {
                     ))}
                   </div>
 
+<<<<<<< HEAD
                   {/* Search box */}
                   <div className="relative flex-grow max-w-sm">
                     <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
@@ -691,6 +772,41 @@ export const PaymentsTrackerPage: React.FC = () => {
                       placeholder="Search INV #, client, code..."
                       className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-8 pr-3 py-1.5 text-xs focus:ring-2 focus:ring-sky-500/30 focus:outline-hidden"
                     />
+=======
+                  <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center grow max-w-lg">
+                    {/* Plant Dropdown Filter */}
+                    <div className="flex items-center space-x-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 shadow-3xs shrink-0">
+                      <span className="text-[9px] font-mono font-bold uppercase text-slate-400 shrink-0">Plant:</span>
+                      <select
+                        value={selectedPlantId}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setSelectedPlantId(val);
+                          localStorage.setItem('payments_selected_plant_id', val);
+                        }}
+                        className="text-[11px] font-bold text-slate-700 bg-transparent border-none focus:ring-0 p-0 pr-6 cursor-pointer font-mono"
+                      >
+                        <option value="all">🌐 All Facilities</option>
+                        {(plants || []).map((p) => (
+                          <option key={p.id} value={p.id}>
+                            🏭 {p.name.split(' ')[0]}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Search box */}
+                    <div className="relative grow">
+                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                      <input
+                        type="text"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        placeholder="Search INV #, client, code..."
+                        className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-8 pr-3 py-1.5 text-xs focus:ring-2 focus:ring-sky-500/30 focus:outline-hidden"
+                      />
+                    </div>
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
                   </div>
                 </div>
 
@@ -721,16 +837,31 @@ export const PaymentsTrackerPage: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 text-xs">
+<<<<<<< HEAD
                       {sortedInvoices.map(inv => {
+=======
+                      {(sortedInvoices || []).map(inv => {
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
                         const isOverdue = inv.status === 'overdue';
                         return (
                           <tr key={inv.id} className={`transition-all ${isOverdue ? 'bg-rose-50/45 hover:bg-rose-50/75 border-l-2 border-rose-550' : 'hover:bg-slate-50/50'}`}>
                             <td className="p-3 font-semibold text-slate-800 font-mono tracking-tight">#{inv.invoiceNumber}</td>
                             <td className="p-3">
                               <p className="font-bold text-slate-800 leading-none">{inv.customerName}</p>
+<<<<<<< HEAD
                               {inv.customerPhone && (
                                 <p className="text-[10px] text-slate-400 mt-1 font-mono">{inv.customerPhone}</p>
                               )}
+=======
+                              <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                                {inv.customerPhone && (
+                                  <span className="text-[10px] text-slate-400 font-mono">{inv.customerPhone}</span>
+                                )}
+                                <span className="bg-amber-50 text-amber-800 border border-amber-100 rounded px-1.5 py-0.2 text-[8px] font-bold font-mono uppercase tracking-wider">
+                                  🏭 {plants?.find(p => p.id === inv.plantId)?.name?.split(' ')[0] || 'All Plants'}
+                                </span>
+                              </div>
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
                             </td>
                             <td className="p-3 text-slate-500 font-mono text-[11px]">{inv.orderNumber}</td>
                             <td className="p-3 text-slate-450 font-mono text-[10px]">{new Date(inv.invoiceDate).toLocaleDateString()}</td>
@@ -783,7 +914,11 @@ export const PaymentsTrackerPage: React.FC = () => {
 
                 {/* MOBILE RESPONSIVE CARDS VIEW */}
                 <div className="block md:hidden space-y-3">
+<<<<<<< HEAD
                   {sortedInvoices.map(inv => {
+=======
+                  {(sortedInvoices || []).map(inv => {
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
                     const isOverdue = inv.status === 'overdue';
                     const isExpanded = expandedInvoiceIdMobile === inv.id;
                     return (
@@ -887,7 +1022,11 @@ export const PaymentsTrackerPage: React.FC = () => {
 
             {/* SIDEBAR KPI - TOP OVERDUE CLIENTS */}
             <div className="space-y-6">
+<<<<<<< HEAD
               <TopOverdueWidget invoices={invoices} onSelectInvoice={(inv) => setSelectedInvoice(inv)} />
+=======
+              <TopOverdueWidget invoices={plantFilteredInvoices} onSelectInvoice={(inv) => setSelectedInvoice(inv)} />
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
             </div>
 
           </div>
@@ -996,6 +1135,26 @@ export const PaymentsTrackerPage: React.FC = () => {
                       <span className="text-[9px] text-slate-400 mt-1 block">Specify matching customer telephone to enable reminders triggers.</span>
                     </div>
 
+<<<<<<< HEAD
+=======
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-450 mb-1">Plant Facility Scope *</label>
+                      <select
+                        value={newInvPlantId}
+                        onChange={(e) => setNewInvPlantId(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 rounded p-2 text-xs focus:ring-1 focus:ring-sky-550 focus:outline-hidden font-bold"
+                        required
+                      >
+                        <option value="">-- Select Plant --</option>
+                        {(plants || []).map((p) => (
+                          <option key={p.id} value={p.id}>
+                            🏭 {p.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-450 mb-1">Invoice Date *</label>
@@ -1157,7 +1316,11 @@ export const PaymentsTrackerPage: React.FC = () => {
                         </div>
                         <div className="flex justify-between">
                           <span>Incremental Collected:</span>
+<<<<<<< HEAD
                           <span className="font-semibold text-emerald-600 font-bold">₹{selectedInvoice.totalPaid.toLocaleString('en-IN')}</span>
+=======
+                          <span className="font-semibold text-emerald-600">₹{selectedInvoice.totalPaid.toLocaleString('en-IN')}</span>
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
                         </div>
                         <div className="flex justify-between border-t border-slate-100 pt-2 text-slate-800 font-bold mt-1 text-xs">
                           <span>Outstanding Due:</span>
@@ -1439,5 +1602,9 @@ export const PaymentsTrackerPage: React.FC = () => {
 
     </div>
   );
+<<<<<<< HEAD
 };
 
+=======
+};
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145

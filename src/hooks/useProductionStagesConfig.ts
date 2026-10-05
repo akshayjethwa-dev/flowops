@@ -110,22 +110,44 @@ export const useProductionStagesConfig = (tenantId: string | undefined) => {
     }
 
     const isSandbox = localStorage.getItem('isSandboxMode') === 'true' || !db;
+<<<<<<< HEAD
     const stageId = name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '_');
+=======
+    const baseStageId = name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '_');
+    let stageId = baseStageId;
+    let stageName = name.trim();
+    let counter = 1;
+
+    // Auto-disambiguate duplicate stage IDs
+    while (stages.some(s => s.id === stageId)) {
+      counter++;
+      stageId = `${baseStageId}_${counter}`;
+      stageName = `${name.trim()} (${counter})`;
+    }
+
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
     const order = stages.length > 0 ? Math.max(...stages.map(s => s.order)) + 1 : 0;
 
     const newStage: ProductionStageConfig = {
       id: stageId,
+<<<<<<< HEAD
       name: name.trim(),
+=======
+      name: stageName,
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
       color,
       isFinalStage,
       order
     };
 
+<<<<<<< HEAD
     // Prevent duplicate values
     if (stages.some(s => s.id === stageId)) {
       throw new Error('An identical workflow checkpoint code already operates in this routing line.');
     }
 
+=======
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
     if (isSandbox) {
       const updated = [...stages, newStage];
       localStorage.setItem(`flowops_stages_${tenantId}`, JSON.stringify(updated));
@@ -245,6 +267,7 @@ export const useProductionStagesConfig = (tenantId: string | undefined) => {
       throw new Error('Only administrator profile owners can configure production stages.');
     }
 
+<<<<<<< HEAD
     const updated: ProductionStageConfig[] = newStages.map((s, idx) => ({
       id: s.name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '_'),
       name: s.name.trim(),
@@ -252,6 +275,29 @@ export const useProductionStagesConfig = (tenantId: string | undefined) => {
       isFinalStage: s.isFinalStage,
       order: idx
     }));
+=======
+    const seenIds = new Set<string>();
+    const updated: ProductionStageConfig[] = newStages.map((s, idx) => {
+      let baseId = s.name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '_');
+      let id = baseId;
+      let counter = 1;
+      
+      // Auto-disambiguate payload IDs completely seamlessly
+      while (seenIds.has(id)) {
+        counter++;
+        id = `${baseId}_${counter}`;
+      }
+      seenIds.add(id);
+
+      return {
+        id,
+        name: s.name.trim(),
+        color: s.color,
+        isFinalStage: s.isFinalStage,
+        order: idx
+      };
+    });
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
 
     const isSandbox = localStorage.getItem('isSandboxMode') === 'true' || !db;
 
@@ -298,4 +344,8 @@ export const useProductionStagesConfig = (tenantId: string | undefined) => {
     checkStageHasJobs,
     isAdmin
   };
+<<<<<<< HEAD
 };
+=======
+};
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145

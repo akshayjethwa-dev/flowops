@@ -345,7 +345,11 @@ export const OnboardingWizard: React.FC = () => {
         contactPhone,
         defaultCurrency: currency,
         onboardingCompleted: true,
+<<<<<<< HEAD
         onboardingState: null // Clean up detailed onboarding variables to save database storage space
+=======
+        onboardingState: undefined // Fixed Type Issue (changed from null to undefined)
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
       });
 
       // Erase sandbox skipping flag inside session storage
@@ -358,6 +362,7 @@ export const OnboardingWizard: React.FC = () => {
     }
   };
 
+<<<<<<< HEAD
   // Helper handling adding stages
   const handleAddStage = () => {
     if (!newStageName.trim()) return;
@@ -369,6 +374,25 @@ export const OnboardingWizard: React.FC = () => {
     const finalStages = setupStages.map(s => ({ ...s, isFinalStage: false })); // temporary clear final
     const insertIndex = finalStages.length;
     const newStage = { name: newStageName.trim(), color, isFinalStage: false };
+=======
+  // Helper handling adding stages (With automated unique naming resolver)
+  const handleAddStage = () => {
+    if (!newStageName.trim()) return;
+    
+    let candidateName = newStageName.trim();
+    const baseName = candidateName;
+    let counter = 1;
+    
+    // Auto-disambiguate without throwing annoying error
+    while (setupStages.some(s => s.name.toLowerCase() === candidateName.toLowerCase())) {
+      counter++;
+      candidateName = `${baseName} ${counter}`;
+    }
+
+    const color = newStageColor;
+    const finalStages = setupStages.map(s => ({ ...s, isFinalStage: false })); // temporary clear final
+    const newStage = { name: candidateName, color, isFinalStage: false };
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
     
     // Add inside array, set final stage
     const updated = [...finalStages, newStage];
@@ -381,6 +405,7 @@ export const OnboardingWizard: React.FC = () => {
     setWizardError(null);
   };
 
+<<<<<<< HEAD
   // Delete production checkpoints
   const handleDeleteStage = (index: number) => {
     if (setupStages[index].isFinalStage && setupStages.length > 1) {
@@ -388,6 +413,12 @@ export const OnboardingWizard: React.FC = () => {
       return;
     }
     const updated = setupStages.filter((_, idx) => idx !== index);
+=======
+  // Delete production checkpoints safely
+  const handleDeleteStage = (index: number) => {
+    const updated = setupStages.filter((_, idx) => idx !== index);
+    // Auto-assign the last remaining stage as the final stage to prevent UI blockages
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
     if (updated.length > 0 && !updated.some(s => s.isFinalStage)) {
       updated[updated.length - 1].isFinalStage = true;
     }
@@ -414,12 +445,17 @@ export const OnboardingWizard: React.FC = () => {
     setSetupStages(cleared);
   };
 
+<<<<<<< HEAD
   // Team members construction helpers
+=======
+  // Team members construction helpers (Auto updates duplicate emails silently)
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
   const handleAddTeamMember = () => {
     if (!memberName.trim() || !memberEmail.trim()) {
       setWizardError('Worker name and corporate email are required credentials.');
       return;
     }
+<<<<<<< HEAD
     if (teamMembers.some(m => m.email.toLowerCase() === memberEmail.trim().toLowerCase())) {
       setWizardError('Corporate identity is already scheduled for onboarding.');
       return;
@@ -429,6 +465,25 @@ export const OnboardingWizard: React.FC = () => {
       email: memberEmail.trim(),
       role: memberRole
     }]);
+=======
+
+    const cleanEmail = memberEmail.trim().toLowerCase();
+    const existingIdx = teamMembers.findIndex(m => m.email.toLowerCase() === cleanEmail);
+    
+    if (existingIdx >= 0) {
+      // Silently update existing user info instead of throwing a validation wall
+      const updated = [...teamMembers];
+      updated[existingIdx] = { name: memberName.trim(), email: cleanEmail, role: memberRole };
+      setTeamMembers(updated);
+    } else {
+      setTeamMembers([...teamMembers, {
+        name: memberName.trim(),
+        email: cleanEmail,
+        role: memberRole
+      }]);
+    }
+    
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
     setMemberName('');
     setMemberEmail('');
     setMemberRole('production');
@@ -485,7 +540,11 @@ export const OnboardingWizard: React.FC = () => {
       </header>
 
       {/* Main Wizard Area Viewport */}
+<<<<<<< HEAD
       <main className="flex-grow p-4 md:p-8 flex flex-col justify-center items-center">
+=======
+      <main className="grow p-4 md:p-8 flex flex-col justify-center items-center">
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
         
         {/* Progress Pipeline Dots */}
         <div className="max-w-3xl w-full flex items-center justify-between mb-8 px-4">
@@ -502,7 +561,11 @@ export const OnboardingWizard: React.FC = () => {
               </div>
               {st < 6 && (
                 <div 
+<<<<<<< HEAD
                   className={`flex-grow h-0.5 mx-2 transition-colors ${
+=======
+                  className={`grow h-0.5 mx-2 transition-colors ${
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
                     currentStep > st ? 'bg-sky-500' : 'bg-slate-850'
                   }`}
                 />
@@ -957,7 +1020,11 @@ export const OnboardingWizard: React.FC = () => {
                     type="checkbox"
                     checked={whatsappEnabled}
                     onChange={(e) => setWhatsappEnabled(e.target.checked)}
+<<<<<<< HEAD
                     className="h-5 w-5 bg-slate-900 border border-slate-800 rounded focus:ring-sky-500 checked:bg-sky-500 rounded-sm shrink-0 cursor-pointer"
+=======
+                    className="h-5 w-5 bg-slate-900 border border-slate-800 rounded focus:ring-sky-500 checked:bg-sky-500 shrink-0 cursor-pointer"
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
                   />
                 </div>
 
@@ -1011,7 +1078,11 @@ export const OnboardingWizard: React.FC = () => {
             {/* ==================== STEP 6: FINISH CELEBRATION ==================== */}
             {currentStep === 6 && (
               <div className="space-y-6 text-center py-6 animate-fade-in font-sans">
+<<<<<<< HEAD
                 <div className="h-16 w-16 bg-gradient-to-tr from-sky-400 to-sky-600 rounded-2xl flex items-center justify-center text-slate-950 font-black mx-auto shadow-sky-500/20 shadow-xl scale-110 mb-4 animate-bounce">
+=======
+                <div className="h-16 w-16 bg-linear-to-tr from-sky-400 to-sky-600 rounded-2xl flex items-center justify-center text-slate-950 font-black mx-auto shadow-sky-500/20 shadow-xl scale-110 mb-4 animate-bounce">
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
                   <Sparkles className="h-8 w-8 text-slate-950" />
                 </div>
 
@@ -1101,7 +1172,11 @@ export const OnboardingWizard: React.FC = () => {
                   onClick={handleFinish}
                   className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black px-6 py-4.5 rounded-lg flex items-center justify-center space-x-1.5 cursor-pointer text-sm uppercase tracking-widest transition-all shadow-xl shadow-emerald-500/10 active:scale-95 h-13"
                 >
+<<<<<<< HEAD
                   <Check className="h-4.5 w-4.5 text-slate-950 stroke-[3]" />
+=======
+                  <Check className="h-4.5 w-4.5 text-slate-950 stroke-3" />
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
                   <span>{saving ? 'Finalizing Profile Configurations...' : 'Launch Shard Dashboard'}</span>
                 </button>
               )}
@@ -1116,4 +1191,8 @@ export const OnboardingWizard: React.FC = () => {
 
     </div>
   );
+<<<<<<< HEAD
 };
+=======
+};
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145

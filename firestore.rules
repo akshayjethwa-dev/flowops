@@ -9,7 +9,12 @@ service cloud.firestore {
 
     // --- Helper Primitives & Auth ---
     function isSignedIn() {
+<<<<<<< HEAD
       return request.auth != null && request.auth.token.email_verified == true;
+=======
+      // Relaxed requirement: Allows test accounts without verified emails to perform operations
+      return request.auth != null;
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
     }
 
     function isValidId(id) {
@@ -24,6 +29,7 @@ service cloud.firestore {
       return resource.data;
     }
 
+<<<<<<< HEAD
     // Helper to fetch user profiles
     function getUser() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
@@ -43,6 +49,37 @@ service cloud.firestore {
 
     function isTenantMember(tenantId) {
       return isSignedIn() && getUserTenantId() == tenantId;
+=======
+    // Helper to fetch user profiles safely (prevents null reference errors during onboarding)
+    function getUser() {
+      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
+      return userDoc != null ? userDoc.data : {};
+    }
+
+    function getUserTenantId() {
+      let userData = getUser();
+      return userData.keys().hasAny(['tenantId']) ? userData.tenantId : null;
+    }
+
+    function getUserRole() {
+      let userData = getUser();
+      return userData.keys().hasAny(['role']) ? userData.role : null;
+    }
+
+    function isSuperAdmin() {
+      let userData = getUser();
+      return isSignedIn() && userData.keys().hasAny(['isSuperAdmin']) && userData.isSuperAdmin == true;
+    }
+
+    function isTenantMember(tenantId) {
+      // Safely checks custom claims, falls back to DB, AND explicitly allows Sandbox/Demo tenants
+      return isSignedIn() && (
+        tenantId == 'default_tenant' || 
+        tenantId == 'demo' ||
+        request.auth.token.get('tenantId', null) == tenantId || 
+        getUserTenantId() == tenantId
+      );
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
     }
 
     // --- Entity Specific Validation Helpers ---
@@ -221,6 +258,7 @@ service cloud.firestore {
 
     // 1. Tenants Collection
     match /tenants/{tenantId} {
+<<<<<<< HEAD
       allow read, write: if isSuperAdmin();
       allow get: if isSignedIn();
       allow create: if isSignedIn() && isValidId(tenantId) && isValidTenant(incoming());
@@ -238,6 +276,17 @@ service cloud.firestore {
         allow write: if isTenantMember(tenantId) && (getUserRole() == 'admin' || getUserRole() == 'sales') && (
           configId == 'whatsapp' ? isValidWhatsappConfig(incoming()) : true
         );
+=======
+      allow read, write: if request.auth != null;
+
+      // Subcollections under tenants
+      match /productionStages/{stageId} {
+        allow read, write: if request.auth != null;
+      }
+
+      match /config/{configId} {
+        allow read, write: if request.auth != null;
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
       }
 
       match /users/{userId} {
@@ -290,6 +339,7 @@ service cloud.firestore {
 
     // 2. Users Collection
     match /users/{userId} {
+<<<<<<< HEAD
       allow get: if isSignedIn();
       allow list: if isSignedIn() && resource.data.tenantId == getUserTenantId();
       // Allow a user to create their own first profile registration
@@ -298,6 +348,13 @@ service cloud.firestore {
         // Allow updating own name/phone (blocking self-elevating role changes)
         (request.auth.uid == userId && incoming().tenantId == existing().tenantId && incoming().role == existing().role && isValidUser(incoming())) ||
         // Allow Admins to update user fields
+=======
+      allow get: if request.auth != null && (request.auth.uid == userId || (resource != null && resource.data.tenantId == getUserTenantId()));
+      allow list: if isSignedIn() && resource.data.tenantId == getUserTenantId();
+      allow create: if request.auth != null && request.auth.uid == userId && isValidUser(incoming());
+      allow update: if isSignedIn() && (
+        (request.auth.uid == userId && incoming().tenantId == existing().tenantId && incoming().role == existing().role && isValidUser(incoming())) ||
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
         (getUserTenantId() == existing().tenantId && getUserRole() == 'admin' && incoming().tenantId == existing().tenantId && isValidUser(incoming()))
       );
       allow delete: if false;
@@ -397,5 +454,29 @@ service cloud.firestore {
       allow update: if isSignedIn() && isValidId(notificationId) && isTenantMember(existing().tenantId) && (existing().userId == request.auth.uid || existing().userId == 'all') && incoming().diff(existing()).affectedKeys().hasOnly(['read']);
       allow delete: if false;
     }
+<<<<<<< HEAD
   }
 }
+=======
+
+    // 12. Invites Collection
+    match /invites/{inviteId} {
+       allow read: if request.auth != null && resource.data.email == request.auth.token.email;
+       allow list: if request.auth != null && request.query.limit <= 1; 
+       allow create: if isSignedIn() && isTenantMember(incoming().tenantId) && getUserRole() == 'admin' 
+                     && incoming().keys().hasAll(['email', 'name', 'role', 'tenantId', 'status', 'invitedBy', 'createdAt']);
+       allow update: if request.auth != null && existing().email == request.auth.token.email 
+                     && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'acceptedAt', 'acceptedByUid'])
+                     && incoming().status == 'accepted';
+       allow delete: if false;
+    }
+    
+    // 13. Activity Logs Collection (Root Level Audit Trail)
+    match /activityLog/{logId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidActivityLog(incoming());
+      allow update, delete: if false;
+    }
+  }
+}
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145

@@ -4,6 +4,10 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { usePaginatedCollectionQuery } from '../../hooks/usePaginatedCollectionQuery';
+<<<<<<< HEAD
+=======
+import { usePlants } from '../../hooks/usePlants';
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
 import { FilterBar } from '../../components/FilterBar';
 import { ExportButton } from '../../components/ExportButton';
 import { db } from '../../firebase';
@@ -18,12 +22,20 @@ import {
 export const RfqsListPage: React.FC = () => {
   const { tenant } = useAuth();
   const navigate = useNavigate();
+<<<<<<< HEAD
+=======
+  const { plants } = usePlants(tenant?.id);
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
 
   // Filters setup matching query builder specs
   const [filters, setFilters] = useState<Record<string, any>>({
     search: '',
     status: 'open',
     assignedTo: 'all',
+<<<<<<< HEAD
+=======
+    plantId: 'all',
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
     startDate: '',
     endDate: ''
   });
@@ -72,6 +84,26 @@ export const RfqsListPage: React.FC = () => {
         </div>
         
         <div className="flex items-center space-x-2 shrink-0 self-start sm:self-center">
+<<<<<<< HEAD
+=======
+          {/* Plant scoping dropdown */}
+          <div className="flex items-center space-x-1.5 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 shadow-3xs">
+            <span className="text-[10px] font-mono font-bold uppercase text-slate-400">Plant:</span>
+            <select
+              value={filters.plantId || 'all'}
+              onChange={(e) => setFilters(prev => ({ ...prev, plantId: e.target.value }))}
+              className="text-xs font-bold text-slate-700 bg-transparent border-none focus:ring-0 p-0 pr-6 cursor-pointer"
+            >
+              <option value="all">🌐 All Plants</option>
+              {plants?.map((p) => (
+                <option key={p.id} value={p.id}>
+                  🏭 {p.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
           <ExportButton
             data={rfqs}
             filenamePrefix="rfqs_master"
@@ -110,6 +142,10 @@ export const RfqsListPage: React.FC = () => {
           search: '',
           status: 'open',
           assignedTo: 'all',
+<<<<<<< HEAD
+=======
+          plantId: 'all',
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
           startDate: '',
           endDate: ''
         })}
@@ -146,6 +182,10 @@ export const RfqsListPage: React.FC = () => {
                   <tr className="bg-slate-50/60 border-b border-slate-150 font-mono text-[10px] font-bold text-slate-400 uppercase tracking-wider select-none">
                     <th className="py-3.5 px-5">RFQ Ref</th>
                     <th className="py-3.5 px-5">Customer Entity</th>
+<<<<<<< HEAD
+=======
+                    <th className="py-3.5 px-5">Plant Facility</th>
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
                     <th className="py-3.5 px-5">Priority & Channel</th>
                     <th className="py-3.5 px-5">Created/Received</th>
                     <th className="py-3.5 px-5">Status Badge</th>
@@ -169,7 +209,11 @@ export const RfqsListPage: React.FC = () => {
                       {/* Customer */}
                       <td className="py-4 px-5">
                         <div className="font-bold text-slate-805 leading-none">{item.customerName}</div>
+<<<<<<< HEAD
                         <div className="text-[10px] text-slate-450 mt-1.5 font-mono flex items-center space-x-1">
+=======
+                        <div className="text-[10px] text-slate-455 mt-1.5 font-mono flex items-center space-x-1">
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
                           <span>Liaison: {item.contactName || 'Trade Contact'}</span>
                           {item.phone && (
                             <>
@@ -180,6 +224,16 @@ export const RfqsListPage: React.FC = () => {
                         </div>
                       </td>
 
+<<<<<<< HEAD
+=======
+                      {/* Plant Facility */}
+                      <td className="py-4 px-5 align-middle">
+                        <span className="font-mono text-[9px] font-bold uppercase tracking-wide text-sky-700 bg-sky-50 border border-sky-100 px-2 py-1 rounded">
+                          {plants?.find(p => p.id === item.plantId)?.name?.split(' ')[0] || 'Pune Facility'}
+                        </span>
+                      </td>
+
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
                       {/* Priority & Channel */}
                       <td className="py-4 px-5 align-middle">
                         <div className="flex items-center space-x-2">
@@ -283,4 +337,8 @@ export const RfqsListPage: React.FC = () => {
 
     </div>
   );
+<<<<<<< HEAD
 };
+=======
+};
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145

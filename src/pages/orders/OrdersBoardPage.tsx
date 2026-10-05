@@ -5,6 +5,10 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useProductionBoard } from '../../hooks/useProduction';
 import { useProductionStagesConfig } from '../../hooks/useProductionStagesConfig';
+<<<<<<< HEAD
+=======
+import { usePlants } from '../../hooks/usePlants';
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
 import { sendWhatsAppNotification } from '../../utils/whatsapp';
 import { PRODUCTION_STAGES_ENUM } from '../../data/mockData';
 import { ProductionJob, Order } from '../../types';
@@ -30,6 +34,10 @@ export const OrdersBoardPage: React.FC = () => {
   const { tenant, profile } = useAuth();
   const { jobs, orders, loading, error, updateJobStage } = useProductionBoard(tenant?.id);
   const { stages } = useProductionStagesConfig(tenant?.id);
+<<<<<<< HEAD
+=======
+  const { plants } = usePlants(tenant?.id);
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
 
   // Dynamic stages mapping from process config settings
   const activeStages = stages && stages.length > 0 
@@ -56,6 +64,12 @@ export const OrdersBoardPage: React.FC = () => {
       ];
 
   // States
+<<<<<<< HEAD
+=======
+  const [selectedPlantId, setSelectedPlantId] = useState<string>(() => {
+    return localStorage.getItem('production_selected_plant_id') || 'all';
+  });
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedMobileStage, setSelectedMobileStage] = useState<string>('cutting');
   const [stageNotes, setStageNotes] = useState('');
@@ -71,10 +85,18 @@ export const OrdersBoardPage: React.FC = () => {
   }, [stages, activeStages, selectedMobileStage]);
 
   // Filters output
+<<<<<<< HEAD
   const filteredJobs = jobs.filter(j => {
     const isSearchMatch = j.itemName.toLowerCase().includes(searchTerm.toLowerCase()) || 
                           j.id.toLowerCase().includes(searchTerm.toLowerCase());
     return isSearchMatch;
+=======
+  const filteredJobs = (jobs || []).filter(j => {
+    const matchesPlant = selectedPlantId === 'all' || j.plantId === selectedPlantId;
+    const isSearchMatch = j.itemName.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          j.id.toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesPlant && isSearchMatch;
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
   });
 
   // Overdue Check (placeholder checking if job was updated > 5 days ago and is not 'ready')
@@ -102,7 +124,11 @@ export const OrdersBoardPage: React.FC = () => {
       );
 
       // Trigger automatic WhatsApp update alert if contact details exit on parent Order card
+<<<<<<< HEAD
       const parentOrder = orders.find(o => o.id === job.orderId);
+=======
+      const parentOrder = (orders || []).find(o => o.id === job.orderId);
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
       if (parentOrder?.phone) {
         const displayLabel = activeStages.find(s => s.value === nextStage)?.label || nextStage;
         await sendWhatsAppNotification({
@@ -160,17 +186,26 @@ export const OrdersBoardPage: React.FC = () => {
         <div className="flex items-center space-x-3 text-right text-xs">
           <div className="p-2.5 bg-slate-50 border rounded-lg">
             <span className="text-[9px] text-slate-400 font-mono block uppercase">Yield Items WIP</span>
+<<<<<<< HEAD
             <span className="font-extrabold text-slate-800">{jobs.filter(j => j.currentStage !== 'ready').length} active lines</span>
           </div>
           <div className="p-2.5 bg-emerald-50 border border-emerald-150 rounded-lg text-emerald-800">
             <span className="text-[9px] text-emerald-600/70 font-mono block uppercase">Completed ready</span>
             <span className="font-black text-emerald-900">{jobs.filter(j => j.currentStage === 'ready').length} jobs</span>
+=======
+            <span className="font-extrabold text-slate-800">{(jobs || []).filter(j => j.currentStage !== 'ready').length} active lines</span>
+          </div>
+          <div className="p-2.5 bg-emerald-50 border border-emerald-150 rounded-lg text-emerald-800">
+            <span className="text-[9px] text-emerald-600/70 font-mono block uppercase">Completed ready</span>
+            <span className="font-black text-emerald-900">{(jobs || []).filter(j => j.currentStage === 'ready').length} jobs</span>
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
           </div>
         </div>
       </div>
 
       {/* Global Toolbar filters search input desk */}
       <div className="bg-white border rounded-xl p-4 flex flex-col md:flex-row items-center justify-between gap-4 select-none">
+<<<<<<< HEAD
         <div className="relative w-full md:w-80">
           <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
           <input
@@ -180,6 +215,40 @@ export const OrdersBoardPage: React.FC = () => {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
+=======
+        <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3 w-full md:w-auto">
+          <div className="relative w-full md:w-80">
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+            <input
+              type="text"
+              className="w-full bg-slate-50 hover:bg-slate-100/50 focus:bg-white text-xs pl-9 pr-4 py-2 border rounded-lg focus:outline-hidden"
+              placeholder="Search items, order refs, customer links..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+
+          {/* Plant Scoping Filter */}
+          <div className="flex items-center space-x-1.5 bg-white border border-slate-220 rounded-lg px-2.5 py-1.5 shadow-3xs">
+            <span className="text-[10px] font-mono font-bold uppercase text-slate-400">Plant:</span>
+            <select
+              value={selectedPlantId}
+              onChange={(e) => {
+                const val = e.target.value;
+                setSelectedPlantId(val);
+                localStorage.setItem('production_selected_plant_id', val);
+              }}
+              className="text-xs font-bold text-slate-705 bg-transparent border-none focus:ring-0 p-0 pr-6 cursor-pointer"
+            >
+              <option value="all">🌐 All Plants WIP</option>
+              {plants?.map((p) => (
+                <option key={p.id} value={p.id}>
+                  🏭 {p.name}
+                </option>
+              ))}
+            </select>
+          </div>
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
         </div>
 
         <div className="flex items-center space-x-2 w-full md:w-auto justify-end">
@@ -276,7 +345,11 @@ export const OrdersBoardPage: React.FC = () => {
               <JobCard 
                 key={job.id} 
                 job={job}
+<<<<<<< HEAD
                 orders={orders}
+=======
+                orders={orders || []}
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
                 onSelectStage={() => setActiveStageUpdateJob(job)}
                 isJobOverdue={isJobOverdue(job)}
                 onNavigateDetail={() => navigate(`/orders/${job.id}`)}
@@ -291,13 +364,21 @@ export const OrdersBoardPage: React.FC = () => {
       </div>
 
       {/* FULL DESKTOP HORIZONTALLY SCROLLING KANBAN SLABS */}
+<<<<<<< HEAD
       <div className="hidden lg:flex flex-row gap-4 min-h-[500px] overflow-x-auto pb-4 items-start select-none">
+=======
+      <div className="hidden lg:flex flex-row gap-4 min-h-125 overflow-x-auto pb-4 items-start select-none">
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
         {activeStages.map(col => {
           const colJobs = filteredJobs.filter(j => j.currentStage === col.value);
           return (
             <div 
               key={col.value}
+<<<<<<< HEAD
               className={`w-[260px] shrink-0 border border-slate-205/85 rounded-xl p-3 flex flex-col gap-3 min-h-[480px] group transition-all duration-200 border-t-4 ${col.color}`}
+=======
+              className={`w-65 shrink-0 border border-slate-205/85 rounded-xl p-3 flex flex-col gap-3 min-h-120 group transition-all duration-200 border-t-4 ${col.color}`}
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
             >
               {/* Header block details */}
               <div className="flex items-center justify-between font-mono pb-1.5 border-b border-dashed border-slate-200">
@@ -310,13 +391,21 @@ export const OrdersBoardPage: React.FC = () => {
               </div>
 
               {/* Stacked Cards */}
+<<<<<<< HEAD
               <div className="space-y-3 flex-1 overflow-y-auto max-h-[600px] pr-1 scrollbar-thin">
+=======
+              <div className="space-y-3 flex-1 overflow-y-auto max-h-150 pr-1 scrollbar-thin">
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
                 {colJobs.length > 0 ? (
                   colJobs.map(job => (
                     <JobCard 
                       key={job.id} 
                       job={job}
+<<<<<<< HEAD
                       orders={orders}
+=======
+                      orders={orders || []}
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
                       onSelectStage={() => setActiveStageUpdateJob(job)}
                       isJobOverdue={isJobOverdue(job)}
                       onNavigateDetail={() => navigate(`/orders/${job.id}`)}
@@ -406,4 +495,8 @@ const JobCard: React.FC<JobCardProps> = ({
       </div>
     </div>
   );
+<<<<<<< HEAD
 };
+=======
+};
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145

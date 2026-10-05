@@ -29,10 +29,18 @@ export const useQuotation = (quotationId: string | undefined) => {
   const [quotation, setQuotation] = useState<Quote | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+<<<<<<< HEAD
   const { tenant } = useAuth();
 
   useEffect(() => {
     if (!quotationId || !tenant?.id) {
+=======
+  const { tenant, profile } = useAuth(); // 🔒 IMPORT PROFILE
+
+  useEffect(() => {
+    // 🔒 SECURITY CHECK: Ensure user's verified profile matches the active tenant state
+    if (!quotationId || !tenant?.id || !profile?.tenantId || tenant.id !== profile.tenantId) {
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
       setLoading(false);
       return;
     }
@@ -44,7 +52,11 @@ export const useQuotation = (quotationId: string | undefined) => {
 
     if (isSandbox) {
       try {
+<<<<<<< HEAD
         const cached = localStorage.getItem(`quotes_${tenant.id}`);
+=======
+        const cached = localStorage.getItem(`quotes_${profile.tenantId}`);
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
         if (cached) {
           const list = JSON.parse(cached) as Quote[];
           const found = list.find(q => q.id === quotationId);
@@ -61,7 +73,11 @@ export const useQuotation = (quotationId: string | undefined) => {
       const qPath = 'quotes';
       const q = query(
         collection(db, qPath),
+<<<<<<< HEAD
         where('tenantId', '==', tenant.id),
+=======
+        where('tenantId', '==', profile.tenantId), // 🔒 Enforce strictly via Profile
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
         where('id', '==', quotationId)
       );
 
@@ -79,7 +95,11 @@ export const useQuotation = (quotationId: string | undefined) => {
 
       return () => unsubscribe();
     }
+<<<<<<< HEAD
   }, [quotationId, tenant?.id]);
+=======
+  }, [quotationId, tenant?.id, profile?.tenantId]);
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
 
   return { quotation, loading, error };
 };
@@ -89,10 +109,18 @@ export const useQuotationList = (rfqId?: string) => {
   const [quotations, setQuotations] = useState<Quote[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+<<<<<<< HEAD
   const { tenant } = useAuth();
 
   useEffect(() => {
     if (!tenant?.id) {
+=======
+  const { tenant, profile } = useAuth(); // 🔒 IMPORT PROFILE
+
+  useEffect(() => {
+    // 🔒 SECURITY CHECK: Mitigate client side local storage tampering
+    if (!tenant?.id || !profile?.tenantId || tenant.id !== profile.tenantId) {
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
       setLoading(false);
       return;
     }
@@ -104,7 +132,11 @@ export const useQuotationList = (rfqId?: string) => {
 
     if (isSandbox) {
       try {
+<<<<<<< HEAD
         const cached = localStorage.getItem(`quotes_${tenant.id}`);
+=======
+        const cached = localStorage.getItem(`quotes_${profile.tenantId}`);
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
         if (cached) {
           let list = JSON.parse(cached) as Quote[];
           if (rfqId) {
@@ -123,13 +155,21 @@ export const useQuotationList = (rfqId?: string) => {
       const qPath = 'quotes';
       let q = query(
         collection(db, qPath),
+<<<<<<< HEAD
         where('tenantId', '==', tenant.id)
+=======
+        where('tenantId', '==', profile.tenantId) // 🔒 Enforce strictly via Profile
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
       );
 
       if (rfqId) {
         q = query(
           collection(db, qPath),
+<<<<<<< HEAD
           where('tenantId', '==', tenant.id),
+=======
+          where('tenantId', '==', profile.tenantId),
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
           where('rfqId', '==', rfqId)
         );
       }
@@ -150,7 +190,11 @@ export const useQuotationList = (rfqId?: string) => {
 
       return () => unsubscribe();
     }
+<<<<<<< HEAD
   }, [tenant?.id, rfqId]);
+=======
+  }, [tenant?.id, profile?.tenantId, rfqId]);
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
 
   return { quotations, loading, error };
 };
@@ -162,8 +206,14 @@ export const useCreateQuotation = () => {
   const { tenant, profile } = useAuth();
 
   const createQuotation = async (quotationData: Omit<Quote, 'id' | 'tenantId' | 'createdBy' | 'createdAt'>) => {
+<<<<<<< HEAD
     if (!tenant?.id || !profile?.uid) {
       throw new Error('User or tenant context missing.');
+=======
+    // 🔒 SECURITY CHECK
+    if (!tenant?.id || !profile?.uid || !profile?.tenantId || tenant.id !== profile.tenantId) {
+      throw new Error('User or tenant context missing or unauthorized cross-tenant action attempted.');
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
     }
 
     setLoading(true);
@@ -174,13 +224,18 @@ export const useCreateQuotation = () => {
     const newQuotation: Quote = {
       ...quotationData,
       id: newQuoteId,
+<<<<<<< HEAD
       tenantId: tenant.id,
+=======
+      tenantId: profile.tenantId, // 🔒 Force to authenticated profile id
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
       createdBy: profile.uid,
       createdAt: isSandbox ? new Date().toISOString() : serverTimestamp()
     };
 
     try {
       if (isSandbox) {
+<<<<<<< HEAD
         const cached = localStorage.getItem(`quotes_${tenant.id}`);
         const list: Quote[] = cached ? JSON.parse(cached) : [];
         const updated = [newQuotation, ...list];
@@ -189,19 +244,37 @@ export const useCreateQuotation = () => {
         // Update associated RFQ
         if (quotationData.rfqId && quotationData.rfqId !== 'direct_quote') {
           const rfqsCached = localStorage.getItem(`rfqs_${tenant.id}`);
+=======
+        const cached = localStorage.getItem(`quotes_${profile.tenantId}`);
+        const list: Quote[] = cached ? JSON.parse(cached) : [];
+        const updated = [newQuotation, ...list];
+        localStorage.setItem(`quotes_${profile.tenantId}`, JSON.stringify(updated));
+
+        // Update associated RFQ
+        if (quotationData.rfqId && quotationData.rfqId !== 'direct_quote') {
+          const rfqsCached = localStorage.getItem(`rfqs_${profile.tenantId}`);
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
           if (rfqsCached) {
             const rfqsList = JSON.parse(rfqsCached);
             const rfqUpdated = rfqsList.map((r: any) => 
               r.id === quotationData.rfqId ? { ...r, status: 'quoted' } : r
             );
+<<<<<<< HEAD
             localStorage.setItem(`rfqs_${tenant.id}`, JSON.stringify(rfqUpdated));
+=======
+            localStorage.setItem(`rfqs_${profile.tenantId}`, JSON.stringify(rfqUpdated));
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
           }
         }
       } else {
         await addDoc(collection(db, 'quotes'), newQuotation);
 
         if (quotationData.rfqId && quotationData.rfqId !== 'direct_quote') {
+<<<<<<< HEAD
           const rfqSnap = await getDocs(query(collection(db, 'rfqs'), where('id', '==', quotationData.rfqId), where('tenantId', '==', tenant.id)));
+=======
+          const rfqSnap = await getDocs(query(collection(db, 'rfqs'), where('id', '==', quotationData.rfqId), where('tenantId', '==', profile.tenantId)));
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
           if (!rfqSnap.empty) {
             await updateDoc(doc(db, 'rfqs', rfqSnap.docs[0].id), { status: 'quoted' });
           }
@@ -209,7 +282,11 @@ export const useCreateQuotation = () => {
       }
 
       logActivityEvent({
+<<<<<<< HEAD
         tenantId: tenant.id,
+=======
+        tenantId: profile.tenantId,
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
         actionType: 'create',
         entityType: 'quotation',
         entityId: newQuoteId,
@@ -243,10 +320,20 @@ export const useCreateQuotation = () => {
 export const useUpdateQuotation = () => {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+<<<<<<< HEAD
   const { tenant } = useAuth();
 
   const updateQuotation = async (quotationId: string, updates: Partial<Quote>) => {
     if (!tenant?.id) throw new Error('Tenant context missing.');
+=======
+  const { tenant, profile } = useAuth(); // 🔒 IMPORT PROFILE
+
+  const updateQuotation = async (quotationId: string, updates: Partial<Quote>) => {
+    // 🔒 SECURITY CHECK
+    if (!tenant?.id || !profile?.tenantId || tenant.id !== profile.tenantId) {
+      throw new Error('Tenant context missing or unauthorized cross-tenant action attempted.');
+    }
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
 
     setLoading(true);
     setError(null);
@@ -255,6 +342,7 @@ export const useUpdateQuotation = () => {
 
     try {
       if (isSandbox) {
+<<<<<<< HEAD
         const cached = localStorage.getItem(`quotes_${tenant.id}`);
         if (cached) {
           const list = JSON.parse(cached) as Quote[];
@@ -263,6 +351,16 @@ export const useUpdateQuotation = () => {
         }
       } else {
         const qSnap = await getDocs(query(collection(db, 'quotes'), where('id', '==', quotationId), where('tenantId', '==', tenant.id)));
+=======
+        const cached = localStorage.getItem(`quotes_${profile.tenantId}`);
+        if (cached) {
+          const list = JSON.parse(cached) as Quote[];
+          const updated = list.map(q => q.id === quotationId ? { ...q, ...updates } : q);
+          localStorage.setItem(`quotes_${profile.tenantId}`, JSON.stringify(updated));
+        }
+      } else {
+        const qSnap = await getDocs(query(collection(db, 'quotes'), where('id', '==', quotationId), where('tenantId', '==', profile.tenantId)));
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
         if (!qSnap.empty) {
           await updateDoc(doc(db, 'quotes', qSnap.docs[0].id), updates);
         } else {
@@ -284,11 +382,22 @@ export const useUpdateQuotation = () => {
 export const useGeneratePDF = () => {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+<<<<<<< HEAD
   const { tenant } = useAuth();
   const { updateQuotation } = useUpdateQuotation();
 
   const generatePDF = async (quote: Quote, pdfBlob: Blob): Promise<string> => {
     if (!tenant?.id) throw new Error('Tenant context missing.');
+=======
+  const { tenant, profile } = useAuth();
+  const { updateQuotation } = useUpdateQuotation();
+
+  const generatePDF = async (quote: Quote, pdfBlob: Blob): Promise<string> => {
+    // 🔒 SECURITY CHECK
+    if (!tenant?.id || !profile?.tenantId || tenant.id !== profile.tenantId) {
+      throw new Error('Tenant context missing or unauthorized cross-tenant action attempted.');
+    }
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
 
     setLoading(true);
     setError(null);
@@ -322,7 +431,11 @@ export const useGeneratePDF = () => {
         });
       } else {
         // Upload real PDF to Firebase Storage
+<<<<<<< HEAD
         const storagePath = `tenant/${tenant.id}/quotations/${quote.id}/v${nextVersion}.pdf`;
+=======
+        const storagePath = `tenant/${profile.tenantId}/quotations/${quote.id}/v${nextVersion}.pdf`;
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
         const fileRef = ref(storage, storagePath);
         
         await uploadBytes(fileRef, pdfBlob, { contentType: 'application/pdf' });
@@ -364,7 +477,14 @@ export const useSendQuotation = () => {
   const { updateQuotation } = useUpdateQuotation();
 
   const sendWhatsApp = async (quote: Quote, downloadUrl: string) => {
+<<<<<<< HEAD
     if (!tenant?.id || !profile?.uid) throw new Error('Auth scope missing.');
+=======
+    // 🔒 SECURITY CHECK
+    if (!tenant?.id || !profile?.uid || !profile?.tenantId || tenant.id !== profile.tenantId) {
+      throw new Error('Auth scope missing or unauthorized cross-tenant action attempted.');
+    }
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
     if (!quote.phone) throw new Error('Customer phone not configured.');
 
     setLoading(true);
@@ -378,7 +498,11 @@ export const useSendQuotation = () => {
         recipientName: quote.customerName,
         recipientPhone: quote.phone,
         templateName: 'quotation_pdf_shared',
+<<<<<<< HEAD
         tenantId: tenant.id,
+=======
+        tenantId: profile.tenantId,
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
         parameters: {
           quotationNumber: quote.quoteNumber,
           validUntil: validUntilStr,
@@ -393,7 +517,11 @@ export const useSendQuotation = () => {
       // Log dispatch communication securely in Firestore or local log
       if (!isSandbox) {
         await addDoc(collection(db, 'communicationLogs'), {
+<<<<<<< HEAD
           tenantId: tenant.id,
+=======
+          tenantId: profile.tenantId,
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
           quoteId: quote.id,
           recipientName: quote.customerName,
           recipientPhone: quote.phone,
@@ -408,7 +536,11 @@ export const useSendQuotation = () => {
       }
 
       logActivityEvent({
+<<<<<<< HEAD
         tenantId: tenant.id,
+=======
+        tenantId: profile.tenantId,
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
         actionType: 'sent',
         entityType: 'quotation',
         entityId: quote.id,
@@ -436,7 +568,14 @@ export const useSendQuotation = () => {
   };
 
   const sendEmail = async (quote: Quote, downloadUrl: string, destinationEmail: string) => {
+<<<<<<< HEAD
     if (!tenant?.id || !profile?.uid) throw new Error('Auth scope missing.');
+=======
+    // 🔒 SECURITY CHECK
+    if (!tenant?.id || !profile?.uid || !profile?.tenantId || tenant.id !== profile.tenantId) {
+      throw new Error('Auth scope missing or unauthorized cross-tenant action attempted.');
+    }
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
     if (!destinationEmail) throw new Error('Target destination email missing.');
 
     setLoading(true);
@@ -457,7 +596,11 @@ export const useSendQuotation = () => {
 
       if (!isSandbox) {
         await addDoc(collection(db, 'communicationLogs'), {
+<<<<<<< HEAD
           tenantId: tenant.id,
+=======
+          tenantId: profile.tenantId,
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
           quoteId: quote.id,
           recipientName: quote.customerName,
           recipientEmail: destinationEmail,
@@ -472,7 +615,11 @@ export const useSendQuotation = () => {
       }
 
       logActivityEvent({
+<<<<<<< HEAD
         tenantId: tenant.id,
+=======
+        tenantId: profile.tenantId,
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
         actionType: 'sent',
         entityType: 'quotation',
         entityId: quote.id,
@@ -500,4 +647,8 @@ export const useSendQuotation = () => {
   };
 
   return { sendWhatsApp, sendEmail, loading, error };
+<<<<<<< HEAD
 };
+=======
+};
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145

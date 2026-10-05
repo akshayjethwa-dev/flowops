@@ -709,6 +709,7 @@ export interface Plant {
   gstin?: string;
   processStages: ProductionStageConfig[];
   createdAt: string;
+<<<<<<< HEAD
 }
 
 // ==========================================
@@ -764,4 +765,6 @@ export interface ProductMaterial {
   consumption_stage_id?: string;
   createdAt?: string;
   updatedAt?: string;
+=======
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
 }

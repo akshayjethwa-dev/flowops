@@ -26,7 +26,13 @@ import {
 import { TextField } from '../../components/ui/TextField';
 
 export const CustomersListPage: React.FC = () => {
+<<<<<<< HEAD
   const { tenant } = useAuth();
+=======
+  const { tenant, activePlantId, plants = [] } = useAuth();
+  const activeTenantId = tenant?.id;
+  
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
   const navigate = useNavigate();
 
   // Unified Filter mapping
@@ -35,7 +41,12 @@ export const CustomersListPage: React.FC = () => {
     status: '',
     tag: '',
     assignedSalesUserId: '',
+<<<<<<< HEAD
     city: ''
+=======
+    city: '',
+    plantId: 'all'
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
   });
 
   const isSandbox = localStorage.getItem('isSandboxMode') === 'true' || !db;
@@ -46,7 +57,12 @@ export const CustomersListPage: React.FC = () => {
     type: filters.status === 'customer' || filters.status === 'dealer' ? filters.status : '',
     tag: filters.tag,
     assignedSalesUserId: filters.assignedSalesUserId,
+<<<<<<< HEAD
     city: filters.city
+=======
+    city: filters.city,
+    plantId: filters.plantId === 'all' ? '' : filters.plantId
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
   };
 
   // Lazy chunked loader
@@ -56,16 +72,27 @@ export const CustomersListPage: React.FC = () => {
     loadingMore,
     hasMore,
     error: listError,
+<<<<<<< HEAD
     loadMore
   } = usePaginatedCollectionQuery<Customer & { id: string }>(
     tenant?.id ? `tenants/${tenant.id}/customers` : 'customers',
+=======
+    loadMore,
+    reset
+  } = usePaginatedCollectionQuery<Customer & { id: string }>(
+    activeTenantId ? `tenants/${activeTenantId}/customers` : '',
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
     {
       filters: queryFilters,
       pageSize: 8,
       sortField: 'createdAt',
       sortDirection: 'desc',
       isSandbox,
+<<<<<<< HEAD
       localBackupKey: `customers_${tenant?.id}`
+=======
+      localBackupKey: `customers_${activeTenantId}`
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
     }
   );
 
@@ -74,10 +101,17 @@ export const CustomersListPage: React.FC = () => {
     addCustomer, 
     updateCustomer, 
     deleteCustomer 
+<<<<<<< HEAD
   } = useCustomersList(tenant?.id);
 
   // Retrieve tenant users to map assignments
   const { users: tenantUsers } = useTenantUsers(tenant?.id);
+=======
+  } = useCustomersList(activeTenantId);
+
+  // Retrieve tenant users to map assignments
+  const { users: tenantUsers } = useTenantUsers(activeTenantId);
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
   const salesExecutives = (tenantUsers || []).filter(
     u => u.role === 'sales' || u.role === 'admin' || u.role === 'management'
   );
@@ -85,6 +119,10 @@ export const CustomersListPage: React.FC = () => {
   // Slide-over Form States
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+<<<<<<< HEAD
+=======
+  const [isSubmitting, setIsSubmitting] = useState(false);
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
 
   // Form Fields
   const [name, setName] = useState('');
@@ -99,6 +137,10 @@ export const CustomersListPage: React.FC = () => {
   const [notes, setNotes] = useState('');
   const [tagsInput, setTagsInput] = useState('');
   const [assignedSalesUserId, setAssignedSalesUserId] = useState('');
+<<<<<<< HEAD
+=======
+  const [plantId, setPlantId] = useState('all');
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
 
   // Reset form helper
   const resetForm = () => {
@@ -114,11 +156,19 @@ export const CustomersListPage: React.FC = () => {
     setNotes('');
     setTagsInput('');
     setAssignedSalesUserId('');
+<<<<<<< HEAD
+=======
+    setPlantId(activePlantId && activePlantId !== 'all' ? activePlantId : 'all');
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
     setEditingCustomer(null);
   };
 
   const handleOpenCreate = () => {
     resetForm();
+<<<<<<< HEAD
+=======
+    setPlantId(activePlantId && activePlantId !== 'all' ? activePlantId : 'all');
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
     setIsDrawerOpen(true);
   };
 
@@ -137,6 +187,10 @@ export const CustomersListPage: React.FC = () => {
     setNotes(cust.notes || '');
     setTagsInput(cust.tags ? cust.tags.join(', ') : '');
     setAssignedSalesUserId(cust.assignedSalesUserId || '');
+<<<<<<< HEAD
+=======
+    setPlantId(cust.plantId || 'all');
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
     setIsDrawerOpen(true);
   };
 
@@ -147,6 +201,11 @@ export const CustomersListPage: React.FC = () => {
       return;
     }
 
+<<<<<<< HEAD
+=======
+    setIsSubmitting(true);
+
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
     const processedTags = tagsInput
       .split(',')
       .map(t => t.trim())
@@ -158,6 +217,7 @@ export const CustomersListPage: React.FC = () => {
       contactPerson,
       phone,
       email,
+<<<<<<< HEAD
       gstNumber: gstNumber || undefined,
       billingAddress,
       shippingAddress,
@@ -165,6 +225,16 @@ export const CustomersListPage: React.FC = () => {
       notes: notes || undefined,
       tags: processedTags,
       assignedSalesUserId: assignedSalesUserId || undefined
+=======
+      gstNumber,
+      billingAddress,
+      shippingAddress,
+      city,
+      notes,
+      tags: processedTags,
+      assignedSalesUserId,
+      plantId: plantId === 'all' ? 'all' : plantId
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
     };
 
     try {
@@ -177,8 +247,19 @@ export const CustomersListPage: React.FC = () => {
       }
       setIsDrawerOpen(false);
       resetForm();
+<<<<<<< HEAD
     } catch (err: any) {
       alert(`Operation failed: ${err.message || err}`);
+=======
+
+      // Refresh the paginated collection query list to fetch the newly updated/created customer
+      reset();
+
+    } catch (err: any) {
+      alert(err.message || 'An error occurred while saving.');
+    } finally {
+      setIsSubmitting(false);
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
     }
   };
 
@@ -188,6 +269,10 @@ export const CustomersListPage: React.FC = () => {
       try {
         await deleteCustomer(id);
         alert('Customer record deleted.');
+<<<<<<< HEAD
+=======
+        reset();
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
       } catch (err: any) {
         alert(`Error deleting customer: ${err.message}`);
       }
@@ -212,7 +297,11 @@ export const CustomersListPage: React.FC = () => {
         </div>
         <div className="flex items-center space-x-2 shrink-0 self-start sm:self-center">
           <ExportButton
+<<<<<<< HEAD
             data={customers}
+=======
+            data={customers || []}
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
             filenamePrefix="customers_registry"
             headersMap={{
               name: 'Enterprise Name',
@@ -241,7 +330,11 @@ export const CustomersListPage: React.FC = () => {
       {/* Dynamic FilterBar component */}
       <FilterBar
         entityType="customers"
+<<<<<<< HEAD
         tenantId={tenant?.id || 'demo'}
+=======
+        tenantId={activeTenantId || 'demo'}
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
         filters={filters}
         onFilterChange={(updated) => setFilters(updated)}
         onClearFilters={() => setFilters({
@@ -273,7 +366,11 @@ export const CustomersListPage: React.FC = () => {
             value={filters.city || ''}
             onChange={(e) => setFilters(prev => ({ ...prev, city: e.target.value }))}
             placeholder="Pune, MH"
+<<<<<<< HEAD
             className="border border-slate-200 bg-white rounded-lg px-2 py-1 text-[11px] focus:outline-hidden focus:ring-1 focus:ring-sky-500 max-w-[120px] font-mono text-slate-800"
+=======
+            className="border border-slate-200 bg-white rounded-lg px-2 py-1 text-[11px] focus:outline-hidden focus:ring-1 focus:ring-sky-500 max-w-30 font-mono text-slate-800"
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
           />
         </div>
 
@@ -286,7 +383,11 @@ export const CustomersListPage: React.FC = () => {
             className="border border-slate-200 bg-white rounded-lg px-2 py-1 text-[11px] focus:outline-hidden text-slate-800 font-sans"
           >
             <option value="">All Executives</option>
+<<<<<<< HEAD
             {salesExecutives.map(u => (
+=======
+            {(salesExecutives || []).map(u => (
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
               <option key={u.id} value={u.id}>{u.name}</option>
             ))}
           </select>
@@ -300,6 +401,7 @@ export const CustomersListPage: React.FC = () => {
             value={filters.tag || ''}
             onChange={(e) => setFilters(prev => ({ ...prev, tag: e.target.value }))}
             placeholder="e.g. Priority"
+<<<<<<< HEAD
             className="border border-slate-200 bg-white rounded-lg px-2 py-1 text-[11px] focus:outline-hidden focus:ring-1 focus:ring-sky-500 max-w-[120px] font-mono text-slate-800"
           />
         </div>
@@ -307,6 +409,30 @@ export const CustomersListPage: React.FC = () => {
         {(filters.city || filters.assignedSalesUserId || filters.tag) && (
           <button
             onClick={() => setFilters(prev => ({ ...prev, city: '', assignedSalesUserId: '', tag: '' }))}
+=======
+            className="border border-slate-200 bg-white rounded-lg px-2 py-1 text-[11px] focus:outline-hidden focus:ring-1 focus:ring-sky-500 max-w-30 font-mono text-slate-800"
+          />
+        </div>
+
+        {/* Plant Scope Filter */}
+        <div className="flex items-center space-x-1.5">
+          <span className="text-slate-400 font-mono text-[9px]">Plant Scope:</span>
+          <select
+            value={filters.plantId || 'all'}
+            onChange={(e) => setFilters(prev => ({ ...prev, plantId: e.target.value }))}
+            className="border border-slate-200 bg-white rounded-lg px-2 py-1 text-[11px] focus:outline-hidden text-slate-800 font-mono"
+          >
+            <option value="all">🌐 All Plants</option>
+            {(plants || []).map(p => (
+              <option key={p.id} value={p.id}>🏭 {p.name}</option>
+            ))}
+          </select>
+        </div>
+
+        {(filters.city || filters.assignedSalesUserId || filters.tag || filters.plantId !== 'all') && (
+          <button
+            onClick={() => setFilters(prev => ({ ...prev, city: '', assignedSalesUserId: '', tag: '', plantId: 'all' }))}
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
             className="ml-auto text-[9px] text-rose-600 hover:text-rose-800 font-mono font-bold uppercase transition cursor-pointer"
           >
             × Clear CRM Filters
@@ -326,7 +452,11 @@ export const CustomersListPage: React.FC = () => {
           <h4 className="font-bold text-slate-900 text-sm">Failed to Sync Corporate Records</h4>
           <p className="text-[11px] text-slate-505 mt-1">{listError}</p>
         </div>
+<<<<<<< HEAD
       ) : customers.length > 0 ? (
+=======
+      ) : (customers || []).length > 0 ? (
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
         <div className="space-y-4">
           {/* DESKTOP TABULAR VIEW */}
           <div className="hidden md:block bg-white border border-slate-200 rounded-xl overflow-hidden shadow-2xs select-none">
@@ -342,7 +472,11 @@ export const CustomersListPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-xs">
+<<<<<<< HEAD
                   {customers.map((c) => (
+=======
+                  {(customers || []).map((c) => (
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
                     <tr 
                       key={c.id} 
                       onClick={() => navigate(`/customers/${c.id}`)}
@@ -359,17 +493,33 @@ export const CustomersListPage: React.FC = () => {
                           {c.email && (
                             <>
                               <span>•</span>
+<<<<<<< HEAD
                               <span className="truncate max-w-[150px] font-mono lowercase">{c.email}</span>
+=======
+                              <span className="truncate max-w-37.5 font-mono lowercase">{c.email}</span>
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
                             </>
                           )}
                         </div>
                         {c.assignedSalesUserId && (
                           <div className="text-[10px] mt-1 text-slate-500">
                             <span className="font-mono bg-indigo-50/50 hover:bg-indigo-50 text-indigo-750 px-1.5 py-0.5 rounded border border-indigo-100 font-semibold text-[9px]">
+<<<<<<< HEAD
                               Liaison: {salesExecutives.find(u => u.id === c.assignedSalesUserId)?.name || 'Account Rep'}
                             </span>
                           </div>
                         )}
+=======
+                              Liaison: {(salesExecutives || []).find(u => u.id === c.assignedSalesUserId)?.name || 'Account Rep'}
+                            </span>
+                          </div>
+                        )}
+                        <div className="text-[10px] mt-1 text-slate-500">
+                          <span className="font-mono bg-amber-50 text-amber-800 px-1.5 py-0.5 rounded border border-amber-100 font-bold text-[8.5px] inline-flex items-center gap-1 uppercase tracking-wider">
+                            Plant: {(plants || []).find(p => p.id === c.plantId)?.name?.split(' ')[0] || 'All Facilities'}
+                          </span>
+                        </div>
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
                         {/* Tags display */}
                         {c.tags && c.tags.length > 0 && (
                           <div className="flex flex-wrap gap-1 mt-2">
@@ -414,7 +564,11 @@ export const CustomersListPage: React.FC = () => {
                         <div className="inline-flex items-center space-x-1">
                           <button
                             onClick={(e) => handleOpenEdit(e, c)}
+<<<<<<< HEAD
                             className="p-1 px-2.5 bg-slate-50 hover:bg-slate-100 hover:text-slate-900 border border-slate-200 text-slate-650 rounded-lg text-[10px] font-bold font-mono uppercase tracking-wider flex items-center space-x-1 transition-all cursor-pointer"
+=======
+                            className="p-1 px-2.5 bg-slate-50 hover:bg-slate-100 hover:text-slate-900 border border-slate-200 text-slate-655 rounded-lg text-[10px] font-bold font-mono uppercase tracking-wider flex items-center space-x-1 transition-all cursor-pointer"
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
                           >
                             <Edit2 className="h-3 w-3 shrink-0" />
                             <span>Edit</span>
@@ -440,7 +594,11 @@ export const CustomersListPage: React.FC = () => {
 
           {/* MOBILE CARD LAYOUT */}
           <div className="grid grid-cols-1 gap-4 md:hidden">
+<<<<<<< HEAD
             {customers.map((c) => (
+=======
+            {(customers || []).map((c) => (
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
               <div 
                 key={c.id}
                 onClick={() => navigate(`/customers/${c.id}`)}
@@ -454,8 +612,18 @@ export const CustomersListPage: React.FC = () => {
                     </h3>
                     <p className="text-[10px] font-mono text-slate-500 leading-none mt-0.5">Contact: {c.contactPerson}</p>
                     {c.assignedSalesUserId && (
+<<<<<<< HEAD
                       <p className="text-[9px] font-mono text-indigo-755 font-semibold bg-indigo-50/40 px-1 py-0.5 rounded border border-indigo-100 inline-block mt-1 select-none">
                         Rep: {salesExecutives.find(u => u.id === c.assignedSalesUserId)?.name || 'Account Rep'}
+=======
+                      <p className="text-[9px] font-mono text-indigo-755 font-semibold bg-indigo-50/40 px-1 py-0.5 rounded border border-indigo-100 inline-block mt-1 select-none mr-1.5">
+                        Rep: {(salesExecutives || []).find(u => u.id === c.assignedSalesUserId)?.name || 'Account Rep'}
+                      </p>
+                    )}
+                    {c.plantId && c.plantId !== 'all' && (
+                      <p className="text-[9px] font-mono text-amber-800 font-semibold bg-amber-50/80 px-1 py-0.5 rounded border border-amber-150 inline-block mt-1 select-none">
+                        Plant: {(plants || []).find(p => p.id === c.plantId)?.name || c.plantId}
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
                       </p>
                     )}
                   </div>
@@ -582,7 +750,11 @@ export const CustomersListPage: React.FC = () => {
               </div>
 
               {/* Scrollable Form body */}
+<<<<<<< HEAD
               <form onSubmit={handleSubmit} className="flex-grow overflow-y-auto p-6 space-y-5 min-h-0 select-none">
+=======
+              <form onSubmit={handleSubmit} className="grow overflow-y-auto p-6 space-y-5 min-h-0 select-none">
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
                 
                 {/* 1. Brand name */}
                 <TextField
@@ -611,7 +783,11 @@ export const CustomersListPage: React.FC = () => {
                     >
                       <Building2 className={`h-5 w-5 mb-1 ${type === 'customer' ? 'text-emerald-600' : 'text-slate-404'}`} />
                       <span className="text-xs uppercase tracking-wider font-mono">Customer</span>
+<<<<<<< HEAD
                       <span className="text-[8px] text-slate-400 font-sans font-normal normal-case mt-0.5 mt-1 block">Simple custom orders</span>
+=======
+                      <span className="text-[8px] text-slate-400 font-sans font-normal normal-case mt-0.5 block">Simple custom orders</span>
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
                     </button>
                     <button
                       type="button"
@@ -624,7 +800,11 @@ export const CustomersListPage: React.FC = () => {
                     >
                       <ArrowRightLeft className={`h-5 w-5 mb-1 ${type === 'dealer' ? 'text-indigo-600' : 'text-slate-404'}`} />
                       <span className="text-xs uppercase tracking-wider font-mono">Dealer</span>
+<<<<<<< HEAD
                       <span className="text-[8px] text-slate-400 font-sans font-normal normal-case mt-0.5 mt-1 block">High-volume wholesale hub</span>
+=======
+                      <span className="text-[8px] text-slate-400 font-sans font-normal normal-case mt-0.5 block">High-volume wholesale hub</span>
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
                     </button>
                   </div>
                 </div>
@@ -688,7 +868,11 @@ export const CustomersListPage: React.FC = () => {
                     Billing Address & Registered corporate seat
                   </label>
                   <textarea
+<<<<<<< HEAD
                     className="w-full text-xs font-sans border border-slate-200 hover:border-slate-250 bg-slate-50 rounded-lg p-2.5 min-h-[50px] focus:bg-white focus:outline-hidden text-slate-800"
+=======
+                    className="w-full text-xs font-sans border border-slate-200 hover:border-slate-250 bg-slate-50 rounded-lg p-2.5 min-h-12.5 focus:bg-white focus:outline-hidden text-slate-800"
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
                     placeholder="Enter official billing coordinate details..."
                     value={billingAddress}
                     onChange={(e) => setBillingAddress(e.target.value)}
@@ -701,7 +885,11 @@ export const CustomersListPage: React.FC = () => {
                     Shipping Address / Lorry unloading yard
                   </label>
                   <textarea
+<<<<<<< HEAD
                     className="w-full text-xs font-sans border border-slate-200 hover:border-slate-250 bg-slate-50 rounded-lg p-2.5 min-h-[50px] focus:bg-white focus:outline-hidden text-slate-800"
+=======
+                    className="w-full text-xs font-sans border border-slate-200 hover:border-slate-250 bg-slate-50 rounded-lg p-2.5 min-h-12.5 focus:bg-white focus:outline-hidden text-slate-800"
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
                     placeholder="Enter factory delivery gates, dispatch yards, or warehouse address..."
                     value={shippingAddress}
                     onChange={(e) => setShippingAddress(e.target.value)}
@@ -729,7 +917,11 @@ export const CustomersListPage: React.FC = () => {
                     onChange={(e) => setAssignedSalesUserId(e.target.value)}
                   >
                     <option value="">-- No Assignment / General Accounts --</option>
+<<<<<<< HEAD
                     {salesExecutives.map((exec) => (
+=======
+                    {(salesExecutives || []).map((exec) => (
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
                       <option key={exec.id} value={exec.id}>
                         {exec.name} ({exec.role})
                       </option>
@@ -737,13 +929,40 @@ export const CustomersListPage: React.FC = () => {
                   </select>
                 </div>
 
+<<<<<<< HEAD
+=======
+                {/* Multi-Plant Assignment */}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block font-mono">
+                    Facility / Plant Scope
+                  </label>
+                  <select
+                    id="form-plant-scope"
+                    className="w-full text-xs font-sans border border-slate-200 bg-slate-50 rounded-lg p-2.5 focus:bg-white focus:outline-hidden text-slate-800"
+                    value={plantId}
+                    onChange={(e) => setPlantId(e.target.value)}
+                  >
+                    <option value="all">-- Company-Wide (All Plants / Facilities) --</option>
+                    {(plants || []).map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} ({p.location || 'Active Facility'})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
                 {/* 11. Notes */}
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block font-mono">
                     Internal Operator Notes
                   </label>
                   <textarea
+<<<<<<< HEAD
                     className="w-full text-xs font-sans border border-slate-200 hover:border-slate-250 bg-slate-50 rounded-lg p-2.5 min-h-[60px] focus:bg-white focus:outline-hidden text-slate-800"
+=======
+                    className="w-full text-xs font-sans border border-slate-200 hover:border-slate-250 bg-slate-50 rounded-lg p-2.5 min-h-15 focus:bg-white focus:outline-hidden text-slate-800"
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
                     placeholder="Enter any private trade terms, transport lorry preferences, or special billing directives..."
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
@@ -764,9 +983,16 @@ export const CustomersListPage: React.FC = () => {
                   </button>
                   <button
                     type="submit"
+<<<<<<< HEAD
                     className="px-5 py-2 bg-slate-900 border border-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition shadow-sm"
                   >
                     {editingCustomer ? 'Update Ledger' : 'Onboard Now'}
+=======
+                    disabled={isSubmitting}
+                    className="px-5 py-2 bg-slate-900 border border-slate-900 hover:bg-slate-800 disabled:bg-slate-500 text-white rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition shadow-sm cursor-pointer disabled:cursor-not-allowed"
+                  >
+                    {isSubmitting ? 'Processing...' : editingCustomer ? 'Update Ledger' : 'Onboard Now'}
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
                   </button>
                 </div>
               </form>
@@ -776,4 +1002,8 @@ export const CustomersListPage: React.FC = () => {
       )}
     </div>
   );
+<<<<<<< HEAD
 };
+=======
+};
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145

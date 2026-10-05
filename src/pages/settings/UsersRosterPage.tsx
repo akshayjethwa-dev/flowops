@@ -5,6 +5,11 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useTenantUsers } from '../../hooks/useTenantUsers';
 import { UserRole, TenantUser } from '../../types';
+<<<<<<< HEAD
+=======
+import { doc, setDoc } from 'firebase/firestore';
+import { db } from '../../firebase';
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
 import { 
   UserPlus, 
   Shield, 
@@ -26,7 +31,12 @@ import {
 
 export const UsersRosterPage: React.FC = () => {
   const navigate = useNavigate();
+<<<<<<< HEAD
   const { tenant } = useAuth();
+=======
+  // We extract `profile` so we know exactly who is doing the auditing
+  const { tenant, profile } = useAuth();
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
   const { 
     users, 
     loading, 
@@ -80,6 +90,10 @@ export const UsersRosterPage: React.FC = () => {
 
   // Change Role Callback
   const handleRoleChange = async (userId: string, newRole: UserRole) => {
+<<<<<<< HEAD
+=======
+    // 🔒 Enforce Admin Check
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
     if (!isAdmin) {
       setErrMsg('Administrative credentials required to tweak roles.');
       return;
@@ -91,6 +105,31 @@ export const UsersRosterPage: React.FC = () => {
 
     try {
       await updateUserRole(userId, newRole);
+<<<<<<< HEAD
+=======
+      
+      // 🔒 Create an audit trail log required by AC for system owner verification
+      if (tenant?.id && profile) {
+        const activityId = `act_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const activityRef = doc(db, 'tenants', tenant.id, 'activity', activityId);
+        await setDoc(activityRef, {
+          id: activityId,
+          actionType: 'role_change',
+          entityType: 'user',
+          entityId: userId,
+          tenantId: tenant.id,
+          actor: {
+            userId: profile.uid,
+            displayName: profile.name,
+            email: profile.email
+          },
+          timestamp: new Date().toISOString(),
+          description: `User role forcefully updated to ${getRoleLabel(newRole)} by administrator.`,
+          metadata: { role: newRole }
+        });
+      }
+
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
       setSuccessMsg(`User role updated successfully to "${getRoleLabel(newRole)}".`);
       setTimeout(() => setSuccessMsg(null), 3500);
     } catch (err: any) {
@@ -306,7 +345,11 @@ export const UsersRosterPage: React.FC = () => {
         </div>
       ) : filteredUsers.length > 0 ? (
         <div className="bg-white border border-slate-200 rounded-xl shadow-2xs overflow-x-auto">
+<<<<<<< HEAD
           <table className="w-full text-left border-collapse min-w-[700px]">
+=======
+          <table className="w-full text-left border-collapse min-w-175">
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
             <thead>
               <tr className="bg-slate-50 border-b border-slate-205 text-[10px] font-mono font-bold text-slate-500 uppercase tracking-wider">
                 <th className="px-5 py-3">Operator Details</th>
@@ -340,7 +383,11 @@ export const UsersRosterPage: React.FC = () => {
                             {u.name}
                           </span>
                         </div>
+<<<<<<< HEAD
                         <span className="text-[10px] font-mono text-slate-450 block flex items-center">
+=======
+                        <span className="text-[10px] font-mono text-slate-450 block items-center">
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
                           <Mail className="h-3 w-3 mr-1 text-slate-350" />
                           <span>{u.email}</span>
                         </span>
@@ -457,4 +504,8 @@ export const UsersRosterPage: React.FC = () => {
 
     </div>
   );
+<<<<<<< HEAD
 };
+=======
+};
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145

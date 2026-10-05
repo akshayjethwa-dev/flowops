@@ -50,7 +50,15 @@ export async function logActivityEvent({
   action: customAction,
   entityLabel: customEntityLabel
 }: LogActivityParams): Promise<boolean> {
+<<<<<<< HEAD
   if (!tenantId) return false;
+=======
+  // STRICT GUARD: Prevent logging attempts if tenantId or userId is missing
+  if (!tenantId || !actor?.userId) {
+    console.warn("Activity logger skipped: Missing tenantId or userId in auth context.");
+    return false;
+  }
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
 
   // Derive module matching schema: "rfq" | "order" | "dispatch" | "payment" | "inventory" | "whatsapp"
   let derivedModule: 'rfq' | 'order' | 'dispatch' | 'payment' | 'inventory' | 'whatsapp' = 'rfq';
@@ -145,6 +153,7 @@ export async function logActivityEvent({
       return false;
     }
   } else {
+<<<<<<< HEAD
     try {
       const eventId = baseEvent.id;
 
@@ -174,3 +183,39 @@ export async function logActivityEvent({
     }
   }
 }
+=======
+    const eventId = baseEvent.id;
+    const liveEventWithTimestamp = {
+      ...baseEvent,
+      timestamp: serverTimestamp()
+    };
+
+    let tenantWriteSuccess = false;
+
+    // 1. Root collection 'activityLog' (Separated try/catch)
+    // If strict rules reject root writes, this will fail gracefully without blocking the tenant write.
+    try {
+      const rootDocRef = doc(collection(db, 'activityLog'), eventId);
+      await setDoc(rootDocRef, liveEventWithTimestamp);
+    } catch (err) {
+      console.warn('Skipped writing to root activityLog (likely rule blocked):', err);
+    }
+
+    // 2. Tenant subcollection 'tenants/${tenantId}/activity'
+    try {
+      const legacyDocRef = doc(collection(db, 'tenants', tenantId, 'activity'), eventId);
+      await setDoc(legacyDocRef, liveEventWithTimestamp);
+      tenantWriteSuccess = true;
+    } catch (err) {
+      console.error('Firestore logActivityEvent failed on tenant subcollection:', err);
+      try {
+        handleFirestoreError(err, OperationType.WRITE, `tenants/${tenantId}/activity/${baseEvent.id}`);
+      } catch (logErr) {
+        // Suppress failure propagation to not interrupt transactions
+      }
+    }
+
+    return tenantWriteSuccess;
+  }
+}
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145

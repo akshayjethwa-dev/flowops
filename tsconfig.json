@@ -9,6 +9,10 @@
       "DOM",
       "DOM.Iterable"
     ],
+<<<<<<< HEAD
+=======
+    "types": ["vite/client"], 
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
     "skipLibCheck": true,
     "moduleResolution": "bundler",
     "isolatedModules": true,
@@ -24,4 +28,8 @@
     "noEmit": true
   },
   "exclude": ["migration/**/*"]
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145

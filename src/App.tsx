@@ -5,11 +5,19 @@
 
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+<<<<<<< HEAD
 import { AuthProvider } from './context/AuthContext';
+=======
+import { AuthProvider, useAuth } from './context/AuthContext';
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
 import { ToastProvider } from './context/ToastContext';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { AppShell } from './components/layout/AppShell';
 import { ProtectedRoute } from './components/layout/ProtectedRoute';
+<<<<<<< HEAD
+=======
+import { Loader2, ShieldCheck } from 'lucide-react';
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
 
 // Unauthenticated views
 import { Login } from './pages/unauth/Login';
@@ -33,6 +41,10 @@ import { ReportsPage } from './pages/ReportsPage';
 
 // Settings sub-views
 import { TenantSettingsPage } from './pages/settings/TenantSettingsPage';
+<<<<<<< HEAD
+=======
+import { PlantsManagementPage } from './pages/settings/PlantsManagementPage';
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
 import { ProductionStagesPage } from './pages/settings/ProductionStagesPage';
 import { WhatsAppPage } from './pages/settings/WhatsAppPage';
 import { WhatsAppInboxPage } from './pages/WhatsAppInboxPage';
@@ -272,11 +284,27 @@ export default function App() {
               } 
             />
 
+<<<<<<< HEAD
+=======
+            <Route 
+              path="settings/plants" 
+              element={
+                <ProtectedRoute allowedRoles={['admin', 'management']}>
+                  <PlantsManagementPage />
+                </ProtectedRoute>
+              } 
+            />
+
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
             {/* Internal SaaS Admins boundary shard manager */}
             <Route 
               path="internal/tenants" 
               element={
+<<<<<<< HEAD
                 <ProtectedRoute requireSuperAdmin={true}>
+=======
+                <ProtectedRoute allowedRoles={['admin', 'management']}>
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
                   <InternalTenantsListPage />
                 </ProtectedRoute>
               } 
@@ -296,8 +324,16 @@ export default function App() {
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </BrowserRouter>
+<<<<<<< HEAD
       </ToastProvider>
     </AuthProvider>
   </ErrorBoundary>
   );
 }
+=======
+        </ToastProvider>
+      </AuthProvider>
+    </ErrorBoundary>
+  );
+}
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145

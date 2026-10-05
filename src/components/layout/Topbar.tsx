@@ -2,7 +2,11 @@
 
 import React, { useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
+<<<<<<< HEAD
 import { ChevronDown, LogOut, CheckCircle, Menu } from 'lucide-react';
+=======
+import { ChevronDown, LogOut, CheckCircle, Menu, Factory } from 'lucide-react';
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
 import { useNavigate } from 'react-router-dom';
 import { NotificationBell } from '../NotificationBell';
 
@@ -11,7 +15,11 @@ export interface TopbarProps {
 }
 
 export const Topbar: React.FC<TopbarProps> = ({ onMenuToggle }) => {
+<<<<<<< HEAD
   const { profile, signOut } = useAuth();
+=======
+  const { profile, signOut, plants, activePlantId, setActivePlantId } = useAuth();
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const navigate = useNavigate();
 
@@ -24,6 +32,22 @@ export const Topbar: React.FC<TopbarProps> = ({ onMenuToggle }) => {
     }
   };
 
+<<<<<<< HEAD
+=======
+  // Filter plants based on user assignment
+  const userPlants = React.useMemo(() => {
+    if (!profile?.assignedPlantIds || profile.assignedPlantIds.length === 0) {
+      return plants;
+    }
+    return plants.filter(p => profile.assignedPlantIds?.includes(p.id));
+  }, [plants, profile?.assignedPlantIds]);
+
+  const activePlant = React.useMemo(() => {
+    if (activePlantId === 'all') return null;
+    return plants.find(p => p.id === activePlantId) || null;
+  }, [plants, activePlantId]);
+
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
   return (
     <header className="h-16 bg-white border-b border-slate-205 flex items-center justify-between px-4 md:px-8 shrink-0 relative select-none">
       {/* Dynamic Status Connection Badges & Hamburger */}
@@ -43,12 +67,50 @@ export const Topbar: React.FC<TopbarProps> = ({ onMenuToggle }) => {
           <span className="hidden xs:inline">AiSensy Live Connected</span>
           <span className="xs:hidden">Live</span>
         </div>
+<<<<<<< HEAD
         <div className="hidden sm:flex items-center space-x-1 text-slate-500 text-[10px] uppercase font-mono">
+=======
+        <div className="hidden lg:flex items-center space-x-1 text-slate-500 text-[10px] uppercase font-mono">
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
           <CheckCircle className="h-3.5 w-3.5 text-slate-400 shrink-0" />
           <span>DB Isolation Guard Active</span>
         </div>
       </div>
 
+<<<<<<< HEAD
+=======
+      {/* Global Plant Selector / Badge */}
+      {plants.length > 0 && (
+        <div className="flex items-center space-x-2 bg-slate-50 border border-slate-200/80 rounded-lg p-1.5 px-3 shadow-3xs">
+          <Factory className="h-4 w-4 text-indigo-600 shrink-0" />
+          {userPlants.length <= 1 ? (
+            // Single assigned plant: show static label
+            <span className="text-[11px] font-bold text-slate-700 font-mono uppercase tracking-wide">
+              🏭 {userPlants[0]?.name || activePlant?.name || 'Company Wide'}
+            </span>
+          ) : (
+            // Multiple plants or admin: show selector dropdown
+            <div className="relative">
+              <select
+                value={activePlantId || 'all'}
+                onChange={(e) => setActivePlantId(e.target.value === 'all' ? 'all' : e.target.value)}
+                className="bg-transparent text-[11px] font-bold text-slate-750 focus:outline-hidden cursor-pointer pr-1 font-mono uppercase tracking-wider"
+              >
+                {!profile?.assignedPlantIds || profile.assignedPlantIds.length === 0 ? (
+                  <option value="all">🏢 Consolidated (All Plants)</option>
+                ) : null}
+                {userPlants.map(p => (
+                  <option key={p.id} value={p.id}>
+                    🏭 {p.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
+      )}
+
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
       {/* Operator profile card triggers dropdown */}
       <div className="flex items-center space-x-4">
         <NotificationBell />
@@ -90,4 +152,8 @@ export const Topbar: React.FC<TopbarProps> = ({ onMenuToggle }) => {
       </div>
     </header>
   );
+<<<<<<< HEAD
 };
+=======
+};
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145

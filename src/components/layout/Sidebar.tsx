@@ -23,7 +23,12 @@ import {
   X,
   Package,
   Receipt,
+<<<<<<< HEAD
   BarChart2
+=======
+  BarChart2,
+  Factory
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
 } from 'lucide-react';
 import { UserRole } from '../../types';
 
@@ -62,7 +67,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => 
   ];
 
   const settingItems: SidebarItem[] = [
+<<<<<<< HEAD
     { to: '/settings/tenant', label: 'Plant Profile', icon: Building, roles: ['admin'] },
+=======
+    { to: '/settings/tenant', label: 'Company Profile', icon: Building, roles: ['admin'] },
+    { to: '/settings/plants', label: 'Manage Plants', icon: Factory, roles: ['admin'] },
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
     { to: '/settings/production-stages', label: 'Process Stages', icon: Settings, roles: ['admin'] },
     { to: '/settings/whatsapp', label: 'WhatsApp Outbox', icon: MessageSquare, roles: ['admin', 'sales'] },
     { to: '/settings/users', label: 'Staff Roster', icon: UserPlus, roles: ['admin'] },
@@ -143,7 +153,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => 
         </div>
 
         {/* Navigation Groups inside scroll viewport */}
+<<<<<<< HEAD
         <div className="flex-grow p-4 overflow-y-auto space-y-6">
+=======
+        <div className="grow p-4 overflow-y-auto space-y-6">
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
           <div>
             <h3 className="px-3 mb-2 text-[9px] font-mono font-bold text-slate-500 uppercase tracking-widest">
               Production & Pipeline
@@ -165,7 +179,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => 
                     `}
                   >
                     <Icon className="h-4 w-4 shrink-0" />
+<<<<<<< HEAD
                     <span className="flex-grow">{item.label}</span>
+=======
+                    <span className="grow">{item.label}</span>
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
                     {item.to === '/whatsapp-inbox' && whatsappUnreadCount > 0 && (
                       <span className="bg-emerald-500 text-slate-950 font-bold text-[10px] h-4 min-w-4 px-1 rounded-full flex items-center justify-center font-mono">
                         {whatsappUnreadCount}
@@ -243,12 +261,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => 
           <div className="h-8 w-8 bg-slate-800 rounded-full flex items-center justify-center border border-slate-700 text-xs font-bold text-white font-display">
             {profile?.name ? profile.name.slice(0, 2).toUpperCase() : 'OP'}
           </div>
+<<<<<<< HEAD
           <div className="min-w-0 flex-grow">
+=======
+          <div className="min-w-0 grow">
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
             <p className="text-xs font-semibold text-white truncate">{profile?.name || 'Operator'}</p>
             <p className="text-[10px] text-slate-500 mt-0.5 truncate">{getRoleLabel(profile?.role || 'admin')}</p>
           </div>
         </div>
 
+<<<<<<< HEAD
         {/* Dynamic Role Swapping tool panel for system auditors */}
         <div className="relative">
           <button
@@ -302,8 +325,72 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => 
             {profile?.isSuperAdmin ? 'ON 🛡️' : 'OFF'}
           </span>
         </button>
+=======
+        {/* SECURITY FIX: Only render switcher & super-admin tools if the user is an Admin */}
+        {profile?.role === 'admin' && (
+          <>
+            {/* Dynamic Role Swapping tool panel for system auditors */}
+            <div className="relative">
+              <button
+                onClick={() => setRoleDropdownOpen(!roleDropdownOpen)}
+                className="w-full bg-slate-800/80 hover:bg-slate-750 border border-slate-705 text-slate-400 text-[10px] px-2.5 py-1.5 rounded flex items-center justify-between transition-colors focus:outline-hidden cursor-pointer"
+              >
+                <span className="flex items-center space-x-1.5 font-mono uppercase tracking-wider">
+                  <SlidersHorizontal className="h-3.5 w-3.5 text-sky-400 shrink-0" />
+                  <span>Switch Role Profile</span>
+                </span>
+                <ChevronDown className={`h-3 w-3 text-slate-500 shrink-0 transition-transform ${roleDropdownOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {roleDropdownOpen && (
+                <div className="absolute bottom-full left-0 right-0 mb-1.5 bg-slate-800 border border-slate-700 rounded shadow-xl overflow-hidden z-50">
+                  <p className="px-2.5 py-1.5 text-[9px] font-mono tracking-wider text-slate-500 border-b border-slate-705 uppercase bg-slate-850">
+                    Assume Role Persona
+                  </p>
+                  {(['admin', 'sales', 'production', 'dispatch', 'management'] as UserRole[]).map(r => (
+                    <button
+                      key={r}
+                      onClick={() => {
+                        switchToSandboxRole(r);
+                        setRoleDropdownOpen(false);
+                      }}
+                      className={`w-full flex items-center justify-between px-2.5 py-2 text-left text-[11px] hover:bg-slate-700/80 cursor-pointer ${
+                        profile?.role === r ? 'text-sky-400 font-semibold bg-slate-750/35' : 'text-slate-300'
+                      }`}
+                    >
+                      <span>{getRoleLabel(r)}</span>
+                      {profile?.role === r && <UserCheck className="h-3.5 w-3.5 text-sky-400 shrink-0" />}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Toggle Super Admin for testing */}
+            <button
+              onClick={() => {
+                updateProfileLocally({ isSuperAdmin: !profile?.isSuperAdmin });
+              }}
+              className={`w-full mt-2 border px-2.5 py-1.5 rounded flex items-center justify-between text-[10px] font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                profile?.isSuperAdmin 
+                  ? 'bg-rose-500/15 text-rose-400 border-rose-500/35 hover:bg-rose-500/25' 
+                  : 'bg-slate-800/80 hover:bg-slate-750 border-slate-705 text-slate-400'
+              }`}
+            >
+              <span>Super-Admin Mode</span>
+              <span className={profile?.isSuperAdmin ? 'text-rose-400 font-bold' : 'text-slate-450'}>
+                {profile?.isSuperAdmin ? 'ON 🛡️' : 'OFF'}
+              </span>
+            </button>
+          </>
+        )}
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
       </div>
     </aside>
     </>
   );
+<<<<<<< HEAD
 };
+=======
+};
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145

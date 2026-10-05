@@ -848,7 +848,11 @@ export function LandingPage() {
                   </div>
                   <div>
                     <h5 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-400">Phone & Instant Support</h5>
+<<<<<<< HEAD
                     <p className="text-sm font-medium text-white">+91 94292 XXXXX <span className="text-slate-400 text-xs italic ml-1">(Anand Representative)</span></p>
+=======
+                    <p className="text-sm font-medium text-white">+91 84608 52903 <span className="text-slate-400 text-xs italic ml-1">(Anand Representative)</span></p>
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
                   </div>
                 </div>
 

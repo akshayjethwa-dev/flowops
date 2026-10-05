@@ -12,6 +12,7 @@ import {
   ShieldCheck, 
   AlertCircle, 
   CheckCircle2, 
+<<<<<<< HEAD
   Briefcase,
   Users,
   Search,
@@ -19,12 +20,26 @@ import {
   Layers,
   Truck,
   FolderSync
+=======
+  Briefcase
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
 } from 'lucide-react';
 
 export const InviteUserForm: React.FC = () => {
   const navigate = useNavigate();
+<<<<<<< HEAD
   const { tenant } = useAuth();
   const { inviteUser, isAdmin, loading: hookLoading } = useTenantUsers(tenant?.id);
+=======
+  
+  // Capture robust auth fallbacks
+  const authContext = useAuth() as any;
+  const activeTenantId = authContext?.tenant?.id || 
+                         (typeof authContext?.tenant === 'string' ? authContext.tenant : null) || 
+                         authContext?.profile?.tenantId;
+
+  const { inviteUser, isAdmin, loading: hookLoading } = useTenantUsers(activeTenantId);
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
 
   // Form states
   const [userName, setUserName] = useState('');
@@ -111,7 +126,11 @@ export const InviteUserForm: React.FC = () => {
     if (!isAdmin) {
       setFeedback({
         type: 'error',
+<<<<<<< HEAD
         message: 'A administrative rank is necessary to authorize new corporate credentials.'
+=======
+        message: 'An administrative rank is necessary to authorize new corporate credentials.'
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
       });
       return;
     }
@@ -119,7 +138,11 @@ export const InviteUserForm: React.FC = () => {
     if (!userName.trim() || !userEmail.trim()) {
       setFeedback({
         type: 'error',
+<<<<<<< HEAD
         message: 'Name and email are required fields to trigger the invitación.'
+=======
+        message: 'Name and email are required fields to trigger the invitation.'
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
       });
       return;
     }
@@ -128,6 +151,7 @@ export const InviteUserForm: React.FC = () => {
     setFeedback(null);
 
     try {
+<<<<<<< HEAD
       const success = await inviteUser(userName.trim(), userEmail.trim().toLowerCase(), userRole);
       if (success) {
         setFeedback({
@@ -151,6 +175,36 @@ export const InviteUserForm: React.FC = () => {
       setFeedback({
         type: 'error',
         message: err.message || 'Firestore rules permission denied or schema validation failed.'
+=======
+      await inviteUser(userName.trim(), userEmail.trim().toLowerCase(), userRole);
+      
+      setFeedback({
+        type: 'success',
+        message: `Success! Invited ${userName} [${userRole.toUpperCase()}] and logged out-of-band mock notification to developer console.`
+      });
+      setUserName('');
+      setUserEmail('');
+      setUserRole('production');
+      
+      // Redirect back to user roster with a slight delay so they can read the success state
+      setTimeout(() => {
+        navigate('/settings/users');
+      }, 3000);
+      
+    } catch (err: any) {
+      let errorMessage = err.message || 'Firestore rules permission denied or schema validation failed.';
+      
+      try {
+        const parsed = JSON.parse(errorMessage);
+        if (parsed.error) errorMessage = parsed.error;
+      } catch (e) {
+        // Fallback to initial message
+      }
+
+      setFeedback({
+        type: 'error',
+        message: errorMessage
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
       });
     } finally {
       setInviting(false);
@@ -311,4 +365,8 @@ export const InviteUserForm: React.FC = () => {
       </div>
     </div>
   );
+<<<<<<< HEAD
 };
+=======
+};
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145

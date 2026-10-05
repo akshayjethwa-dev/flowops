@@ -48,7 +48,12 @@ export const DispatchListPage: React.FC = () => {
     loadingMore,
     hasMore,
     error,
+<<<<<<< HEAD
     loadMore
+=======
+    loadMore,
+    reset
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
   } = usePaginatedCollectionQuery<any>(
     tenant?.id ? `tenants/${tenant.id}/dispatches` : 'dispatches',
     {
@@ -347,6 +352,10 @@ export const DispatchListPage: React.FC = () => {
         preselectedOrder={preselectedOrder}
         onSuccess={() => {
           setIsCreateOpen(false);
+<<<<<<< HEAD
+=======
+          reset();
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
         }}
       />
 

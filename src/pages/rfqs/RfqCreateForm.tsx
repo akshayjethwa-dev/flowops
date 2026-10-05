@@ -1,12 +1,23 @@
 // src/pages/rfqs/RfqCreateForm.tsx
 
+<<<<<<< HEAD
 import React, { useState } from 'react';
+=======
+import React, { useState, useEffect } from 'react';
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useRfqsList } from '../../hooks/useRfqsList';
 import { useCustomersList } from '../../hooks/useCustomersList';
+<<<<<<< HEAD
 import { DEMO_PRODUCTS } from '../../data/mockData';
 import { RFQItem, Rfq } from '../../types';
+=======
+import { useTenantUsers } from '../../hooks/useTenantUsers';
+import { useStockItems } from '../../hooks/useStockInventory';
+import { usePlants } from '../../hooks/usePlants';
+import { RFQItem, Rfq, StockItem } from '../../types';
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
 import { db } from '../../firebase';
 import { useToast } from '../../context/ToastContext';
 import { FieldError } from '../../components/ui/FieldError';
@@ -18,10 +29,16 @@ import {
   Library, 
   Plus, 
   Trash2, 
+<<<<<<< HEAD
   CheckCircle2, 
   AlertCircle,
   HelpCircle,
   UserCheck
+=======
+  AlertCircle,
+  UserCheck,
+  Factory
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
 } from 'lucide-react';
 
 export const RfqCreateForm: React.FC = () => {
@@ -29,16 +46,47 @@ export const RfqCreateForm: React.FC = () => {
   const { tenant, profile } = useAuth();
   const { addRfq } = useRfqsList(tenant?.id);
   const { customers, addCustomer, loading: loadingCust } = useCustomersList(tenant?.id);
+<<<<<<< HEAD
+=======
+  
+  // Fetch live staff and inventory using the correct hook mappings
+  const { users, loading: loadingUsers } = useTenantUsers();
+  const { items: inventory, loading: loadingInventory } = useStockItems(tenant?.id);
+  const { plants } = usePlants(tenant?.id);
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
   const { toastSuccess, toastError } = useToast();
 
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
+<<<<<<< HEAD
   // RFQ fields state
   const [rfqNumber, setRfqNumber] = useState(`RFQ-2026-${Math.floor(1001 + Math.random() * 8999)}`);
   const [dateReceived, setDateReceived] = useState(new Date().toISOString().split('T')[0]);
   const [source, setSource] = useState<'Phone' | 'Email' | 'WhatsApp' | 'Walk-in'>('Email');
   const [priority, setPriority] = useState<'Low' | 'Medium' | 'High'>('Medium');
   const [assignedTo, setAssignedTo] = useState('Anand K.');
+=======
+  // Filter staff for valid estimator roles with explicit 'any' typing to resolve ts(7006)
+  const estimators = users?.filter((u: any) => ['admin', 'sales', 'management'].includes(u.role)) || [];
+
+  // RFQ fields state
+  const [plantId, setPlantId] = useState('');
+  const [rfqNumber, setRfqNumber] = useState(`RFQ-2026-${Math.floor(1001 + Math.random() * 8999)}`);
+
+  // Auto-select plant safely handling potential undefined states
+  useEffect(() => {
+    if (profile?.plantId) {
+      setPlantId(profile.plantId);
+    } else if (plants?.length > 0) {
+      setPlantId(plants[0].id);
+    }
+  }, [profile, plants]);
+
+  const [dateReceived, setDateReceived] = useState(new Date().toISOString().split('T')[0]);
+  const [source, setSource] = useState<'Phone' | 'Email' | 'WhatsApp' | 'Walk-in'>('Email');
+  const [priority, setPriority] = useState<'Low' | 'Medium' | 'High'>('Medium');
+  const [assignedTo, setAssignedTo] = useState('');
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
   const [description, setDescription] = useState('');
 
   // Customer linkage mode
@@ -52,7 +100,11 @@ export const RfqCreateForm: React.FC = () => {
   const [quickCustEmail, setQuickCustEmail] = useState('');
   const [quickCustCity, setQuickCustCity] = useState('');
 
+<<<<<<< HEAD
   // Manual fallback fields (in case they don't want to save a profile, or default)
+=======
+  // Manual fallback fields
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
   const [fallbackContactName, setFallbackContactName] = useState('');
   const [fallbackPhone, setFallbackPhone] = useState('');
   const [fallbackEmail, setFallbackEmail] = useState('');
@@ -75,16 +127,28 @@ export const RfqCreateForm: React.FC = () => {
         setFormError('Please select a catalog product first');
         return;
       }
+<<<<<<< HEAD
       const prod = DEMO_PRODUCTS.find(p => p.id === catalogProductId);
       if (!prod) return;
 
       // Avoid duplication if preferred or append
+=======
+      
+      // Pull directly from live inventory with proper StockItem type
+      const prod = inventory?.find((p: StockItem) => p.id === catalogProductId);
+      if (!prod) return;
+
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
       const newItem: RFQItem = {
         id: prod.id,
         name: prod.name,
         quantity: itemQuantity,
         specs: itemSpecs.trim() || undefined
       };
+<<<<<<< HEAD
+=======
+      
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
       setRfqItems([...rfqItems, newItem]);
       setCatalogProductId('');
       setItemQuantity(1);
@@ -110,19 +174,42 @@ export const RfqCreateForm: React.FC = () => {
   };
 
   const handleRemoveItem = (index: number) => {
+<<<<<<< HEAD
     setRfqItems(rfqItems.filter((_, i) => i !== index));
+=======
+    setRfqItems(rfqItems.filter((_: any, i: number) => i !== index));
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
   };
 
   // Submit Rfq Form
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+<<<<<<< HEAD
     if (!tenant || !profile) return;
+=======
+    
+    // STRICT TENANT GUARD: Check if tenant context exists before attempting writes
+    if (!tenant || !tenant.id || !profile) {
+      toastError('Authentication Error', 'No tenant detected. Please refresh the page or log in again.');
+      console.error("Submission blocked: tenant or tenant.id is null");
+      return; 
+    }
+
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
     setSaving(true);
     setFormError(null);
     setFieldErrors({});
 
+<<<<<<< HEAD
     // Field Validation Form Pattern (Requirement 2)
     const errors: Record<string, string> = {};
+=======
+    // Field Validation Form Pattern
+    const errors: Record<string, string> = {};
+    if (!plantId) {
+      errors.plantId = 'Please select the target plant facility.';
+    }
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
     if (customerMode === 'select' && !selectedCustomerId) {
       errors.customerId = 'B2B Client Profile selection is required.';
     }
@@ -132,6 +219,12 @@ export const RfqCreateForm: React.FC = () => {
     if (rfqItems.length === 0) {
       errors.rfqItems = 'Please append at least one engineering compound parts line item below.';
     }
+<<<<<<< HEAD
+=======
+    if (!assignedTo) {
+      errors.assignedTo = 'Please assign an estimator to this RFQ.';
+    }
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
 
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
@@ -148,7 +241,11 @@ export const RfqCreateForm: React.FC = () => {
       let finalEmail = '';
 
       if (customerMode === 'select') {
+<<<<<<< HEAD
         const custRef = customers.find(c => c.id === selectedCustomerId);
+=======
+        const custRef = customers?.find((c: any) => c.id === selectedCustomerId);
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
         if (!custRef) throw new Error('Selected customer profile is invalid');
 
         finalCustomerId = selectedCustomerId;
@@ -184,6 +281,10 @@ export const RfqCreateForm: React.FC = () => {
       // Build RFQ payload
       const rfqPayload: Omit<Rfq, 'id' | 'tenantId' | 'createdAt'> = {
         rfqNumber,
+<<<<<<< HEAD
+=======
+        plantId,
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
         customerId: finalCustomerId,
         customerName: finalCustomerName,
         contactName: finalContactName,
@@ -191,6 +292,7 @@ export const RfqCreateForm: React.FC = () => {
         email: finalEmail,
         source,
         dateReceived,
+<<<<<<< HEAD
         status: 'New', // default status
         priority,
         description: description.trim(),
@@ -198,13 +300,26 @@ export const RfqCreateForm: React.FC = () => {
         attachments: [],
         items: rfqItems,
         requirements: description.trim(), // backward compatibility
+=======
+        status: 'New', 
+        priority,
+        description: description.trim(),
+        assignedTo, 
+        attachments: [],
+        items: rfqItems,
+        requirements: description.trim(), 
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
         createdBy: profile.uid
       };
 
       // Call API
       const createdRfq = await addRfq(rfqPayload);
 
+<<<<<<< HEAD
       // Trigger D: Create notification type "new_rfq" for all users with role "sales" or "admin"
+=======
+      // Trigger Notifications
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
       const rfqIsSandbox = localStorage.getItem('isSandboxMode') === 'true' || !db;
       let targetUsers: string[] = [];
 
@@ -234,12 +349,18 @@ export const RfqCreateForm: React.FC = () => {
         }
       }
 
+<<<<<<< HEAD
       // Fallback if no target users found
+=======
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
       if (targetUsers.length === 0) {
         targetUsers.push(profile.uid);
       }
 
+<<<<<<< HEAD
       // Create notifications
+=======
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
       if (rfqIsSandbox) {
         const key = `flowops_notifications_${tenant.id}`;
         const cached = localStorage.getItem(key);
@@ -288,7 +409,10 @@ export const RfqCreateForm: React.FC = () => {
         }
       }
       
+<<<<<<< HEAD
       // Save timeline automatically in localStorage since the detail page uses it
+=======
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
       const timelineKey = `rfq_timeline_${tenant.id}_${createdRfq.id}`;
       const events = [
         {
@@ -301,6 +425,7 @@ export const RfqCreateForm: React.FC = () => {
       ];
       localStorage.setItem(timelineKey, JSON.stringify(events));
 
+<<<<<<< HEAD
       // Global Toast Notification Pattern (Requirement 1)
       toastSuccess('RFQ Formulated Successfully', `Quotation file ${rfqNumber} has been updated in database.`, 5000);
 
@@ -308,6 +433,12 @@ export const RfqCreateForm: React.FC = () => {
       navigate('/rfqs');
     } catch (err: any) {
       // Backend error code mapping (Requirement 2)
+=======
+      toastSuccess('RFQ Formulated Successfully', `Quotation file ${rfqNumber} has been updated in database.`, 5000);
+
+      navigate('/rfqs');
+    } catch (err: any) {
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
       const mappedMsg = getFriendlyErrorMessage(err);
       setFormError(mappedMsg);
       toastError('Operational Mismatch Exception', mappedMsg);
@@ -410,6 +541,7 @@ export const RfqCreateForm: React.FC = () => {
               <select
                 value={assignedTo}
                 onChange={(e) => setAssignedTo(e.target.value)}
+<<<<<<< HEAD
                 className="w-full bg-slate-50 border border-slate-205 rounded-lg p-2 font-sans focus:bg-white text-slate-800 focus:outline-hidden"
               >
                 <option value="Anand K.">Anand K. (Lead Estimator)</option>
@@ -418,6 +550,38 @@ export const RfqCreateForm: React.FC = () => {
                 <option value="Sales Admin">Sales Admin Desk</option>
                 <option value="demo_user">demo_user</option>
               </select>
+=======
+                disabled={loadingUsers}
+                className="w-full bg-slate-50 border border-slate-205 rounded-lg p-2 font-sans focus:bg-white text-slate-800 focus:outline-hidden"
+              >
+                <option value="">{loadingUsers ? 'Loading staff...' : '-- Select Estimator --'}</option>
+                {estimators?.map((user: any) => (
+                  <option key={user.id} value={user.name}>
+                    {user.name} ({user.role})
+                  </option>
+                ))}
+              </select>
+              <FieldError message={fieldErrors.assignedTo} />
+            </div>
+
+            {/* Target Plant Facility Selector */}
+            <div className="space-y-1">
+              <label className="text-[9px] font-bold text-slate-450 uppercase tracking-widest block">Target Plant Facility</label>
+              <select
+                required
+                value={plantId}
+                onChange={(e) => setPlantId(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-205 rounded-lg p-2 font-sans focus:bg-white text-slate-800 focus:outline-hidden"
+              >
+                <option value="">-- Choose Target Plant --</option>
+                {plants?.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    🏭 {p.name}
+                  </option>
+                ))}
+              </select>
+              <FieldError message={fieldErrors.plantId} />
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
             </div>
           </div>
         </div>
@@ -466,16 +630,27 @@ export const RfqCreateForm: React.FC = () => {
                   value={selectedCustomerId}
                   onChange={(e) => {
                     setSelectedCustomerId(e.target.value);
+<<<<<<< HEAD
                     const selected = customers.find(c => c.id === e.target.value);
+=======
+                    const selected = customers?.find((c: any) => c.id === e.target.value);
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
                     if (selected) {
                       setFallbackContactName(selected.contactPerson);
                       setFallbackPhone(selected.phone || '');
                       setFallbackEmail(selected.email || '');
                     }
                   }}
+<<<<<<< HEAD
                 >
                   <option value="">-- Click to search customer rolodex --</option>
                   {customers.map((c) => (
+=======
+                  disabled={loadingCust}
+                >
+                  <option value="">{loadingCust ? 'Loading customers...' : '-- Click to search customer rolodex --'}</option>
+                  {customers?.map((c: any) => (
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
                     <option key={c.id} value={c.id}>
                       {c.name} {c.city ? `(${c.city})` : ''} - Contact: {c.contactPerson}
                     </option>
@@ -617,11 +792,20 @@ export const RfqCreateForm: React.FC = () => {
                     className="w-full bg-white border border-slate-220 rounded-lg p-2 text-xs text-slate-705 focus:outline-hidden"
                     value={catalogProductId}
                     onChange={(e) => setCatalogProductId(e.target.value)}
+<<<<<<< HEAD
                   >
                     <option value="">-- Choose Catalogue SKU --</option>
                     {DEMO_PRODUCTS.map(p => (
                       <option key={p.id} value={p.id}>
                         {p.name} (Custom Rate)
+=======
+                    disabled={loadingInventory}
+                  >
+                    <option value="">{loadingInventory ? 'Loading inventory...' : '-- Choose Catalogue SKU --'}</option>
+                    {inventory?.map((p: StockItem) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} {p.code ? `[${p.code}]` : ''} ({p.currentQty || 0} in stock)
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
                       </option>
                     ))}
                   </select>
@@ -654,7 +838,11 @@ export const RfqCreateForm: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleAddItem}
+<<<<<<< HEAD
                   className="w-full bg-indigo-600 hover:bg-indigo-700 text-white hover:bg-sky-700 text-xs font-mono py-2 rounded-lg font-bold flex items-center justify-center space-x-1 cursor-pointer transition"
+=======
+                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-mono py-2 rounded-lg font-bold flex items-center justify-center space-x-1 cursor-pointer transition"
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
                 >
                   <Plus className="h-4 w-4" />
                   <span>Append Line</span>
@@ -687,7 +875,11 @@ export const RfqCreateForm: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
+<<<<<<< HEAD
                   {rfqItems.map((itm, index) => (
+=======
+                  {rfqItems.map((itm: any, index: number) => (
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
                     <tr key={index} className="hover:bg-slate-50/10">
                       <td className="py-2 px-4 whitespace-normal">
                         <div className="font-bold text-slate-800">{itm.name}</div>
@@ -775,4 +967,8 @@ export const RfqCreateForm: React.FC = () => {
       </form>
     </div>
   );
+<<<<<<< HEAD
 };
+=======
+};
+>>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
