@@ -12,25 +12,19 @@ import {
   ShieldCheck, 
   AlertCircle, 
   CheckCircle2, 
-<<<<<<< HEAD
   Briefcase,
-  Users,
-  Search,
-  Key,
-  Layers,
-  Truck,
-  FolderSync
-=======
-  Briefcase
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
+  KeyRound,
+  UserCheck2,
+  Lock
 } from 'lucide-react';
+import { 
+  getRoleTitle, 
+  getRoleBadgeColor, 
+  getRoleCapabilities 
+} from '../../utils/permissions';
 
 export const InviteUserForm: React.FC = () => {
   const navigate = useNavigate();
-<<<<<<< HEAD
-  const { tenant } = useAuth();
-  const { inviteUser, isAdmin, loading: hookLoading } = useTenantUsers(tenant?.id);
-=======
   
   // Capture robust auth fallbacks
   const authContext = useAuth() as any;
@@ -38,99 +32,31 @@ export const InviteUserForm: React.FC = () => {
                          (typeof authContext?.tenant === 'string' ? authContext.tenant : null) || 
                          authContext?.profile?.tenantId;
 
-  const { inviteUser, isAdmin, loading: hookLoading } = useTenantUsers(activeTenantId);
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
+  const { inviteUser, createUserAccount, isAdmin } = useTenantUsers(activeTenantId);
 
   // Form states
   const [userName, setUserName] = useState('');
   const [userEmail, setUserEmail] = useState('');
-  const [userRole, setUserRole] = useState<UserRole>('production');
+  const [userRole, setUserRole] = useState<UserRole>('operator');
+  const [creationMode, setCreationMode] = useState<'create_account' | 'invite'>('create_account');
+  const [tempPassword, setTempPassword] = useState('FlowOps@2026');
 
   // Status indicators
-  const [inviting, setInviting] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   const handleRoleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setUserRole(e.target.value as UserRole);
   };
 
-  const getRoleBadgeColor = (role: UserRole) => {
-    switch (role) {
-      case 'admin': return 'bg-amber-50 text-amber-800 border-amber-200';
-      case 'sales': return 'bg-emerald-50 text-emerald-800 border-emerald-200';
-      case 'production': return 'bg-indigo-50 text-indigo-800 border-indigo-200';
-      case 'dispatch': return 'bg-sky-50 text-sky-800 border-sky-200';
-      case 'management': return 'bg-purple-50 text-purple-800 border-purple-200';
-      default: return 'bg-slate-50 text-slate-800 border-slate-200';
-    }
-  };
-
-  const getRoleScopeDescription = (role: UserRole) => {
-    switch (role) {
-      case 'admin':
-        return {
-          title: 'Owner & System Administrator',
-          capabilities: [
-            'Global parameter profile & Tenant settings controls',
-            'Full User Onboarding, Deactivation & Role editing authority',
-            'Manufacturing process milestones, checkpoints & WhatsApp config',
-            'Full pipeline data read/write & Audit logs visibility'
-          ]
-        };
-      case 'sales':
-        return {
-          title: 'Sales Engineer',
-          capabilities: [
-            'Full management of Customers roster and CRM details',
-            'Direct creation & capture of RFQs & costing parameters',
-            'Draft, customize & download PDF commercial Quotations',
-            'View Production Board and dispatch statuses'
-          ]
-        };
-      case 'production':
-        return {
-          title: 'Shopfloor Supervisor',
-          capabilities: [
-            'Complete control of Active Kanban Production line',
-            'Perform structural checkpoint advancements & routing steps',
-            'Annotate and add custom shopfloor notes to jobs',
-            'View orders & design specifications'
-          ]
-        };
-      case 'dispatch':
-        return {
-          title: 'Dispatch & Logistics Clerk',
-          capabilities: [
-            'Compilation and issuing of Lorry Outward dispatch records',
-            'Update dispatch statuses (Pending, Dispatched, Received)',
-            'Generate official Challans and cargo loading specifications',
-            'View shopfloor production statuses'
-          ]
-        };
-      case 'management':
-        return {
-          title: 'Plant General Manager',
-          capabilities: [
-            'Plant-wide efficiency & analytics dashboard access',
-            'Read-only inspect access across RFQs, Orders, and Dispatch modules',
-            'Audit activity trail logs but cannot write profile data'
-          ]
-        };
-    }
-  };
-
-  const currentScope = getRoleScopeDescription(userRole);
+  const currentScope = getRoleCapabilities(userRole);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isAdmin) {
       setFeedback({
         type: 'error',
-<<<<<<< HEAD
-        message: 'A administrative rank is necessary to authorize new corporate credentials.'
-=======
-        message: 'An administrative rank is necessary to authorize new corporate credentials.'
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
+        message: 'An administrative or manager rank is necessary to authorize new corporate credentials.'
       });
       return;
     }
@@ -138,62 +64,55 @@ export const InviteUserForm: React.FC = () => {
     if (!userName.trim() || !userEmail.trim()) {
       setFeedback({
         type: 'error',
-<<<<<<< HEAD
-        message: 'Name and email are required fields to trigger the invitación.'
-=======
-        message: 'Name and email are required fields to trigger the invitation.'
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
+        message: 'Full name and email are required to configure the user account.'
       });
       return;
     }
 
-    setInviting(true);
+    if (creationMode === 'create_account' && (!tempPassword || tempPassword.length < 6)) {
+      setFeedback({
+        type: 'error',
+        message: 'Temporary password must be at least 6 characters.'
+      });
+      return;
+    }
+
+    setSubmitting(true);
     setFeedback(null);
 
     try {
-<<<<<<< HEAD
-      const success = await inviteUser(userName.trim(), userEmail.trim().toLowerCase(), userRole);
-      if (success) {
+      if (creationMode === 'create_account') {
+        await createUserAccount({
+          name: userName.trim(),
+          email: userEmail.trim().toLowerCase(),
+          role: userRole,
+          temporaryPassword: tempPassword
+        });
+
         setFeedback({
           type: 'success',
-          message: `Success! Invited ${userName} [${userRole.toUpperCase()}] and logged out-of-band mock notification to developer console.`
+          message: `User account created successfully for "${userName}" with role "${getRoleTitle(userRole)}". Custom claims and credentials have been provisioned!`
         });
-        setUserName('');
-        setUserEmail('');
-        setUserRole('production');
-        // Redirect back to user roster with a slight delay so they can read the success state
-        setTimeout(() => {
-          navigate('/settings/users');
-        }, 3000);
       } else {
+        await inviteUser(userName.trim(), userEmail.trim().toLowerCase(), userRole);
+        
         setFeedback({
-          type: 'error',
-          message: 'An unknown Firestore database exception occurred.'
+          type: 'success',
+          message: `Invitation generated successfully for ${userName} as [${getRoleTitle(userRole)}]. Invitation record logged.`
         });
       }
-    } catch (err: any) {
-      setFeedback({
-        type: 'error',
-        message: err.message || 'Firestore rules permission denied or schema validation failed.'
-=======
-      await inviteUser(userName.trim(), userEmail.trim().toLowerCase(), userRole);
       
-      setFeedback({
-        type: 'success',
-        message: `Success! Invited ${userName} [${userRole.toUpperCase()}] and logged out-of-band mock notification to developer console.`
-      });
       setUserName('');
       setUserEmail('');
-      setUserRole('production');
+      setTempPassword('FlowOps@2026');
       
-      // Redirect back to user roster with a slight delay so they can read the success state
+      // Redirect back to user roster with a slight delay
       setTimeout(() => {
         navigate('/settings/users');
-      }, 3000);
+      }, 2500);
       
     } catch (err: any) {
       let errorMessage = err.message || 'Firestore rules permission denied or schema validation failed.';
-      
       try {
         const parsed = JSON.parse(errorMessage);
         if (parsed.error) errorMessage = parsed.error;
@@ -204,10 +123,9 @@ export const InviteUserForm: React.FC = () => {
       setFeedback({
         type: 'error',
         message: errorMessage
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
       });
     } finally {
-      setInviting(false);
+      setSubmitting(false);
     }
   };
 
@@ -224,7 +142,7 @@ export const InviteUserForm: React.FC = () => {
           <span>Back to Roster</span>
         </button>
         <div className="h-4 w-px bg-slate-200" />
-        <span className="text-xs font-mono text-slate-450 uppercase font-semibold">Invite Operator</span>
+        <span className="text-xs font-mono text-slate-450 uppercase font-semibold">User Account Management</span>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
@@ -235,11 +153,39 @@ export const InviteUserForm: React.FC = () => {
             <div>
               <h2 className="text-base font-bold text-slate-900 tracking-tight flex items-center space-x-2">
                 <Briefcase className="h-4.5 w-4.5 text-sky-600" />
-                <span>Invite Corporate User</span>
+                <span>Create User Account & Role</span>
               </h2>
-              <p className="text-xs text-slate-450 mt-1">
-                Authorize new credentials. The platform will dynamically assign the scope checklist to their account node based on the selected role below.
+              <p className="text-xs text-slate-500 mt-1">
+                Configure role-based access control (RBAC) with Firebase Auth and custom claims. Each persona will view and access only authorized manufacturing modules.
               </p>
+            </div>
+
+            {/* Mode Selector Tab */}
+            <div className="flex p-1 bg-slate-100 rounded-lg text-xs font-medium">
+              <button
+                type="button"
+                onClick={() => setCreationMode('create_account')}
+                className={`flex-1 py-1.5 rounded-md transition-all flex items-center justify-center space-x-1.5 cursor-pointer ${
+                  creationMode === 'create_account' 
+                    ? 'bg-white text-slate-900 shadow-xs font-bold' 
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <KeyRound className="h-3.5 w-3.5 text-sky-600" />
+                <span>Direct Account Creation</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setCreationMode('invite')}
+                className={`flex-1 py-1.5 rounded-md transition-all flex items-center justify-center space-x-1.5 cursor-pointer ${
+                  creationMode === 'invite' 
+                    ? 'bg-white text-slate-900 shadow-xs font-bold' 
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Send className="h-3.5 w-3.5 text-sky-600" />
+                <span>Send Invitation</span>
+              </button>
             </div>
 
             {feedback && (
@@ -255,7 +201,7 @@ export const InviteUserForm: React.FC = () => {
                 )}
                 <div>
                   <h5 className="font-bold uppercase tracking-wider font-mono">
-                    {feedback.type === 'success' ? 'Invitation Drafted' : 'Action Denied'}
+                    {feedback.type === 'success' ? 'Account Provisioned' : 'Action Denied'}
                   </h5>
                   <p className="mt-1 font-sans">{feedback.message}</p>
                 </div>
@@ -265,54 +211,75 @@ export const InviteUserForm: React.FC = () => {
             <form onSubmit={handleSubmit} className="space-y-4">
               <TextField
                 id="invite-name"
-                label="Full Industrial Name *"
+                label="Full Employee / Operator Name *"
                 value={userName}
                 onChange={(e) => setUserName(e.target.value)}
                 required
-                placeholder="e.g. Ananya Sharma"
-                disabled={inviting}
+                placeholder="e.g. Vikram Malhotra"
+                disabled={submitting}
               />
 
               <TextField
                 id="invite-email"
-                label="Corporate Email Address *"
+                label="User Login Email *"
                 type="email"
                 value={userEmail}
                 onChange={(e) => setUserEmail(e.target.value)}
                 required
-                placeholder="e.g. ananya@company.com"
-                disabled={inviting}
+                placeholder="e.g. vikram.qc@company.com"
+                disabled={submitting}
               />
 
+              {creationMode === 'create_account' && (
+                <TextField
+                  id="invite-temp-password"
+                  label="Temporary Password *"
+                  type="text"
+                  value={tempPassword}
+                  onChange={(e) => setTempPassword(e.target.value)}
+                  required
+                  placeholder="Minimum 6 characters"
+                  disabled={submitting}
+                />
+              )}
+
               <div className="space-y-1.5">
-                <label htmlFor="invite-role" className="block text-xs font-mono font-bold text-slate-500 uppercase tracking-wider">
-                  Assigned Team Scope Role *
+                <label htmlFor="invite-role" className="block text-xs font-mono font-bold text-slate-600 uppercase tracking-wider">
+                  Select Role & Clearance Level *
                 </label>
                 <select
                   id="invite-role"
                   value={userRole}
                   onChange={handleRoleChange}
-                  disabled={inviting}
+                  disabled={submitting}
                   className="w-full bg-slate-50 border border-slate-350 hover:border-slate-400 focus:border-sky-500 focus:bg-white h-10 px-3 py-1 text-xs rounded transition-all duration-150 text-slate-800 font-sans"
                 >
-                  <option value="production">Shopfloor Supervisor (Production / Routing)</option>
-                  <option value="sales">Sales Engineer (RFQs / Quotation creation)</option>
-                  <option value="dispatch">Dispatch Logistics Clerk (Laying Lorry Receipts)</option>
-                  <option value="management">Plant General Manager (Analytics & Dashboard)</option>
-                  <option value="admin">Plant Owner / System Admin (Global profile & config)</option>
+                  <optgroup label="Target Manufacturing Roles">
+                    <option value="admin">Admin (Business Owner) — Global controls, user management & all modules</option>
+                    <option value="manager">Manager — Operations oversight, RFQs, production, dispatch, staff roster</option>
+                    <option value="operator">Operator — Shopfloor machine lines, active stages advancement & notes</option>
+                    <option value="quality_inspector">Quality Inspector — NDT, QC checkpoints, tolerance checks & certificates</option>
+                    <option value="store_keeper">Store Keeper — Raw material receipts, inventory adjustments & dispatch</option>
+                    <option value="viewer">Viewer — Read-only observation of dashboard, jobs, reports & stock</option>
+                  </optgroup>
+                  <optgroup label="Pipeline Specialist Roles">
+                    <option value="sales">Sales Engineer — RFQs, costing, quotes & customer CRM</option>
+                    <option value="production">Production Supervisor — Shopfloor Kanban & routing</option>
+                    <option value="dispatch">Dispatch Clerk — Lorry receipts & delivery challans</option>
+                  </optgroup>
                 </select>
               </div>
 
               {!isAdmin && (
                 <div className="p-3 bg-amber-50 border border-amber-200 rounded text-[11px] text-amber-800 leading-relaxed font-sans">
-                  ⚠️ <strong>Administrator required</strong>: You are logged in with role <strong>{userRole}</strong>. Only users possessing administrative Clearance can onboard operator credentials. Use the role switcher first to change role to "Owner / Administrator".
+                  ⚠️ <strong>Administrator or Manager required</strong>: You are currently logged in with role <strong>{userRole}</strong>. Use the role switcher in the sidebar to test as Admin/Manager.
                 </div>
               )}
 
               <div className="pt-2 border-t border-slate-100 flex items-center justify-end space-x-2">
                 <button
                   type="button"
-                  disabled={inviting}
+                  disabled={submitting}
                   onClick={() => navigate('/settings/users')}
                   className="px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold uppercase tracking-wider rounded transition-colors cursor-pointer"
                 >
@@ -320,11 +287,20 @@ export const InviteUserForm: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  disabled={inviting || !isAdmin}
+                  disabled={submitting || !isAdmin}
                   className="bg-slate-900 border border-slate-900 hover:bg-slate-800 disabled:opacity-40 text-white text-xs font-bold uppercase tracking-wider px-5 py-2.5 rounded flex items-center space-x-2 transition-all cursor-pointer h-10"
                 >
-                  <Send className="h-3.5 w-3.5" />
-                  <span>{inviting ? 'Onboarding...' : 'Onboard & Send Invite'}</span>
+                  {creationMode === 'create_account' ? (
+                    <>
+                      <UserCheck2 className="h-3.5 w-3.5" />
+                      <span>{submitting ? 'Provisioning...' : 'Provision User Account'}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Send className="h-3.5 w-3.5" />
+                      <span>{submitting ? 'Sending...' : 'Send Invitation'}</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>
@@ -336,15 +312,15 @@ export const InviteUserForm: React.FC = () => {
           <div className="bg-slate-50 border border-slate-250 rounded-xl p-5 shadow-2xs space-y-4">
             <div className="flex items-center space-x-2 pb-2 border-b border-slate-200">
               <ShieldCheck className="h-4.5 w-4.5 text-sky-600" />
-              <h4 className="text-xs font-bold font-mono text-slate-750 uppercase tracking-widest">Team Role Scopes</h4>
+              <h4 className="text-xs font-bold font-mono text-slate-750 uppercase tracking-widest">Role Clearance Map</h4>
             </div>
 
             <div className="space-y-1">
-              <span className={`text-[9px] font-mono border px-2 py-0.5 rounded-full uppercase font-bold tracking-wider float-right ${getRoleBadgeColor(userRole)}`}>
-                {userRole.toUpperCase()}
+              <span className={`text-[10px] font-mono border px-2 py-0.5 rounded-full uppercase font-bold tracking-wider float-right ${getRoleBadgeColor(userRole)}`}>
+                {userRole.replace('_', ' ').toUpperCase()}
               </span>
               <h3 className="text-sm font-bold text-slate-800 leading-snug">{currentScope?.title}</h3>
-              <p className="text-[10px] font-mono text-teal-650 font-bold uppercase clear-both pt-1">Authorized Capabilities Checklist</p>
+              <p className="text-[10px] font-mono text-teal-650 font-bold uppercase clear-both pt-1">Authorized Capabilities</p>
             </div>
 
             <ul className="space-y-2.5 pt-1.5">
@@ -356,8 +332,17 @@ export const InviteUserForm: React.FC = () => {
               ))}
             </ul>
 
-            <div className="p-3.5 bg-slate-100 border border-slate-200 rounded text-[10px] text-slate-500 leading-relaxed font-mono">
-              ⚡ <strong>Out-of-band communication:</strong> For safety in this environment, invited users are instant mock entities with active credential credentials initialized immediately for role trials.
+            <div className="p-3 bg-white border border-slate-200 rounded-lg text-[10px] text-slate-600 leading-relaxed font-mono space-y-1">
+              <div className="font-bold text-slate-800 flex items-center space-x-1">
+                <Lock className="h-3 w-3 text-sky-500" />
+                <span>Custom Claims Security:</span>
+              </div>
+              <p>
+                Token Claim: <code>{`{ role: "${userRole}", tenantId: "${activeTenantId || 'tenant'}" }`}</code>
+              </p>
+              <p className="text-slate-500">
+                Firestore rules evaluate custom token claims to guarantee zero privilege leakage.
+              </p>
             </div>
           </div>
         </div>
@@ -365,8 +350,4 @@ export const InviteUserForm: React.FC = () => {
       </div>
     </div>
   );
-<<<<<<< HEAD
 };
-=======
-};
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145

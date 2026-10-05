@@ -5,11 +5,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useTenantUsers } from '../../hooks/useTenantUsers';
 import { UserRole, TenantUser } from '../../types';
-<<<<<<< HEAD
-=======
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
 import { 
   UserPlus, 
   Shield, 
@@ -26,17 +23,23 @@ import {
   Sliders,
   ChevronDown,
   UserCheck2,
-  Trash2
+  Trash2,
+  KeyRound,
+  FileCheck2,
+  Package,
+  Layers,
+  Eye
 } from 'lucide-react';
+import { 
+  getRoleTitle, 
+  getRoleBadgeColor, 
+  getRoleCapabilities 
+} from '../../utils/permissions';
 
 export const UsersRosterPage: React.FC = () => {
   const navigate = useNavigate();
-<<<<<<< HEAD
-  const { tenant } = useAuth();
-=======
   // We extract `profile` so we know exactly who is doing the auditing
   const { tenant, profile } = useAuth();
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
   const { 
     users, 
     loading, 
@@ -57,27 +60,8 @@ export const UsersRosterPage: React.FC = () => {
   const [errMsg, setErrMsg] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
-  const getRoleLabel = (r: UserRole) => {
-    switch (r) {
-      case 'admin': return 'Owner / Administrator';
-      case 'sales': return 'Sales Engineer';
-      case 'production': return 'Shopfloor Supervisor';
-      case 'dispatch': return 'Dispatch & Logistics';
-      case 'management': return 'Plant General Manager';
-      default: return r;
-    }
-  };
-
-  const getRoleBadgeStyle = (r: UserRole) => {
-    switch (r) {
-      case 'admin': return 'bg-amber-50 border-amber-250 text-amber-800';
-      case 'sales': return 'bg-emerald-50 border-emerald-250 text-emerald-800';
-      case 'production': return 'bg-indigo-50 border-indigo-250 text-indigo-800';
-      case 'dispatch': return 'bg-sky-50 border-sky-250 text-sky-800';
-      case 'management': return 'bg-purple-50 border-purple-250 text-purple-800';
-      default: return 'bg-slate-50 border-slate-200 text-slate-850';
-    }
-  };
+  const getRoleLabel = (r: UserRole) => getRoleTitle(r);
+  const getRoleBadgeStyle = (r: UserRole) => getRoleBadgeColor(r);
 
   const getStatusBadgeStyle = (status: 'Active' | 'Inactive' | 'Invited') => {
     switch (status) {
@@ -90,10 +74,7 @@ export const UsersRosterPage: React.FC = () => {
 
   // Change Role Callback
   const handleRoleChange = async (userId: string, newRole: UserRole) => {
-<<<<<<< HEAD
-=======
     // 🔒 Enforce Admin Check
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
     if (!isAdmin) {
       setErrMsg('Administrative credentials required to tweak roles.');
       return;
@@ -105,8 +86,6 @@ export const UsersRosterPage: React.FC = () => {
 
     try {
       await updateUserRole(userId, newRole);
-<<<<<<< HEAD
-=======
       
       // 🔒 Create an audit trail log required by AC for system owner verification
       if (tenant?.id && profile) {
@@ -129,7 +108,6 @@ export const UsersRosterPage: React.FC = () => {
         });
       }
 
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
       setSuccessMsg(`User role updated successfully to "${getRoleLabel(newRole)}".`);
       setTimeout(() => setSuccessMsg(null), 3500);
     } catch (err: any) {
@@ -259,13 +237,22 @@ export const UsersRosterPage: React.FC = () => {
           </p>
         </div>
 
-        <button
-          onClick={() => navigate('/settings/users/invite')}
-          className="bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs uppercase tracking-wider px-4 h-10 rounded flex items-center justify-center space-x-1.5 cursor-pointer shadow-2xs self-start sm:self-center transition-all duration-150"
-        >
-          <UserPlus className="h-3.5 w-3.5" />
-          <span>Invite Team Operator</span>
-        </button>
+        <div className="flex items-center space-x-2.5">
+          <button
+            onClick={() => navigate('/settings/users/invite')}
+            className="bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs uppercase tracking-wider px-3.5 h-10 rounded flex items-center justify-center space-x-1.5 cursor-pointer shadow-xs transition-all duration-150"
+          >
+            <KeyRound className="h-3.5 w-3.5" />
+            <span>Create User Account</span>
+          </button>
+          <button
+            onClick={() => navigate('/settings/users/invite')}
+            className="bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs uppercase tracking-wider px-4 h-10 rounded flex items-center justify-center space-x-1.5 cursor-pointer shadow-xs transition-all duration-150"
+          >
+            <UserPlus className="h-3.5 w-3.5" />
+            <span>Invite Operator</span>
+          </button>
+        </div>
       </div>
 
       {/* Operational notifications */}
@@ -312,11 +299,15 @@ export const UsersRosterPage: React.FC = () => {
               className="bg-slate-50 border border-slate-300 text-slate-700 text-xs h-9 px-2.5 py-0.5 rounded focus:outline-hidden focus:border-sky-500 transition-colors"
             >
               <option value="all">All Roles</option>
-              <option value="admin">Administrators</option>
-              <option value="sales">Sales Engineers</option>
-              <option value="production">Shopfloor Supervisors</option>
-              <option value="dispatch">Dispatch & Logistics</option>
-              <option value="management">Plant Managers</option>
+              <option value="admin">Admin (Business Owner)</option>
+              <option value="manager">Operations Manager</option>
+              <option value="operator">Machine Operator</option>
+              <option value="quality_inspector">Quality Inspector</option>
+              <option value="store_keeper">Store Keeper & Inventory</option>
+              <option value="viewer">Auditor & Viewer</option>
+              <option value="sales">Sales Engineer</option>
+              <option value="production">Production Supervisor</option>
+              <option value="dispatch">Dispatch Clerk</option>
             </select>
           </div>
 
@@ -345,11 +336,7 @@ export const UsersRosterPage: React.FC = () => {
         </div>
       ) : filteredUsers.length > 0 ? (
         <div className="bg-white border border-slate-200 rounded-xl shadow-2xs overflow-x-auto">
-<<<<<<< HEAD
-          <table className="w-full text-left border-collapse min-w-[700px]">
-=======
           <table className="w-full text-left border-collapse min-w-175">
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
             <thead>
               <tr className="bg-slate-50 border-b border-slate-205 text-[10px] font-mono font-bold text-slate-500 uppercase tracking-wider">
                 <th className="px-5 py-3">Operator Details</th>
@@ -383,11 +370,7 @@ export const UsersRosterPage: React.FC = () => {
                             {u.name}
                           </span>
                         </div>
-<<<<<<< HEAD
-                        <span className="text-[10px] font-mono text-slate-450 block flex items-center">
-=======
                         <span className="text-[10px] font-mono text-slate-450 block items-center">
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
                           <Mail className="h-3 w-3 mr-1 text-slate-350" />
                           <span>{u.email}</span>
                         </span>
@@ -402,18 +385,26 @@ export const UsersRosterPage: React.FC = () => {
                         {getRoleLabel(u.role)}
                       </span>
                     ) : (
-                      <div className="relative inline-block w-44">
+                      <div className="relative inline-block w-48">
                         <select
                           value={u.role}
                           disabled={updatingId === u.id}
                           onChange={(e) => handleRoleChange(u.id, e.target.value as UserRole)}
-                          className="w-full bg-slate-50 hover:bg-slate-100/85 border border-slate-300 disabled:opacity-40 text-[11px] font-sans font-medium h-8.5 px-2 py-0.5 rounded cursor-pointer focus:outline-hidden text-slate-750"
+                          className="w-full bg-slate-50 hover:bg-slate-100/85 border border-slate-300 disabled:opacity-40 text-[11px] font-sans font-medium h-8.5 px-2 py-0.5 rounded cursor-pointer focus:outline-hidden text-slate-800"
                         >
-                          <option value="production">Shopfloor Supervisor</option>
-                          <option value="sales">Sales Engineer</option>
-                          <option value="dispatch">Dispatch Logistics Clerk</option>
-                          <option value="management">Plant General Manager</option>
-                          <option value="admin">Owner / Admin</option>
+                          <optgroup label="Target Roles">
+                            <option value="admin">Admin (Business Owner)</option>
+                            <option value="manager">Operations Manager</option>
+                            <option value="operator">Machine Operator</option>
+                            <option value="quality_inspector">Quality Inspector</option>
+                            <option value="store_keeper">Store Keeper & Inventory</option>
+                            <option value="viewer">Auditor & Viewer</option>
+                          </optgroup>
+                          <optgroup label="Specialist Roles">
+                            <option value="sales">Sales Engineer</option>
+                            <option value="production">Production Supervisor</option>
+                            <option value="dispatch">Dispatch Clerk</option>
+                          </optgroup>
                         </select>
                       </div>
                     )}
@@ -491,6 +482,44 @@ export const UsersRosterPage: React.FC = () => {
         </div>
       )}
 
+      {/* Role Clearance & Matrix Breakdown Card Grid */}
+      <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-2xs space-y-4">
+        <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+          <div className="flex items-center space-x-2">
+            <Shield className="h-4.5 w-4.5 text-sky-600" />
+            <h3 className="text-xs font-bold font-mono text-slate-800 uppercase tracking-wider">
+              Role-Based Access Control (RBAC) Clearance Matrix
+            </h3>
+          </div>
+          <span className="text-[10px] font-mono text-slate-450 uppercase">Enforced via Firebase Custom Claims & Rules</span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 pt-1">
+          {(['admin', 'manager', 'operator', 'quality_inspector', 'store_keeper', 'viewer'] as UserRole[]).map(r => {
+            const scope = getRoleCapabilities(r);
+            return (
+              <div key={r} className="p-3.5 bg-slate-50 border border-slate-200 rounded-lg space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className={`text-[9px] font-mono border px-2 py-0.5 rounded-full uppercase font-bold tracking-wider ${getRoleBadgeColor(r)}`}>
+                    {r.replace('_', ' ')}
+                  </span>
+                  <span className="text-[10px] font-mono text-slate-400">Claim: <code>{r}</code></span>
+                </div>
+                <h4 className="text-xs font-bold text-slate-800 font-sans">{scope.title}</h4>
+                <ul className="space-y-1 text-[11px] text-slate-600">
+                  {scope.capabilities.slice(0, 3).map((cap, i) => (
+                    <li key={i} className="flex items-start space-x-1.5 leading-snug">
+                      <span className="text-sky-500 font-bold">•</span>
+                      <span>{cap}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       {/* Rules guidelines block */}
       <div className="p-4 bg-sky-50/50 border border-sky-100 rounded-xl space-y-1.5">
         <h5 className="text-xs font-bold text-sky-955 font-mono uppercase tracking-wider flex items-center">
@@ -504,8 +533,4 @@ export const UsersRosterPage: React.FC = () => {
 
     </div>
   );
-<<<<<<< HEAD
 };
-=======
-};
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145

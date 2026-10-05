@@ -29,22 +29,58 @@ const DEFAULT_SANDBOX_USERS: TenantUser[] = [
     createdAt: '2026-05-01T09:00:00Z' 
   },
   { 
+    id: 'user_demo_ananya', 
+    name: 'Ananya Sharma', 
+    role: 'manager', 
+    email: 'ananya@company.com', 
+    status: 'Active', 
+    lastLogin: '2026-05-30T07:22:00Z', 
+    createdAt: '2026-05-02T08:00:00Z' 
+  },
+  { 
+    id: 'user_demo_harpreet', 
+    name: 'Harpreet Singh', 
+    email: 'harpreet@company.com', 
+    role: 'operator', 
+    status: 'Active', 
+    lastLogin: '2026-05-30T06:45:00Z', 
+    createdAt: '2026-05-03T11:15:05Z' 
+  },
+  { 
+    id: 'user_demo_vikram', 
+    name: 'Vikram Malhotra', 
+    email: 'vikram.qc@company.com', 
+    role: 'quality_inspector', 
+    status: 'Active', 
+    lastLogin: '2026-05-30T06:30:00Z', 
+    createdAt: '2026-05-04T09:15:00Z' 
+  },
+  { 
+    id: 'user_demo_ramesh', 
+    name: 'Ramesh Verma', 
+    email: 'ramesh.store@company.com', 
+    role: 'store_keeper', 
+    status: 'Active', 
+    lastLogin: '2026-05-30T05:50:00Z', 
+    createdAt: '2026-05-05T10:00:00Z' 
+  },
+  { 
+    id: 'user_demo_preeti', 
+    name: 'Preeti Nair', 
+    email: 'preeti.auditor@company.com', 
+    role: 'viewer', 
+    status: 'Active', 
+    lastLogin: '2026-05-30T07:40:00Z', 
+    createdAt: '2026-05-06T11:00:00Z' 
+  },
+  { 
     id: 'user_demo_arjun', 
     name: 'Arjun Sen', 
     email: 'arjun@company.com', 
     role: 'sales', 
     status: 'Active', 
     lastLogin: '2026-05-30T07:10:00Z', 
-    createdAt: '2026-05-02T10:30:00Z' 
-  },
-  { 
-    id: 'user_demo_harpreet', 
-    name: 'Harpreet Singh', 
-    email: 'harpreet@company.com', 
-    role: 'production', 
-    status: 'Active', 
-    lastLogin: '2026-05-30T06:45:00Z', 
-    createdAt: '2026-05-03T11:15:05Z' 
+    createdAt: '2026-05-07T10:30:00Z' 
   },
   { 
     id: 'user_demo_sukhdev', 
@@ -53,37 +89,10 @@ const DEFAULT_SANDBOX_USERS: TenantUser[] = [
     role: 'dispatch', 
     status: 'Active', 
     lastLogin: '2026-05-30T05:20:00Z', 
-    createdAt: '2026-05-04T14:45:00Z' 
-  },
-  { 
-    id: 'user_demo_ananya', 
-    name: 'Ananya Sharma', 
-    role: 'management', 
-    email: 'ananya@company.com', 
-    status: 'Active', 
-    lastLogin: '2026-05-30T07:22:00Z', 
-    createdAt: '2026-05-05T08:00:00Z' 
-  },
-  { 
-    id: 'user_demo_kabir', 
-    name: 'Kabir Das', 
-    email: 'kabir@company.com', 
-    role: 'sales', 
-    status: 'Invited', 
-    invitedAt: '2026-05-29T10:00:00Z', 
-    createdAt: '2026-05-29T10:00:00Z' 
+    createdAt: '2026-05-08T14:45:00Z' 
   }
 ];
 
-<<<<<<< HEAD
-export const useTenantUsers = (tenantId: string | undefined) => {
-  const [users, setUsers] = useState<TenantUser[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const { profile } = useAuth();
-
-  const isAdmin = profile?.role === 'admin';
-=======
 export const useTenantUsers = (providedTenantId?: string) => {
   const [users, setUsers] = useState<TenantUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -104,7 +113,6 @@ export const useTenantUsers = (providedTenantId?: string) => {
 
   // Allow sandbox mode to bypass strict admin blocks for testing
   const isAdmin = profile?.role === 'admin' || isSandbox;
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
 
   useEffect(() => {
     if (!tenantId) {
@@ -115,11 +123,6 @@ export const useTenantUsers = (providedTenantId?: string) => {
     setLoading(true);
     setError(null);
 
-<<<<<<< HEAD
-    const isSandbox = localStorage.getItem('isSandboxMode') === 'true' || !db;
-
-=======
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
     if (isSandbox) {
       try {
         const cached = localStorage.getItem(`flowops_users_${tenantId}`);
@@ -168,13 +171,6 @@ export const useTenantUsers = (providedTenantId?: string) => {
 
       return unsubscribe;
     }
-<<<<<<< HEAD
-  }, [tenantId]);
-
-  // Invite user method
-  const inviteUser = useCallback(async (name: string, email: string, role: UserRole) => {
-    if (!tenantId) return false;
-=======
   }, [tenantId, isSandbox]);
 
   // Invite user method
@@ -182,26 +178,10 @@ export const useTenantUsers = (providedTenantId?: string) => {
     if (!tenantId) {
       throw new Error('Tenant context is missing. Cannot invite user right now.');
     }
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
     if (!isAdmin) {
       throw new Error('Only Tenant Administrators possess permission to issue workspace credentials.');
     }
 
-<<<<<<< HEAD
-    const isSandbox = localStorage.getItem('isSandboxMode') === 'true' || !db;
-    const newUserId = `user_invited_${Date.now()}`;
-    const invitedUser: TenantUser = {
-      id: newUserId,
-      name,
-      email,
-      role,
-      status: 'Invited',
-      invitedAt: new Date().toISOString(),
-      createdAt: new Date().toISOString()
-    };
-
-    if (isSandbox) {
-=======
     const newUserId = `user_invited_${Date.now()}`;
 
     if (isSandbox) {
@@ -214,7 +194,6 @@ export const useTenantUsers = (providedTenantId?: string) => {
         invitedAt: new Date().toISOString(),
         createdAt: new Date().toISOString()
       };
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
       const updated = [...users, invitedUser];
       localStorage.setItem(`flowops_users_${tenantId}`, JSON.stringify(updated));
       setUsers(updated);
@@ -223,15 +202,6 @@ export const useTenantUsers = (providedTenantId?: string) => {
       console.log(`%c[OUT-OF-BAND STUB] Invite email notification mock triggered successfully to: ${email} for role: ${role}`, 'color: #0d9488; font-weight: bold;');
     } else {
       try {
-<<<<<<< HEAD
-        const uDocRef = doc(db, 'tenants', tenantId, 'users', newUserId);
-        await setDoc(uDocRef, {
-          name,
-          email,
-          role,
-          status: 'Invited',
-          invitedAt: new Date().toISOString(),
-=======
         // 1. Create the global invite record first so the auth flow can find it
         const inviteRef = await addDoc(collection(db, 'invites'), {
           email: email.toLowerCase(),
@@ -251,18 +221,13 @@ export const useTenantUsers = (providedTenantId?: string) => {
           role,
           status: 'Invited',
           invitedAt: serverTimestamp(),
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
           createdAt: serverTimestamp()
         });
         
         // Trigger out-of-band communication stub log for production flow
         console.log(`%c[OUT-OF-BAND STUB] Real production invite email triggered via API to: ${email} [${role}]`, 'color: #0284c7; font-weight: bold;');
       } catch (err: any) {
-<<<<<<< HEAD
-        handleFirestoreError(err, OperationType.CREATE, `tenants/${tenantId}/users/${newUserId}`);
-=======
         handleFirestoreError(err, OperationType.CREATE, `invites`);
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
         throw err;
       }
     }
@@ -285,13 +250,6 @@ export const useTenantUsers = (providedTenantId?: string) => {
     });
 
     return true;
-<<<<<<< HEAD
-  }, [tenantId, users, isAdmin]);
-
-  // Edit user role method
-  const updateUserRole = useCallback(async (userId: string, targetRole: UserRole) => {
-    if (!tenantId) return false;
-=======
   }, [tenantId, users, isAdmin, profile, isSandbox]);
 
   // Edit user role method
@@ -299,16 +257,10 @@ export const useTenantUsers = (providedTenantId?: string) => {
     if (!tenantId) {
       throw new Error('Tenant context is missing.');
     }
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
     if (!isAdmin) {
       throw new Error('Only Company Owners hold permissions to tweak operative system roles.');
     }
 
-<<<<<<< HEAD
-    const isSandbox = localStorage.getItem('isSandboxMode') === 'true' || !db;
-
-=======
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
     const uInfo = users.find(u => u.id === userId);
 
     if (isSandbox) {
@@ -348,13 +300,6 @@ export const useTenantUsers = (providedTenantId?: string) => {
     });
 
     return true;
-<<<<<<< HEAD
-  }, [tenantId, users, isAdmin]);
-
-  // Soft delete / deactivate user method
-  const deactivateUser = useCallback(async (userId: string) => {
-    if (!tenantId) return false;
-=======
   }, [tenantId, users, isAdmin, profile, isSandbox]);
 
   // Soft delete / deactivate user method
@@ -362,16 +307,10 @@ export const useTenantUsers = (providedTenantId?: string) => {
     if (!tenantId) {
       throw new Error('Tenant context is missing.');
     }
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
     if (!isAdmin) {
       throw new Error('Only Tenant Administrators can suspend active operator credentials.');
     }
 
-<<<<<<< HEAD
-    const isSandbox = localStorage.getItem('isSandboxMode') === 'true' || !db;
-
-=======
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
     const uInfo = users.find(u => u.id === userId);
 
     if (isSandbox) {
@@ -410,13 +349,6 @@ export const useTenantUsers = (providedTenantId?: string) => {
     });
 
     return true;
-<<<<<<< HEAD
-  }, [tenantId, users, isAdmin]);
-
-  // Soft activate user method
-  const activateUser = useCallback(async (userId: string) => {
-    if (!tenantId) return false;
-=======
   }, [tenantId, users, isAdmin, profile, isSandbox]);
 
   // Soft activate user method
@@ -424,16 +356,10 @@ export const useTenantUsers = (providedTenantId?: string) => {
     if (!tenantId) {
       throw new Error('Tenant context is missing.');
     }
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
     if (!isAdmin) {
       throw new Error('Only Tenant Administrators can enable operator credentials.');
     }
 
-<<<<<<< HEAD
-    const isSandbox = localStorage.getItem('isSandboxMode') === 'true' || !db;
-
-=======
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
     const uInfo = users.find(u => u.id === userId);
 
     if (isSandbox) {
@@ -472,24 +398,96 @@ export const useTenantUsers = (providedTenantId?: string) => {
     });
 
     return true;
-<<<<<<< HEAD
-  }, [tenantId, users, isAdmin]);
-=======
   }, [tenantId, users, isAdmin, profile, isSandbox]);
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
+
+  // Direct User Account Creation with Role & Custom Claims
+  const createUserAccount = useCallback(async (params: {
+    name: string;
+    email: string;
+    role: UserRole;
+    temporaryPassword?: string;
+    plantId?: string;
+  }) => {
+    const { name, email, role, plantId } = params;
+    if (!tenantId) throw new Error('Tenant context missing.');
+    if (!isAdmin) throw new Error('Only Administrator or Manager can create user accounts.');
+
+    const newUserId = `usr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const nowIso = new Date().toISOString();
+
+    const newUser: TenantUser = {
+      id: newUserId,
+      name,
+      email: email.toLowerCase(),
+      role,
+      status: 'Active',
+      lastLogin: undefined,
+      createdAt: nowIso
+    };
+
+    if (isSandbox) {
+      const updated = [newUser, ...users];
+      localStorage.setItem(`flowops_users_${tenantId}`, JSON.stringify(updated));
+      setUsers(updated);
+    } else {
+      try {
+        const uDocRef = doc(db, 'tenants', tenantId, 'users', newUserId);
+        await setDoc(uDocRef, {
+          name,
+          email: email.toLowerCase(),
+          role,
+          status: 'Active',
+          plantId: plantId || '',
+          customClaims: {
+            role,
+            tenantId
+          },
+          createdAt: serverTimestamp()
+        });
+
+        // Also sync global user profile doc
+        const globalDocRef = doc(db, 'users', newUserId);
+        await setDoc(globalDocRef, {
+          uid: newUserId,
+          name,
+          email: email.toLowerCase(),
+          role,
+          tenantId,
+          plantId: plantId || '',
+          createdAt: serverTimestamp()
+        });
+      } catch (err: any) {
+        handleFirestoreError(err, OperationType.CREATE, `tenants/${tenantId}/users/${newUserId}`);
+        throw err;
+      }
+    }
+
+    logActivityEvent({
+      tenantId,
+      actionType: 'create',
+      entityType: 'user',
+      entityId: newUserId,
+      actor: {
+        userId: profile?.uid || 'admin',
+        displayName: profile?.name || 'Administrator'
+      },
+      description: `Created new user account "${name}" (${email}) with role "${role}".`,
+      metadata: { role, email },
+      isSandboxMode: isSandbox
+    });
+
+    return newUser;
+  }, [tenantId, users, isAdmin, profile, isSandbox]);
 
   return {
     users,
     loading,
     error,
     inviteUser,
+    createUserAccount,
     updateUserRole,
     deactivateUser,
     activateUser,
     isAdmin
   };
-<<<<<<< HEAD
 };
-=======
-};
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145

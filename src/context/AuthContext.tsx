@@ -13,19 +13,6 @@ import {
   doc, 
   getDoc, 
   setDoc, 
-<<<<<<< HEAD
-  serverTimestamp 
-} from 'firebase/firestore';
-import { UserProfile, UserRole, Tenant } from '../types';
-import { handleFirestoreError, OperationType } from '../firebaseErrors';
-
-interface AuthContextType {
-  user: FirebaseUser | null;
-  profile: UserProfile | null;
-  loading: boolean;
-  tenant: Tenant | null;
-  isSandboxMode: boolean;
-=======
   collection,
   query,
   where,
@@ -36,8 +23,9 @@ interface AuthContextType {
   limit,
   onSnapshot
 } from 'firebase/firestore';
-import { UserProfile, UserRole, Tenant, Plant, ProductionStageConfig } from '../types';
+import { UserProfile, UserRole, Tenant, Plant, ProductionStageConfig, CustomClaims } from '../types';
 import { handleFirestoreError, OperationType } from '../firebaseErrors';
+import { recordLoginAudit } from '../utils/auditLogger';
 
 export type AuthStatus = 'loading' | 'unauthenticated' | 'needs_onboarding' | 'active' | 'suspended';
 
@@ -51,23 +39,18 @@ interface AuthContextType {
   setActivePlantId: (plantId: string | null) => void;
   plants: Plant[];
   loadingPlants: boolean;
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
   switchToSandboxRole: (role: UserRole) => void;
-  initializeSandbox: (companyName: string) => void;
+  initializeSandbox: (companyName: string, initialRole?: UserRole) => void;
   updateProfileLocally: (updates: Partial<UserProfile>) => void;
-<<<<<<< HEAD
-=======
   setAuthStatus: (status: AuthStatus) => void;
   refreshPlants: () => void;
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
+  refreshClaims: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-<<<<<<< HEAD
-=======
 const DEFAULT_PUNE_STAGES: ProductionStageConfig[] = [
   { id: 'pune_material_cutting', name: 'Material Cutting', color: 'indigo', isFinalStage: false, order: 0 },
   { id: 'pune_heating_welding', name: 'Pre-Heating & Welding', color: 'blue', isFinalStage: false, order: 1 },
@@ -86,16 +69,10 @@ const DEFAULT_VADODARA_STAGES: ProductionStageConfig[] = [
   { id: 'vadodara_packaging_ready', name: 'Packaging & Ready', color: 'green', isFinalStage: true, order: 5 }
 ];
 
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [tenant, setTenant] = useState<Tenant | null>(null);
-<<<<<<< HEAD
-  const [loading, setLoading] = useState(true);
-  const [isSandboxMode, setIsSandboxMode] = useState(false);
-
-=======
   const [authStatus, setAuthStatus] = useState<AuthStatus>('loading');
   const [isSandboxMode, setIsSandboxMode] = useState(false);
 
@@ -254,7 +231,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [tenant?.id, isSandboxMode, profile?.assignedPlantIds]);
 
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
   // Attempt to load sandbox from LocalStorage to persist reload states
   useEffect(() => {
     const sandboxUser = localStorage.getItem('flowops_sandbox_profile');
@@ -264,11 +240,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setTenant(JSON.parse(sandboxTenant));
       setIsSandboxMode(true);
       localStorage.setItem('isSandboxMode', 'true');
-<<<<<<< HEAD
-      setLoading(false);
-=======
       setAuthStatus('active');
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
     } else {
       // Connect to authentic firebase stream
       const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -281,49 +253,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
             if (userSnap.exists()) {
               const uData = userSnap.data() as UserProfile;
-              setProfile(uData);
 
-<<<<<<< HEAD
-              // Get tenant config
-              const tenantRef = doc(db, 'tenants', uData.tenantId);
-              const tenantSnap = await getDoc(tenantRef);
-              if (tenantSnap.exists()) {
-                setTenant(tenantSnap.data() as Tenant);
+              // Inspect Firebase Auth Custom Claims
+              let effectiveRole: UserRole = uData.role;
+              let effectiveTenantId: string = uData.tenantId;
+              let customClaimsSnapshot: CustomClaims | undefined = undefined;
+
+              try {
+                const idTokenResult = await firebaseUser.getIdTokenResult();
+                if (idTokenResult.claims) {
+                  customClaimsSnapshot = {
+                    role: (idTokenResult.claims.role as UserRole) || uData.role,
+                    tenantId: (idTokenResult.claims.tenantId as string) || uData.tenantId,
+                    isSuperAdmin: !!idTokenResult.claims.isSuperAdmin,
+                    ...idTokenResult.claims
+                  };
+                  if (idTokenResult.claims.role) {
+                    effectiveRole = idTokenResult.claims.role as UserRole;
+                  }
+                  if (idTokenResult.claims.tenantId) {
+                    effectiveTenantId = idTokenResult.claims.tenantId as string;
+                  }
+                }
+              } catch (claimsErr) {
+                console.warn('Could not inspect Firebase token claims:', claimsErr);
               }
-            } else {
-              // Sign-up flow: Auto-create tenant & user document for fresh Google Accounts
-              const newTenantId = `tenant_${firebaseUser.uid.substring(0, 8)}`;
-              const newTenant: Tenant = {
-                id: newTenantId,
-                companyName: `${firebaseUser.displayName || 'Industrial'}'s Forge`,
-                currency: '₹',
-                createdAt: new Date().toISOString()
+
+              const mergedProfile: UserProfile = {
+                ...uData,
+                role: effectiveRole,
+                tenantId: effectiveTenantId,
+                customClaims: customClaimsSnapshot || { role: effectiveRole, tenantId: effectiveTenantId }
               };
 
-              // Create tenant
-              await setDoc(doc(db, 'tenants', newTenantId), newTenant);
-              
-              // Create user
-              const newProfile: UserProfile = {
-                uid: firebaseUser.uid,
-                email: firebaseUser.email || '',
-                name: firebaseUser.displayName || 'Operator',
-                tenantId: newTenantId,
-                role: 'admin', // First user is the Owner/Admin
-                createdAt: new Date().toISOString()
-              };
+              setProfile(mergedProfile);
 
-              await setDoc(doc(db, 'users', firebaseUser.uid), newProfile);
-              
-              setProfile(newProfile);
-              setTenant(newTenant);
-            }
-          } catch (e) {
-            console.error('Error in Auth profile retrieval: ', e);
-=======
               // 1. Check Tenant User Status for Suspensions
               let isActive = true;
-              const tenantUserRef = doc(db, 'tenants', uData.tenantId, 'users', firebaseUser.uid);
+              const tenantUserRef = doc(db, 'tenants', effectiveTenantId, 'users', firebaseUser.uid);
               const tenantUserSnap = await getDoc(tenantUserRef);
               
               if (tenantUserSnap.exists()) {
@@ -334,13 +301,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               }
 
               // 2. Get tenant config strictly
-              const tenantRef = doc(db, 'tenants', uData.tenantId);
+              const tenantRef = doc(db, 'tenants', effectiveTenantId);
               const tenantSnap = await getDoc(tenantRef);
               
               if (tenantSnap.exists()) {
                 setTenant(tenantSnap.data() as Tenant);
                 // 3. Lockout or Allow ONLY if tenant exists
-                setAuthStatus(isActive ? 'active' : 'suspended');
+                const finalStatus = isActive ? 'active' : 'suspended';
+                setAuthStatus(finalStatus);
+
+                if (isActive) {
+                  // Log successful authentication event to audit log
+                  recordLoginAudit({
+                    tenantId: effectiveTenantId,
+                    userId: firebaseUser.uid,
+                    userEmail: firebaseUser.email || '',
+                    userName: mergedProfile.name || firebaseUser.displayName || 'Operator',
+                    role: effectiveRole,
+                    authProvider: firebaseUser.providerData[0]?.providerId === 'google.com' ? 'google' : 'password',
+                    status: 'SUCCESS',
+                    customClaims: mergedProfile.customClaims,
+                    isSandboxMode: false
+                  });
+                }
               } else {
                 console.error("CRITICAL: User profile exists, but associated tenant is missing.");
                 setAuthStatus('unauthenticated');
@@ -462,19 +445,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               console.warn("Permission denied while fetching user. Re-evaluating Firestore rules.");
             }
             setAuthStatus('unauthenticated');
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
           }
         } else {
           setUser(null);
           setProfile(null);
           setTenant(null);
-<<<<<<< HEAD
-        }
-        setLoading(false);
-=======
           setAuthStatus('unauthenticated');
         }
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
       });
 
       return () => unsubscribe();
@@ -482,11 +459,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const signInWithGoogle = async () => {
-<<<<<<< HEAD
-    setLoading(true);
-=======
     setAuthStatus('loading');
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
     localStorage.removeItem('flowops_sandbox_profile');
     localStorage.removeItem('flowops_sandbox_tenant');
     localStorage.removeItem('isSandboxMode');
@@ -496,20 +469,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await signInWithPopup(auth, provider);
     } catch (e) {
       console.error('Google Auth Failed: ', e);
-<<<<<<< HEAD
-      setLoading(false);
-=======
       setAuthStatus('unauthenticated');
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
     }
   };
 
   const signOut = async () => {
-<<<<<<< HEAD
-    setLoading(true);
-=======
     setAuthStatus('loading');
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
     localStorage.removeItem('flowops_sandbox_profile');
     localStorage.removeItem('flowops_sandbox_tenant');
     localStorage.removeItem('isSandboxMode');
@@ -518,20 +483,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setProfile(null);
     setTenant(null);
     await firebaseSignOut(auth);
-<<<<<<< HEAD
-    setLoading(false);
-  };
-
-  // Instant sandbox trigger (so non-authentic layout runs beautifully)
-  const initializeSandbox = (companyName: string) => {
-    setLoading(true);
-=======
     setAuthStatus('unauthenticated');
   };
 
-  const initializeSandbox = (companyName: string) => {
+  const initializeSandbox = (companyName: string, initialRole: UserRole = 'admin') => {
     setAuthStatus('loading');
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
     const mockTenantId = `tenant_demo_${Math.random().toString(36).substring(2, 7)}`;
     const mockTenant: Tenant = {
       id: mockTenantId,
@@ -542,14 +498,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       createdAt: new Date().toISOString()
     };
 
+    const personaNames: Record<UserRole, string> = {
+      admin: 'Rajesh Patel (Business Owner)',
+      manager: 'Ananya Sharma (Operations Manager)',
+      operator: 'Harpreet Singh (Shopfloor Operator)',
+      quality_inspector: 'Vikram Malhotra (Quality Inspector)',
+      store_keeper: 'Ramesh Verma (Store Keeper)',
+      viewer: 'Preeti Nair (Management Viewer)',
+      sales: 'Siddharth Rao (Sales Engineer)',
+      production: 'Manoj Tiwari (Production Supervisor)',
+      dispatch: 'Amitabh Joshi (Dispatch Clerk)',
+      management: 'Sunita Aggarwal (Executive)'
+    };
+
     const mockProfile: UserProfile = {
       uid: `user_demo_${Math.random().toString(36).substring(2, 7)}`,
-      email: 'demo@bharatgears.co.in',
-      name: 'Rajesh Patel',
+      email: `${initialRole}.demo@bharatgears.co.in`,
+      name: personaNames[initialRole] || 'Rajesh Patel',
       tenantId: mockTenantId,
-      role: 'admin',
+      role: initialRole,
       phone: '+919876543210',
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      customClaims: {
+        role: initialRole,
+        tenantId: mockTenantId
+      }
     };
 
     localStorage.setItem('flowops_sandbox_profile', JSON.stringify(mockProfile));
@@ -559,48 +532,56 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setProfile(mockProfile);
     setTenant(mockTenant);
     setIsSandboxMode(true);
-<<<<<<< HEAD
-    setLoading(false);
-  };
-
-  // Dynamic role switching for easier review & testing on sandbox
-  const switchToSandboxRole = (role: UserRole) => {
-    if (!profile) return;
-=======
     setAuthStatus('active');
+
+    // Audit log this sandbox login
+    recordLoginAudit({
+      tenantId: mockTenantId,
+      userId: mockProfile.uid,
+      userEmail: mockProfile.email,
+      userName: mockProfile.name,
+      role: initialRole,
+      authProvider: 'sandbox',
+      status: 'SUCCESS',
+      customClaims: { role: initialRole, tenantId: mockTenantId },
+      isSandboxMode: true
+    });
   };
 
   const switchToSandboxRole = (role: UserRole) => {
     if (!profile) return;
-    
-    // SECURITY FIX: Strictly prevent non-admins from switching roles
-    if (profile.role !== 'admin') {
-      console.warn('Action blocked: Only Owner/Admin roles can switch user profiles.');
-      return;
-    }
 
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
-    const updated = { ...profile, role };
+    const updated: UserProfile = { 
+      ...profile, 
+      role,
+      customClaims: {
+        ...(profile.customClaims || {}),
+        role,
+        tenantId: profile.tenantId
+      }
+    };
     setProfile(updated);
     if (isSandboxMode) {
       localStorage.setItem('flowops_sandbox_profile', JSON.stringify(updated));
-    } else {
-<<<<<<< HEAD
-      // Direct Firestore update if they are logged in with real auth to let rules check roles
-      const userRef = doc(db, 'users', profile.uid);
-      setDoc(userRef, { role }, { merge: true }).catch(err => {
-        handleFirestoreError(err, OperationType.UPDATE, `users/${profile.uid}`);
+      // Log role assumption session event into audit log
+      recordLoginAudit({
+        tenantId: profile.tenantId,
+        userId: profile.uid,
+        userEmail: profile.email,
+        userName: `${profile.name} (Assumed ${role})`,
+        role,
+        authProvider: 'sandbox',
+        status: 'SUCCESS',
+        customClaims: { role, tenantId: profile.tenantId },
+        isSandboxMode: true
       });
-=======
+    } else {
       console.warn('Action blocked: Role updates in production must be managed exclusively by an admin via the Roster interface.');
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
     }
   };
 
   const updateProfileLocally = (updates: Partial<UserProfile>) => {
     if (!profile) return;
-<<<<<<< HEAD
-=======
 
     // SECURITY FIX: Prevent non-admins from escalating to Super Admin
     if (updates.isSuperAdmin !== undefined && profile.role !== 'admin') {
@@ -608,7 +589,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
 
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
     const updated = { ...profile, ...updates };
     setProfile(updated);
     if (isSandboxMode) {
@@ -616,8 +596,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-<<<<<<< HEAD
-=======
   const refreshPlants = () => {
     if (!tenant?.id) return;
     const isSandbox = isSandboxMode || localStorage.getItem('isSandboxMode') === 'true' || !db;
@@ -634,16 +612,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Production uses onSnapshot, meaning real-time updates happen automatically without forced manual refreshes
   };
 
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
+  const refreshClaims = async () => {
+    if (user) {
+      try {
+        const tokenResult = await user.getIdTokenResult(true);
+        if (tokenResult.claims && profile) {
+          const newRole = (tokenResult.claims.role as UserRole) || profile.role;
+          const newClaims = {
+            ...profile.customClaims,
+            ...tokenResult.claims,
+            role: newRole
+          };
+          setProfile({
+            ...profile,
+            role: newRole,
+            customClaims: newClaims
+          });
+        }
+      } catch (e) {
+        console.error('Failed to force refresh token claims:', e);
+      }
+    }
+  };
+
   return (
     <AuthContext.Provider value={{ 
       user, 
       profile, 
-<<<<<<< HEAD
-      loading, 
-      tenant,
-      isSandboxMode,
-=======
       tenant,
       authStatus,
       isSandboxMode,
@@ -651,18 +646,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setActivePlantId,
       plants,
       loadingPlants,
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
       signInWithGoogle, 
       signOut, 
       switchToSandboxRole, 
       initializeSandbox,
-<<<<<<< HEAD
-      updateProfileLocally
-=======
       updateProfileLocally,
       setAuthStatus,
-      refreshPlants
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
+      refreshPlants,
+      refreshClaims
     }}>
       {children}
     </AuthContext.Provider>
@@ -675,8 +666,4 @@ export const useAuth = () => {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
-<<<<<<< HEAD
 };
-=======
-};
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145

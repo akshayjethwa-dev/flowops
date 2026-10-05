@@ -5,19 +5,12 @@
 
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-<<<<<<< HEAD
-import { AuthProvider } from './context/AuthContext';
-=======
 import { AuthProvider, useAuth } from './context/AuthContext';
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
 import { ToastProvider } from './context/ToastContext';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { AppShell } from './components/layout/AppShell';
 import { ProtectedRoute } from './components/layout/ProtectedRoute';
-<<<<<<< HEAD
-=======
 import { Loader2, ShieldCheck } from 'lucide-react';
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
 
 // Unauthenticated views
 import { Login } from './pages/unauth/Login';
@@ -41,10 +34,7 @@ import { ReportsPage } from './pages/ReportsPage';
 
 // Settings sub-views
 import { TenantSettingsPage } from './pages/settings/TenantSettingsPage';
-<<<<<<< HEAD
-=======
 import { PlantsManagementPage } from './pages/settings/PlantsManagementPage';
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
 import { ProductionStagesPage } from './pages/settings/ProductionStagesPage';
 import { WhatsAppPage } from './pages/settings/WhatsAppPage';
 import { WhatsAppInboxPage } from './pages/WhatsAppInboxPage';
@@ -97,7 +87,7 @@ export default function App() {
                 <Route 
                   path="dashboard" 
                   element={
-                    <ProtectedRoute allowedRoles={['admin', 'management']}>
+                    <ProtectedRoute allowedRoles={['admin', 'manager', 'operator', 'quality_inspector', 'store_keeper', 'viewer', 'sales', 'production', 'dispatch', 'management']}>
                       <DashboardPage />
                     </ProtectedRoute>
                   } 
@@ -106,7 +96,7 @@ export default function App() {
                 <Route 
                   path="rfqs" 
                   element={
-                    <ProtectedRoute allowedRoles={['admin', 'sales', 'management']}>
+                    <ProtectedRoute allowedRoles={['admin', 'manager', 'sales', 'management', 'viewer']}>
                       <RFQsPage />
                     </ProtectedRoute>
                   } 
@@ -115,7 +105,7 @@ export default function App() {
                 <Route 
                   path="rfqs/new" 
                   element={
-                    <ProtectedRoute allowedRoles={['admin', 'sales', 'management']}>
+                    <ProtectedRoute allowedRoles={['admin', 'manager', 'sales', 'management']}>
                       <RfqCreateForm />
                     </ProtectedRoute>
                   } 
@@ -124,7 +114,7 @@ export default function App() {
                 <Route 
                   path="rfqs/:rfqId" 
                   element={
-                    <ProtectedRoute allowedRoles={['admin', 'sales', 'management']}>
+                    <ProtectedRoute allowedRoles={['admin', 'manager', 'sales', 'management', 'viewer']}>
                       <RfqDetailPage />
                     </ProtectedRoute>
                   } 
@@ -133,7 +123,7 @@ export default function App() {
                 <Route 
                   path="rfqs/:rfqId/quotation" 
                   element={
-                    <ProtectedRoute allowedRoles={['admin', 'sales', 'management']}>
+                    <ProtectedRoute allowedRoles={['admin', 'manager', 'sales', 'management']}>
                       <QuotationEditorPage />
                     </ProtectedRoute>
                   } 
@@ -142,7 +132,7 @@ export default function App() {
                 <Route 
                   path="orders" 
                   element={
-                    <ProtectedRoute allowedRoles={['admin', 'production', 'management']}>
+                    <ProtectedRoute allowedRoles={['admin', 'manager', 'operator', 'quality_inspector', 'store_keeper', 'production', 'management', 'viewer']}>
                       <OrdersPage />
                     </ProtectedRoute>
                   } 
@@ -151,7 +141,7 @@ export default function App() {
                 <Route 
                   path="orders/:jobId" 
                   element={
-                    <ProtectedRoute allowedRoles={['admin', 'production', 'management']}>
+                    <ProtectedRoute allowedRoles={['admin', 'manager', 'operator', 'quality_inspector', 'store_keeper', 'production', 'management', 'viewer']}>
                       <JobDetailPage />
                     </ProtectedRoute>
                   } 
@@ -160,7 +150,7 @@ export default function App() {
                 <Route 
                   path="dispatch" 
                   element={
-                    <ProtectedRoute allowedRoles={['admin', 'dispatch', 'management']}>
+                    <ProtectedRoute allowedRoles={['admin', 'manager', 'dispatch', 'store_keeper', 'management', 'viewer']}>
                       <DispatchPage />
                     </ProtectedRoute>
                   } 
@@ -169,7 +159,7 @@ export default function App() {
                 <Route 
                   path="dispatch/:dispatchId" 
                   element={
-                    <ProtectedRoute allowedRoles={['admin', 'dispatch', 'management']}>
+                    <ProtectedRoute allowedRoles={['admin', 'manager', 'dispatch', 'store_keeper', 'management', 'viewer']}>
                       <DispatchDetailPage />
                     </ProtectedRoute>
                   } 
@@ -178,7 +168,7 @@ export default function App() {
                 <Route 
                   path="customers" 
                   element={
-                    <ProtectedRoute allowedRoles={['admin', 'sales', 'management']}>
+                    <ProtectedRoute allowedRoles={['admin', 'manager', 'sales', 'management', 'viewer']}>
                       <CustomersListPage />
                     </ProtectedRoute>
                   } 
@@ -187,7 +177,7 @@ export default function App() {
                 <Route 
                   path="whatsapp-inbox" 
                   element={
-                    <ProtectedRoute allowedRoles={['admin', 'sales', 'management']}>
+                    <ProtectedRoute allowedRoles={['admin', 'manager', 'sales', 'management']}>
                       <WhatsAppInboxPage />
                     </ProtectedRoute>
                   } 
@@ -196,7 +186,7 @@ export default function App() {
                 <Route 
                   path="payments" 
                   element={
-                    <ProtectedRoute allowedRoles={['admin', 'sales', 'management']}>
+                    <ProtectedRoute allowedRoles={['admin', 'manager', 'sales', 'management', 'viewer']}>
                       <PaymentsTrackerPage />
                     </ProtectedRoute>
                   } 
@@ -205,7 +195,7 @@ export default function App() {
             <Route 
               path="customers/:customerId" 
               element={
-                <ProtectedRoute allowedRoles={['admin', 'sales', 'management']}>
+                <ProtectedRoute allowedRoles={['admin', 'manager', 'sales', 'management', 'viewer']}>
                   <CustomerDetailPage />
                 </ProtectedRoute>
               } 
@@ -214,7 +204,7 @@ export default function App() {
             <Route 
               path="inventory" 
               element={
-                <ProtectedRoute allowedRoles={['admin', 'production', 'management', 'sales', 'dispatch']}>
+                <ProtectedRoute allowedRoles={['admin', 'manager', 'store_keeper', 'operator', 'quality_inspector', 'production', 'management', 'sales', 'dispatch', 'viewer']}>
                   <InventoryPage />
                 </ProtectedRoute>
               } 
@@ -223,7 +213,7 @@ export default function App() {
             <Route 
               path="reports" 
               element={
-                <ProtectedRoute allowedRoles={['admin', 'management', 'sales', 'production', 'dispatch']}>
+                <ProtectedRoute allowedRoles={['admin', 'manager', 'quality_inspector', 'sales', 'production', 'dispatch', 'management', 'viewer']}>
                   <ReportsPage />
                 </ProtectedRoute>
               } 
@@ -242,7 +232,7 @@ export default function App() {
             <Route 
               path="settings/production-stages" 
               element={
-                <ProtectedRoute allowedRoles={['admin']}>
+                <ProtectedRoute allowedRoles={['admin', 'manager']}>
                   <ProductionStagesPage />
                 </ProtectedRoute>
               } 
@@ -251,7 +241,7 @@ export default function App() {
             <Route 
               path="settings/whatsapp" 
               element={
-                <ProtectedRoute allowedRoles={['admin', 'sales']}>
+                <ProtectedRoute allowedRoles={['admin', 'manager', 'sales']}>
                   <WhatsAppPage />
                 </ProtectedRoute>
               } 
@@ -260,7 +250,7 @@ export default function App() {
             <Route 
               path="settings/users" 
               element={
-                <ProtectedRoute allowedRoles={['admin']}>
+                <ProtectedRoute allowedRoles={['admin', 'manager']}>
                   <UsersRosterPage />
                 </ProtectedRoute>
               } 
@@ -269,7 +259,7 @@ export default function App() {
             <Route 
               path="settings/users/invite" 
               element={
-                <ProtectedRoute allowedRoles={['admin']}>
+                <ProtectedRoute allowedRoles={['admin', 'manager']}>
                   <InviteUserForm />
                 </ProtectedRoute>
               } 
@@ -278,33 +268,26 @@ export default function App() {
             <Route 
               path="activity" 
               element={
-                <ProtectedRoute allowedRoles={['admin', 'management']}>
+                <ProtectedRoute allowedRoles={['admin', 'manager', 'management']}>
                   <ActivityPage />
                 </ProtectedRoute>
               } 
             />
 
-<<<<<<< HEAD
-=======
             <Route 
               path="settings/plants" 
               element={
-                <ProtectedRoute allowedRoles={['admin', 'management']}>
+                <ProtectedRoute allowedRoles={['admin', 'manager', 'management']}>
                   <PlantsManagementPage />
                 </ProtectedRoute>
               } 
             />
 
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
             {/* Internal SaaS Admins boundary shard manager */}
             <Route 
               path="internal/tenants" 
               element={
-<<<<<<< HEAD
-                <ProtectedRoute requireSuperAdmin={true}>
-=======
                 <ProtectedRoute allowedRoles={['admin', 'management']}>
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
                   <InternalTenantsListPage />
                 </ProtectedRoute>
               } 
@@ -324,16 +307,8 @@ export default function App() {
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </BrowserRouter>
-<<<<<<< HEAD
-      </ToastProvider>
-    </AuthProvider>
-  </ErrorBoundary>
-  );
-}
-=======
         </ToastProvider>
       </AuthProvider>
     </ErrorBoundary>
   );
 }
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145

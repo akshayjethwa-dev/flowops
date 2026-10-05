@@ -4,64 +4,19 @@ import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { UserRole } from '../../types';
-<<<<<<< HEAD
-import { isSuperAdmin } from '../../utils/permissions';
-=======
 import { isSuperAdmin, canPerformAction, PermissionAction } from '../../utils/permissions';
 import { Lock, LogOut, ShieldCheck, Loader2 } from 'lucide-react';
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
   allowedRoles?: UserRole[];
-<<<<<<< HEAD
-=======
   requiredAction?: PermissionAction;
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
   requireSuperAdmin?: boolean;
 }
 
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ 
   children, 
   allowedRoles,
-<<<<<<< HEAD
-  requireSuperAdmin
-}) => {
-  const { user, profile, loading } = useAuth();
-  const location = useLocation();
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
-        <div className="animate-spin h-8 w-8 border-3 border-sky-600 border-t-transparent rounded-full" />
-        <p className="mt-4 text-xs font-mono text-slate-400 uppercase tracking-widest animate-pulse">
-          Resolving credentials...
-        </p>
-      </div>
-    );
-  }
-
-  // Redirect to login if user is not authenticated (neither real firebase nor sandbox)
-  if (!user && !profile) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
-  }
-
-  // Check Super Admin constraints if targeted
-  if (requireSuperAdmin && !isSuperAdmin(profile)) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-center">
-        <div className="max-w-md bg-white border border-slate-200 rounded-lg p-8 shadow-xs">
-          <div className="w-12 h-12 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4 font-bold text-lg">
-            🚨
-          </div>
-          <h2 className="text-base font-bold text-red-650 mb-2 uppercase tracking-wide">
-            Super-Admin Required
-          </h2>
-          <p className="text-xs text-slate-500 leading-relaxed mb-6">
-            This module is reserved exclusively for the core Ashrey Systems administration team.
-          </p>
-          <Navigate to="/dashboard" replace />
-=======
   requiredAction,
   requireSuperAdmin
 }) => {
@@ -81,27 +36,11 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
           <span className="text-[10px] font-mono text-slate-400">
             Establishing tenant connection and security rules...
           </span>
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
         </div>
       </div>
     );
   }
 
-<<<<<<< HEAD
-  // Check Role Permissions constraints if targeted
-  if (allowedRoles && profile && !allowedRoles.includes(profile.role)) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-center">
-        <div className="max-w-md bg-white border border-slate-200 rounded-lg p-8 shadow-xs">
-          <div className="w-12 h-12 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4 font-bold text-lg">
-            ⚠️
-          </div>
-          <h2 className="text-base font-bold text-slate-900 mb-2 uppercase tracking-wide">
-            Access Restricted
-          </h2>
-          <p className="text-xs text-slate-500 leading-relaxed mb-6">
-            Your current account role ({profile.role.toUpperCase()}) does not have permissions to access this administrative board.
-=======
   if (authStatus === 'unauthenticated') {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
@@ -137,7 +76,27 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
   // 🔒 RBAC Check by specific allowed roles (Legacy fallback)
   if (allowedRoles && profile && !allowedRoles.includes(profile.role)) {
-    return <Navigate to="/dashboard" replace />;
+    const defaultRoute = (profile.role === 'operator' || profile.role === 'production') ? '/orders' :
+                         (profile.role === 'store_keeper') ? '/inventory' :
+                         (profile.role === 'dispatch') ? '/dispatch' : '/dashboard';
+    if (location.pathname !== defaultRoute) {
+      return <Navigate to={defaultRoute} replace />;
+    }
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-center">
+        <div className="max-w-md bg-white border border-slate-200 rounded-lg p-8 shadow-xs">
+          <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-4 font-bold text-lg">
+            ⚠️
+          </div>
+          <h2 className="text-base font-bold text-slate-900 mb-2 uppercase tracking-wide">
+            Module Clearance Required
+          </h2>
+          <p className="text-xs text-slate-500 leading-relaxed mb-6">
+            Your current assigned role ({profile.role}) does not have clearance for this manufacturing module.
+          </p>
+        </div>
+      </div>
+    );
   }
 
   // 🔒 Strict RBAC Check by actionable permissions
@@ -153,7 +112,6 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
           </h2>
           <p className="text-xs text-slate-500 leading-relaxed mb-6">
             Your profile lacks the explicit "{requiredAction}" permission required for this module.
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
           </p>
           <Navigate to="/dashboard" replace />
         </div>
@@ -162,8 +120,4 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   return <>{children}</>;
-<<<<<<< HEAD
 };
-=======
-};
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145

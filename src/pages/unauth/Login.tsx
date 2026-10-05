@@ -4,7 +4,10 @@ import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../../firebase';
 import { useAuth } from '../../context/AuthContext';
 import { TextField } from '../../components/ui/TextField';
-import { Factory, Shield, Hammer, ArrowRight } from 'lucide-react';
+import { Factory, Shield, Hammer, ArrowRight, UserCheck } from 'lucide-react';
+import { recordLoginAudit } from '../../utils/auditLogger';
+import { UserRole } from '../../types';
+import { getRoleTitle, getRoleBadgeColor } from '../../utils/permissions';
 
 export const Login: React.FC = () => {
   const navigate = useNavigate();
@@ -73,15 +76,48 @@ export const Login: React.FC = () => {
         friendlyMessage = 'Too many failed sign-in attempts. Your access has been temporarily blocked. Please retry later.';
       }
 
+      // Record failed authentication attempt into audit log
+      recordLoginAudit({
+        tenantId: 'unassigned',
+        userId: 'anonymous',
+        userEmail: email,
+        userName: email.split('@')[0] || 'User',
+        role: 'viewer',
+        authProvider: 'password',
+        status: 'FAILED',
+        errorMessage: friendlyMessage,
+        isSandboxMode: true
+      });
+
       setFormErrors({ general: friendlyMessage });
     } finally {
       setLoading(false);
     }
   };
 
+  const [sandboxRole, setSandboxRole] = useState<UserRole>('admin');
+
   const handleSandboxLaunch = (e: React.FormEvent) => {
     e.preventDefault();
     initializeSandbox(sandboxCompanyName);
+    // After initializeSandbox, if a specific persona was chosen, switch to it
+    if (sandboxRole !== 'admin') {
+      setTimeout(() => {
+        const stored = localStorage.getItem('flowops_sandbox_profile');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          parsed.role = sandboxRole;
+          parsed.name = sandboxRole === 'manager' ? 'Ananya Sharma' :
+                        sandboxRole === 'operator' ? 'Harpreet Singh' :
+                        sandboxRole === 'quality_inspector' ? 'Vikram Malhotra' :
+                        sandboxRole === 'store_keeper' ? 'Ramesh Verma' :
+                        sandboxRole === 'viewer' ? 'Preeti Nair' : 'Rajesh Patel';
+          localStorage.setItem('flowops_sandbox_profile', JSON.stringify(parsed));
+          window.location.href = '/dashboard';
+          return;
+        }
+      }, 50);
+    }
     navigate('/dashboard');
   };
 
@@ -89,11 +125,7 @@ export const Login: React.FC = () => {
     <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4 selection:bg-sky-500 selection:text-white font-sans">
       <div className="w-full max-w-md bg-white border border-slate-200 rounded-lg shadow-xs p-8 relative overflow-hidden">
         {/* Decorative subtle background grid */}
-<<<<<<< HEAD
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#e2e8f080_1px,transparent_1px),linear-gradient(to_bottom,#e2e8f080_1px,transparent_1px)] bg-[size:16px_16px] pointer-events-none" />
-=======
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#e2e8f080_1px,transparent_1px),linear-gradient(to_bottom,#e2e8f080_1px,transparent_1px)] bg-size-[16px_16px] pointer-events-none" />
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
 
         <div className="relative z-10">
           {/* Logo Heading */}
@@ -176,15 +208,9 @@ export const Login: React.FC = () => {
 
           {/* Alternative Auth / Sandbox and Google logins */}
           <div className="relative flex py-5 items-center">
-<<<<<<< HEAD
-            <div className="flex-grow border-t border-slate-100" />
-            <span className="flex-shrink mx-3 text-[9px] font-mono font-bold tracking-widest text-slate-400 uppercase">Demo & Review Tools</span>
-            <div className="flex-grow border-t border-slate-100" />
-=======
             <div className="grow border-t border-slate-100" />
             <span className="shrink mx-3 text-[9px] font-mono font-bold tracking-widest text-slate-400 uppercase">Demo & Review Tools</span>
             <div className="grow border-t border-slate-100" />
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
           </div>
 
           <div className="space-y-3">
@@ -241,6 +267,28 @@ export const Login: React.FC = () => {
                   onChange={(e) => setSandboxCompanyName(e.target.value)}
                   required
                 />
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Select Role Persona to Experience
+                  </label>
+                  <select
+                    value={sandboxRole}
+                    onChange={(e) => setSandboxRole(e.target.value as UserRole)}
+                    className="w-full bg-white border border-slate-200 rounded px-2.5 py-1.5 text-xs text-slate-800 font-medium focus:outline-none focus:border-sky-500"
+                  >
+                    <option value="admin">Admin (Business Owner) — Full System Access</option>
+                    <option value="manager">Manager — Operations, Oversight & Reports</option>
+                    <option value="operator">Operator — Shopfloor Orders & Stage Advancement</option>
+                    <option value="quality_inspector">Quality Inspector — Inspection Gates & Tolerances</option>
+                    <option value="store_keeper">Store Keeper — Inward/Outward Inventory & Stock</option>
+                    <option value="viewer">Viewer — Read-Only Observability & Audits</option>
+                  </select>
+                  <p className="text-[10px] text-slate-500 mt-1">
+                    UI links, action buttons, and clearance gates will automatically adapt to this role.
+                  </p>
+                </div>
+
                 <div className="flex space-x-2 pt-1">
                   <button
                     type="button"
@@ -253,7 +301,7 @@ export const Login: React.FC = () => {
                     type="submit"
                     className="w-2/3 bg-sky-600 hover:bg-sky-500 text-white font-bold py-2 rounded flex items-center justify-center space-x-1 cursor-pointer text-xs uppercase tracking-wide"
                   >
-                    <span>Launch</span>
+                    <span>Launch as {getRoleTitle(sandboxRole).split(' ')[0]}</span>
                     <ArrowRight className="h-3.5 w-3.5 ml-1" />
                   </button>
                 </div>

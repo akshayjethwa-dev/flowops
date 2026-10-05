@@ -1,6 +1,40 @@
 // src/types.ts
 
-export type UserRole = 'admin' | 'sales' | 'production' | 'dispatch' | 'management';
+export type UserRole = 
+  | 'admin'
+  | 'manager'
+  | 'operator'
+  | 'quality_inspector'
+  | 'store_keeper'
+  | 'viewer'
+  | 'sales'
+  | 'production'
+  | 'dispatch'
+  | 'management';
+
+export interface CustomClaims {
+  role: UserRole;
+  tenantId: string;
+  isSuperAdmin?: boolean;
+  assignedPlantIds?: string[];
+  [key: string]: any;
+}
+
+export interface LoginAuditLog {
+  id: string;
+  tenantId: string;
+  userId: string;
+  userEmail: string;
+  userName: string;
+  role: UserRole;
+  loginTimestamp: any;
+  ipAddress?: string;
+  userAgent?: string;
+  authProvider: 'password' | 'google' | 'custom' | 'sandbox';
+  status: 'SUCCESS' | 'FAILED';
+  errorMessage?: string;
+  customClaims?: CustomClaims;
+}
 
 export interface Tenant {
   id: string;
@@ -24,6 +58,7 @@ export interface UserProfile {
   plantId?: string;
   assignedPlantIds?: string[]; // Scoped Plant assignments
   assignedStageIds?: string[]; // Scoped Process Stage assignments
+  customClaims?: CustomClaims;
 }
 
 export interface RFQItem {
@@ -392,6 +427,9 @@ export type ActivityActionType =
   | 'invited'
   | 'role_change'
   | 'deactivate'
+  | 'login'
+  | 'logout'
+  | 'auth_failure'
   | 'whatsapp_queue'
   | 'whatsapp_sent'
   | 'whatsapp_delivered'
@@ -403,6 +441,8 @@ export type ActivityEntityType =
   | 'job'
   | 'dispatch'
   | 'user'
+  | 'auth'
+  | 'session'
   | 'whatsapp'
   | 'customer';
 
@@ -709,62 +749,4 @@ export interface Plant {
   gstin?: string;
   processStages: ProductionStageConfig[];
   createdAt: string;
-<<<<<<< HEAD
-}
-
-// ==========================================
-// MASTER DATA & FOUNDATION TYPES
-// ==========================================
-
-export interface UomMaster {
-  id: string;
-  name: string;
-  base_unit?: string; // Matches Prisma String?
-  category?: string; // Matches Prisma String?
-  createdAt?: string;
-  updatedAt?: string;
-}
-
-export interface UomConversion {
-  id: string;
-  from_uom_id: string;
-  to_uom_id: string;
-  multiplier: number;
-  createdAt?: string;
-  updatedAt?: string;
-}
-
-export interface Supplier {
-  id: string;
-  name: string;
-  gst?: string;
-  contact?: string;
-  payment_terms?: string;
-  createdAt?: string;
-  updatedAt?: string;
-}
-
-export interface RawMaterial {
-  id: string;
-  name: string;
-  sku: string;
-  default_uom_id: string;
-  standard_cost: number;
-  reorder_level: number;
-  supplier_id?: string; // Matches Prisma String?
-  createdAt?: string;
-  updatedAt?: string;
-}
-
-export interface ProductMaterial {
-  id: string;
-  product_id: string;
-  raw_material_id: string;
-  quantity_per_unit: number;
-  wastage_percent: number;
-  consumption_stage_id?: string;
-  createdAt?: string;
-  updatedAt?: string;
-=======
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
 }
