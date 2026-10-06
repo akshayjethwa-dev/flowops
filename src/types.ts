@@ -81,6 +81,8 @@ export interface RFQItem {
 
 export type RfqStatus = 'New' | 'In Progress' | 'Quoted' | 'Won' | 'Lost' | 'pending' | 'quoted' | 'declined';
 
+export type RfqSource = 'Phone' | 'Email' | 'WhatsApp' | 'Walk-in' | 'Web Form';
+
 export interface Rfq {
   id: string;
   rfqNumber?: string;
@@ -91,7 +93,7 @@ export interface Rfq {
   contactName?: string;
   phone?: string;
   email?: string;
-  source?: 'Phone' | 'Email' | 'WhatsApp' | 'Walk-in';
+  source?: RfqSource;
   dateReceived?: string;
   status: RfqStatus;
   priority?: 'Low' | 'Medium' | 'High';
@@ -105,9 +107,67 @@ export interface Rfq {
   orderId?: string;
   expectedDeliveryDate?: string;
   quantity?: number;
+  intakeInquiryId?: string;
 }
 
 export type RFQ = Rfq;
+
+export type IntakeChannel = 'Email' | 'WhatsApp' | 'Web Form';
+export type IntakeStatus = 'pending' | 'converted' | 'archived';
+
+export interface IntakeAttachment {
+  id: string;
+  name: string;
+  size: number;
+  type: string;
+  url?: string;
+  storagePath?: string;
+  contentBase64?: string;
+}
+
+export interface IntakeInquiry {
+  id: string;
+  tenantId: string;
+  plantId?: string;
+  channel: IntakeChannel;
+  sourceIdentifier: string; // e.g., email address, WhatsApp number, web session
+  subject?: string;
+  rawContent: string;
+  receivedAt: string;
+  status: IntakeStatus;
+  
+  // Parsed metadata
+  customerName?: string;
+  contactName?: string;
+  email?: string;
+  phone?: string;
+  city?: string;
+  gstNumber?: string;
+  priority?: 'Low' | 'Medium' | 'High';
+  expectedDeliveryDate?: string;
+  description?: string;
+  items: RFQItem[];
+  attachments: IntakeAttachment[];
+  
+  // Conversion traces
+  convertedRfqId?: string;
+  convertedRfqNumber?: string;
+  convertedAt?: string;
+  convertedBy?: string;
+}
+
+export interface EmailInboxConfig {
+  protocol: 'IMAP' | 'Graph API';
+  host?: string;
+  port?: number;
+  ssl?: boolean;
+  username?: string;
+  folder?: string;
+  graphTenantId?: string;
+  graphClientId?: string;
+  lastSyncAt?: string;
+  autoSyncEnabled?: boolean;
+}
 
 export interface QuoteItem {
   id: string;
@@ -392,7 +452,7 @@ export interface OnboardingState {
   defaultCurrency: string;
   productionStages: { id?: string; name: string; color: string; isFinalStage: boolean; order?: number }[];
   firstCustomer: { name: string; contactPerson?: string; email?: string; phone?: string; address?: string; city?: string; billingAddress?: string };
-  teamMembers: { name: string; email: string; role: 'admin' | 'sales' | 'production' | 'dispatch' | 'management' }[];
+  teamMembers: { name: string; email: string; role: UserRole }[];
   whatsappEnabled: boolean;
   whatsappApiKey?: string;
   whatsappSenderPhone?: string;

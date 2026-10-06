@@ -200,10 +200,19 @@ export function LandingPage() {
             </nav>
 
             {/* Action Buttons */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <button
+                onClick={() => navigate('/rfq-submit')}
+                className="px-3.5 py-2 text-xs sm:text-sm font-semibold text-teal-700 bg-teal-50 hover:bg-teal-100 border border-teal-200 rounded-lg transition-all flex items-center gap-1.5 pointer-events-auto cursor-pointer"
+                id="landing-submit-rfq-btn"
+                title="Customer Web RFQ & BOM Upload"
+              >
+                <FileText className="h-3.5 w-3.5" />
+                <span>Submit RFQ</span>
+              </button>
               <button
                 onClick={() => navigate('/login')}
-                className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-teal-700 hover:bg-slate-100/70 rounded-lg transition-all flex items-center gap-1.5 pointer-events-auto cursor-pointer"
+                className="px-3 py-2 text-sm font-medium text-slate-600 hover:text-teal-700 hover:bg-slate-100/70 rounded-lg transition-all flex items-center gap-1.5 pointer-events-auto cursor-pointer"
                 id="landing-signin-btn"
               >
                 <Lock className="h-3.5 w-3.5" />
@@ -211,7 +220,7 @@ export function LandingPage() {
               </button>
               <button
                 onClick={() => scrollToSection('demo-request')}
-                className="px-5 py-2.5 bg-teal-700 hover:bg-teal-800 text-white font-medium text-sm rounded-lg transition-all shadow-md shadow-teal-700/15 flex items-center gap-1 hover:translate-y-[-1px] pointer-events-auto cursor-pointer"
+                className="hidden sm:flex px-5 py-2.5 bg-teal-700 hover:bg-teal-800 text-white font-medium text-sm rounded-lg transition-all shadow-md shadow-teal-700/15 items-center gap-1 hover:translate-y-[-1px] pointer-events-auto cursor-pointer"
                 id="landing-demo-top-btn"
               >
                 Get Started
@@ -848,11 +857,9 @@ export function LandingPage() {
                   </div>
                   <div>
                     <h5 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-400">Phone & Instant Support</h5>
-<<<<<<< HEAD
-                    <p className="text-sm font-medium text-white">+91 94292 XXXXX <span className="text-slate-400 text-xs italic ml-1">(Anand Representative)</span></p>
-=======
+
                     <p className="text-sm font-medium text-white">+91 84608 52903 <span className="text-slate-400 text-xs italic ml-1">(Anand Representative)</span></p>
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
+
                   </div>
                 </div>
 

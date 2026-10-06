@@ -24,7 +24,8 @@ import {
   Package,
   Receipt,
   BarChart2,
-  Factory
+  Factory,
+  Inbox
 } from 'lucide-react';
 import { UserRole } from '../../types';
 import { getRoleTitle, getRoleBadgeColor } from '../../utils/permissions';
@@ -55,6 +56,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => 
     { to: '/dashboard', label: 'Dashboard', icon: TrendingUp, roles: ['admin', 'manager', 'management', 'viewer'] },
     { to: '/whatsapp-inbox', label: 'WhatsApp Inbox', icon: MessageSquare, roles: ['admin', 'manager', 'sales', 'management'] },
     { to: '/rfqs', label: 'RFQs & Costing', icon: FolderSync, roles: ['admin', 'manager', 'sales', 'management', 'viewer'] },
+    { to: '/rfqs/intake', label: 'RFQ Intake Hub', icon: Inbox, roles: ['admin', 'manager', 'sales', 'management'] },
     { to: '/orders', label: 'Production Line', icon: Layers, roles: ['admin', 'manager', 'operator', 'quality_inspector', 'store_keeper', 'production', 'management', 'viewer'] },
     { to: '/inventory', label: 'Inventory', icon: Package, roles: ['admin', 'manager', 'store_keeper', 'operator', 'quality_inspector', 'production', 'management', 'sales', 'dispatch', 'viewer'] },
     { to: '/dispatch', label: 'Logistics Desk', icon: Truck, roles: ['admin', 'manager', 'dispatch', 'store_keeper', 'management', 'viewer'] },

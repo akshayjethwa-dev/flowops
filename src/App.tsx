@@ -20,6 +20,7 @@ import { ForgotPassword } from './pages/unauth/ForgotPassword';
 import { DashboardPage } from './pages/dashboard/DashboardPage';
 import { PaymentsTrackerPage } from './pages/PaymentsTrackerPage';
 import { RFQsPage } from './pages/rfqs/RFQsPage';
+import { MultiChannelIntakeHub } from './pages/rfqs/MultiChannelIntakeHub';
 import { RfqCreateForm } from './pages/rfqs/RfqCreateForm';
 import { RfqDetailPage } from './pages/rfqs/RfqDetailPage';
 import { QuotationEditorPage } from './pages/rfqs/QuotationEditorPage';
@@ -31,6 +32,7 @@ import { CustomersListPage } from './pages/customers/CustomersListPage';
 import { CustomerDetailPage } from './pages/customers/CustomerDetailPage';
 import { InventoryPage } from './pages/InventoryPage';
 import { ReportsPage } from './pages/ReportsPage';
+import { PublicRfqWebFormPage } from './pages/public/PublicRfqWebFormPage';
 
 // Settings sub-views
 import { TenantSettingsPage } from './pages/settings/TenantSettingsPage';
@@ -65,6 +67,7 @@ export default function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/portal" element={<PortalPage />} />
+              <Route path="/rfq-submit" element={<PublicRfqWebFormPage />} />
               <Route 
                 path="/onboarding" 
                 element={
@@ -98,6 +101,15 @@ export default function App() {
                   element={
                     <ProtectedRoute allowedRoles={['admin', 'manager', 'sales', 'management', 'viewer']}>
                       <RFQsPage />
+                    </ProtectedRoute>
+                  } 
+                />
+
+                <Route 
+                  path="rfqs/intake" 
+                  element={
+                    <ProtectedRoute allowedRoles={['admin', 'manager', 'sales', 'management']}>
+                      <MultiChannelIntakeHub />
                     </ProtectedRoute>
                   } 
                 />
