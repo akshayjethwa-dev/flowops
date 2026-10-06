@@ -35,6 +35,7 @@ import { CustomerDetailPage } from './pages/customers/CustomerDetailPage';
 import { InventoryPage } from './pages/InventoryPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { PublicRfqWebFormPage } from './pages/public/PublicRfqWebFormPage';
+import { SubcontractorsPage } from './pages/subcontractors/SubcontractorsPage';
 
 // Settings sub-views
 import { TenantSettingsPage } from './pages/settings/TenantSettingsPage';
@@ -175,6 +176,24 @@ export default function App() {
                   element={
                     <ProtectedRoute allowedRoles={['admin', 'manager', 'sales', 'management']}>
                       <QuotationEditorPage />
+                    </ProtectedRoute>
+                  } 
+                />
+
+                <Route 
+                  path="subcontractors" 
+                  element={
+                    <ProtectedRoute allowedRoles={['admin', 'manager', 'sales', 'production', 'management', 'store_keeper', 'viewer']}>
+                      <SubcontractorsPage />
+                    </ProtectedRoute>
+                  } 
+                />
+
+                <Route 
+                  path="rfqs/subcontractors" 
+                  element={
+                    <ProtectedRoute allowedRoles={['admin', 'manager', 'sales', 'production', 'management', 'store_keeper', 'viewer']}>
+                      <SubcontractorsPage />
                     </ProtectedRoute>
                   } 
                 />

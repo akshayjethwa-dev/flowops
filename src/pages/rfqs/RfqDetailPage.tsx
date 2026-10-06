@@ -35,12 +35,13 @@ import {
   Calculator,
   Sliders
 } from 'lucide-react';
-import { RfqStatus } from '../../types';
+import { RfqStatus, Quote } from '../../types';
 import { FileUploader } from '../../components/FileUploader';
 import { AttachmentsList } from '../../components/AttachmentsList';
 import { FileSymlink } from 'lucide-react';
 import { useCostEngine } from '../../hooks/useCostEngine';
 import { InteractiveCostEstimatorModal } from '../../components/cost-engine/InteractiveCostEstimatorModal';
+import { RfqToOrderConversionModal } from '../../components/quotations/RfqToOrderConversionModal';
 
 
 export const RfqDetailPage: React.FC = () => {
@@ -69,20 +70,72 @@ export const RfqDetailPage: React.FC = () => {
   const [costModalOpen, setCostModalOpen] = useState(false);
   const { activeTemplate } = useCostEngine(tenant?.id);
 
-  // Convert to order state and handler
-  const [converting, setConverting] = useState(false);
-  const handleConvertToOrder = async () => {
-    if (converting || !rfq) return;
-    setConverting(true);
-    try {
-      const created = await convertToOrder(profile?.uid, profile?.name || 'Operations Lead');
-      toastSuccess(`Order #${created.orderNumber} created from RFQ #${rfq.rfqNumber || rfqId}`);
-      navigate('/orders', { state: { preselectedOrderId: created.id } });
-    } catch (err: any) {
-      toastError(`Conversion failed: ${err.message || err}`);
-    } finally {
-      setConverting(false);
+  // 1-Click RFQ-to-Order Conversion Modal state
+  const [selectedQuoteForConversion, setSelectedQuoteForConversion] = useState<Quote | null>(null);
+
+  const handleOpenConversionModal = (specificQuote?: Quote | null) => {
+    if (specificQuote) {
+      setSelectedQuoteForConversion(specificQuote);
+      return;
     }
+    const prime = quotes.length > 0 ? quotes[0] : null;
+    if (prime) {
+      setSelectedQuoteForConversion(prime);
+      return;
+    }
+
+    // Synthesize quote from quotation or RFQ items if needed
+    const mappedItems = (quotation?.items && quotation.items.length > 0)
+      ? quotation.items.map((it: any, idx: number) => ({
+          id: `itm_${idx}`,
+          name: it.description || it.name,
+          hsn: '7308',
+          quantity: it.quantity,
+          unit: 'pcs',
+          unitPrice: it.unitPrice,
+          discount: 0,
+          gstPercent: it.taxRate ?? 18,
+          total: it.lineTotal || (it.quantity * it.unitPrice),
+          specs: it.specs || ''
+        }))
+      : (rfq?.items || []).map((it, idx) => ({
+          id: it.id || `itm_${idx}`,
+          name: it.name,
+          hsn: '7308',
+          quantity: it.quantity,
+          unit: 'pcs',
+          unitPrice: 1500,
+          discount: 0,
+          gstPercent: 18,
+          total: (it.quantity || 1) * 1500,
+          specs: it.specs || ''
+        }));
+
+    const calculatedSubtotal = quotation?.subtotal || mappedItems.reduce((acc, cur) => acc + cur.total, 0);
+    const calculatedGst = quotation?.taxTotal || Math.round(calculatedSubtotal * 0.18);
+    const calculatedTotal = quotation?.totalAmount || (calculatedSubtotal + calculatedGst);
+
+    const synthQuote: Quote = {
+      id: quotation?.id || `quo_${rfq?.id || Date.now()}`,
+      tenantId: tenant?.id || '',
+      rfqId: rfq?.id || '',
+      rfqNumber: rfq?.rfqNumber || rfq?.id || '',
+      customerId: rfq?.customerId || '',
+      quoteNumber: quotation?.quotationNumber || `QUO-${new Date().getFullYear()}-${Date.now().toString().slice(-4)}`,
+      customerName: rfq?.customerName || 'Customer',
+      email: rfq?.email || '',
+      phone: rfq?.phone || '',
+      items: mappedItems,
+      subtotal: calculatedSubtotal,
+      gstAmount: calculatedGst,
+      discountTotal: 0,
+      total: calculatedTotal,
+      validUntil: new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString().split('T')[0],
+      status: 'approved',
+      createdBy: profile?.uid || 'estimator',
+      createdAt: new Date().toISOString()
+    };
+    setSelectedQuoteForConversion(synthQuote);
   };
 
   // WhatsApp simulation state
@@ -249,6 +302,22 @@ export const RfqDetailPage: React.FC = () => {
             <span>Cost Engine Rules</span>
           </button>
 
+          <button
+            onClick={() => navigate('/subcontractors', {
+              state: {
+                openCreateModal: true,
+                initialPartName: rfq.items[0]?.name || rfq.description || 'Component Process',
+                initialQuantity: rfq.items[0]?.quantity || 1,
+                initialOrderNumber: rfq.rfqNumber
+              }
+            })}
+            className="border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-3.5 py-3 rounded-lg font-mono text-[10px] uppercase font-bold tracking-wider flex items-center space-x-1.5 cursor-pointer shadow-3xs transition-all shrink-0 select-none"
+            title="Broadcast Subcontract RFQ to certified outside vendors (Heat treat, plating, CNC machining, laser cutting)"
+          >
+            <Building className="h-4 w-4 text-indigo-600" />
+            <span>Subcontract RFQ</span>
+          </button>
+
 
           {/* 🔒 RBAC Guard: Estimation Editing */}
           <GuardedAction action="manage:quotation">
@@ -276,20 +345,16 @@ export const RfqDetailPage: React.FC = () => {
               <span>View Booked Order</span>
             </button>
           ) : (
-            rfq.status === 'Won' && (
-
-              <GuardedAction action="manage:order">
-                <button
-                  onClick={handleConvertToOrder}
-                  disabled={converting}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold font-mono text-[10px] uppercase tracking-wider px-5 py-3 rounded-lg cursor-pointer transition shadow-xs flex items-center space-x-1.5 shrink-0 hover:scale-[1.02] active:scale-[0.98]"
-                >
-                  <FileCheck className="h-4 w-4 shrink-0 text-white" />
-                  <span>{converting ? 'Converting...' : '🎯 Convert to Order'}</span>
-                </button>
-              </GuardedAction>
-
-            )
+            <GuardedAction action="manage:order">
+              <button
+                onClick={() => handleOpenConversionModal()}
+                className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold font-mono text-[10px] uppercase tracking-wider px-5 py-3 rounded-lg cursor-pointer transition shadow-xs flex items-center space-x-1.5 shrink-0 hover:scale-[1.02] active:scale-[0.98]"
+                title="1-Click conversion: carries forward BOM, routing, customer PO reference, and pricing into Sales Order"
+              >
+                <Sparkles className="h-4 w-4 shrink-0 text-emerald-200" />
+                <span>🎯 Convert to Sales Order (1-Click)</span>
+              </button>
+            </GuardedAction>
           )}
         </div>
       </div>
@@ -541,15 +606,39 @@ export const RfqDetailPage: React.FC = () => {
                       <div>GST (18%): ₹{primaryQuote?.gstAmount?.toLocaleString('en-IN') || '0.00'}</div>
                       <div className="font-bold text-slate-900">Total: ₹{primaryQuote?.total?.toLocaleString('en-IN') || '0.00'}</div>
                     </div>
-                    <div className="flex items-center justify-between text-[10px] text-slate-450 font-mono">
-                      <span>{primaryQuote?.items?.length || 0} line items configured</span>
-                      <button
-                        type="button"
-                        onClick={() => navigate('/rfqs?tab=quotes')}
-                        className="text-sky-600 font-bold hover:underline cursor-pointer"
-                      >
-                        Manage in Quotation Desk →
-                      </button>
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-sky-100 text-[10px] font-mono">
+                      <span className="text-slate-450">{primaryQuote?.items?.length || 0} line items configured</span>
+                      
+                      <div className="flex items-center space-x-2">
+                        {primaryQuote?.orderId ? (
+                          <button
+                            type="button"
+                            onClick={() => navigate('/orders', { state: { preselectedOrderId: primaryQuote.orderId } })}
+                            className="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 font-bold px-2.5 py-1 rounded-lg flex items-center space-x-1 cursor-pointer"
+                          >
+                            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                            <span>SO #{primaryQuote.orderNumber || 'View Order'}</span>
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenConversionModal(primaryQuote)}
+                            className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-2.5 py-1 rounded-lg flex items-center space-x-1 uppercase tracking-wider cursor-pointer shadow-xs"
+                            title="1-Click conversion: carries forward BOM, routing, customer PO reference, and pricing into Sales Order"
+                          >
+                            <Sparkles className="h-3 w-3 text-emerald-200" />
+                            <span>1-Click Convert to SO</span>
+                          </button>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() => navigate('/rfqs?tab=quotes')}
+                          className="text-sky-600 font-bold hover:underline cursor-pointer"
+                        >
+                          Quotation Desk →
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -791,6 +880,18 @@ export const RfqDetailPage: React.FC = () => {
               }
             });
             toastSuccess(`Calculated ₹${result.unitPrice}/unit using ${activeTemplate.name} rules! Injected to quotation.`);
+          }}
+        />
+      )}
+
+      {/* 1-Click RFQ-to-Order Conversion Modal */}
+      {selectedQuoteForConversion && (
+        <RfqToOrderConversionModal
+          isOpen={!!selectedQuoteForConversion}
+          quote={selectedQuoteForConversion}
+          onClose={() => setSelectedQuoteForConversion(null)}
+          onOrderCreated={(createdOrder) => {
+            navigate('/orders', { state: { preselectedOrderId: createdOrder.id } });
           }}
         />
       )}

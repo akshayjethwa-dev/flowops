@@ -375,7 +375,12 @@ export const ProductionSection: React.FC<ProductionSectionProps> = ({
                       <React.Fragment key={job.id}>
                         <tr className="hover:bg-slate-50/50">
                           <td className="p-3 font-semibold text-slate-900">
-                            {orderItem?.orderNumber || 'Demo Ref'}
+                            <span className="font-mono block">{orderItem?.orderNumber || 'Demo Ref'}</span>
+                            {orderItem?.customerPoNumber && (
+                              <span className="inline-block text-[9px] font-mono bg-indigo-50 text-indigo-700 border border-indigo-150 px-1.5 py-0.2 rounded mt-0.5 font-bold" title={`Customer PO: ${orderItem.customerPoNumber}`}>
+                                PO: {orderItem.customerPoNumber}
+                              </span>
+                            )}
                           </td>
                           <td className="p-3">
                             <p className="font-bold text-slate-800 leading-none">{job.itemName}</p>
@@ -474,9 +479,19 @@ export const ProductionSection: React.FC<ProductionSectionProps> = ({
                   <div>
                     <div className="flex justify-between items-start mb-3">
                       <div>
-                        <span className="text-[10px] font-mono bg-slate-100 text-slate-600 px-2 py-0.5 rounded">
-                          OR: {order.orderNumber}
+                        <span className="text-[10px] font-mono bg-slate-100 text-slate-700 px-2 py-0.5 rounded font-bold">
+                          SO: {order.orderNumber}
                         </span>
+                        {order.customerPoNumber && (
+                          <span className="text-[10px] font-mono bg-indigo-50 text-indigo-700 border border-indigo-200 px-1.5 py-0.5 rounded font-bold ml-1.5" title={`Customer PO: ${order.customerPoNumber}`}>
+                            PO: {order.customerPoNumber}
+                          </span>
+                        )}
+                        {order.quoteNumber && (
+                          <span className="text-[10px] font-mono text-slate-500 ml-1.5">
+                            Quote: #{order.quoteNumber}
+                          </span>
+                        )}
                         <span className="text-[10px] font-mono text-slate-400 ml-2">
                           Est: {order.deliveryDate ? new Date(order.deliveryDate).toLocaleDateString() : 'N/A'}
                         </span>

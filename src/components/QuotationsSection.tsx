@@ -26,10 +26,11 @@ import { QuotationPDFPreviewModal } from './quotations/QuotationPDFPreviewModal'
 import { QuoteApprovalModal } from './quotations/QuoteApprovalModal';
 import { QuoteVersionHistoryModal } from './quotations/QuoteVersionHistoryModal';
 import { ApprovalWorkflowConfigModal } from './quotations/ApprovalWorkflowConfigModal';
+import { RfqToOrderConversionModal } from './quotations/RfqToOrderConversionModal';
 
 import { 
   Plus, Check, FileText, Send, Share2, Eye, Printer, ShieldCheck, FileCheck, Layers, Calendar, ChevronRight,
-  Sliders, History, Clock, AlertTriangle, Filter, RotateCcw, Edit
+  Sliders, History, Clock, AlertTriangle, Filter, RotateCcw, Edit, Sparkles, CheckCircle2
 } from 'lucide-react';
 import { useUpdateQuotation } from '../hooks/useQuotations';
 import { getApprovalWorkflowConfig, createQuoteRevision } from '../services/quoteApprovalService';
@@ -56,6 +57,7 @@ export const QuotationsSection: React.FC<QuotationsSectionProps> = ({
   const [activePreviewQuote, setActivePreviewQuote] = useState<Quote | null>(null);
   const [activeApprovalQuote, setActiveApprovalQuote] = useState<Quote | null>(null);
   const [activeVersionQuote, setActiveVersionQuote] = useState<Quote | null>(null);
+  const [convertingQuote, setConvertingQuote] = useState<Quote | null>(null);
   const [configModalOpen, setConfigModalOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending_approval' | 'approved' | 'sent' | 'draft'>('all');
 
@@ -520,6 +522,21 @@ export const QuotationsSection: React.FC<QuotationsSectionProps> = ({
 
                         {/* Body Content */}
                         <div className="flex-1 space-y-3">
+                          {/* Converted Sales Order & PO Reference Banner */}
+                          {q.orderNumber && (
+                            <div className="p-2 rounded-lg bg-emerald-50/80 border border-emerald-200 text-[11px] text-emerald-900 flex items-center justify-between">
+                              <span className="font-bold flex items-center font-mono text-emerald-800">
+                                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 mr-1 shrink-0" />
+                                <span>SO #{q.orderNumber}</span>
+                              </span>
+                              {q.customerPoNumber && (
+                                <span className="font-mono text-[10px] text-indigo-700 bg-white px-1.5 py-0.5 rounded border border-indigo-150 font-semibold truncate max-w-[140px]" title={`Customer PO: ${q.customerPoNumber}`}>
+                                  PO: {q.customerPoNumber}
+                                </span>
+                              )}
+                            </div>
+                          )}
+
                           <div>
                             <h4 className="text-xs font-bold text-slate-900 leading-tight line-clamp-1">{q.customerName}</h4>
                             <div className="flex items-center space-x-2 text-[10px] text-slate-500 font-mono mt-1">
@@ -651,24 +668,37 @@ export const QuotationsSection: React.FC<QuotationsSectionProps> = ({
                           {q.status === 'sent' && (
                             <button
                               type="button"
-                              onClick={() => handleApproveQuotation(q)}
-                              className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[10px] px-3 py-2 rounded-lg flex items-center space-x-1 uppercase tracking-wider shadow-3xs cursor-pointer transition-colors"
+                              onClick={() => setConvertingQuote(q)}
+                              className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[10px] px-3.5 py-2 rounded-lg flex items-center space-x-1 uppercase tracking-wider shadow-3xs cursor-pointer transition-colors"
+                              title="1-Click conversion: carries forward BOM, routing, customer PO, and pricing into Sales Order"
                             >
-                              <Check className="h-3.5 w-3.5" />
-                              <span>Confirm Order</span>
+                              <Sparkles className="h-3.5 w-3.5 text-emerald-200" />
+                              <span>Confirm & Convert</span>
                             </button>
                           )}
 
                           {q.status === 'approved' && (
-                            <button
-                              type="button"
-                              onClick={() => handleApproveQuotation(q)}
-                              className="text-[9.5px] font-bold font-mono text-emerald-700 bg-emerald-50/70 hover:bg-emerald-100 border border-emerald-150 rounded-lg px-2.5 py-1.5 flex items-center cursor-pointer transition-colors"
-                              title="Click to spawn or re-check confirmed order"
-                            >
-                              <ShieldCheck className="h-4 w-4 text-emerald-500 mr-1" />
-                              <span>Confirmed Order</span>
-                            </button>
+                            q.orderId ? (
+                              <button
+                                type="button"
+                                onClick={() => onInitiateOrder({ id: q.orderId, orderNumber: q.orderNumber || '' } as Order)}
+                                className="text-[9.5px] font-bold font-mono text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg px-2.5 py-1.5 flex items-center cursor-pointer transition-colors"
+                                title="Sales order already spawned - click to inspect production progress"
+                              >
+                                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 mr-1" />
+                                <span>SO #{q.orderNumber || 'View Order'}</span>
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => setConvertingQuote(q)}
+                                className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[10px] px-3.5 py-2 rounded-lg flex items-center space-x-1.5 uppercase tracking-wider shadow-sm cursor-pointer transition-all hover:scale-101"
+                                title="1-Click conversion: carries forward BOM, routing, customer PO, and pricing into Sales Order"
+                              >
+                                <Sparkles className="h-3.5 w-3.5 text-emerald-200" />
+                                <span>Convert to SO</span>
+                              </button>
+                            )
                           )}
                         </div>
 
@@ -686,6 +716,18 @@ export const QuotationsSection: React.FC<QuotationsSectionProps> = ({
             </p>
           </div>
         )
+      )}
+
+      {/* RENDER 1-CLICK RFQ-TO-ORDER CONVERSION MODAL */}
+      {convertingQuote && (
+        <RfqToOrderConversionModal
+          isOpen={!!convertingQuote}
+          quote={convertingQuote}
+          onClose={() => setConvertingQuote(null)}
+          onOrderCreated={(createdOrder) => {
+            onInitiateOrder(createdOrder);
+          }}
+        />
       )}
 
       {/* RENDER PDF LIVE PREVIEW MODAL */}

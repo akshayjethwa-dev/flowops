@@ -93,7 +93,7 @@ export interface QuoteApprovalStepRecord {
 
 export interface QuoteApprovalState {
   requiresApproval: boolean;
-  currentStatus: 'draft' | 'pending_approval' | 'approved' | 'rejected' | 'sent';
+  currentStatus: 'draft' | 'pending_approval' | 'approved' | 'rejected' | 'sent' | 'converted';
   currentLevel: number;
   totalLevels: number;
   pendingRole: 'sales' | 'manager' | 'management' | 'admin' | null;
@@ -124,6 +124,6 @@ export interface QuoteVersionRecord {
   discountTotal: number;
   gstAmount: number;
   total: number;
-  approvalStatus: 'draft' | 'pending_approval' | 'approved' | 'rejected' | 'sent';
+  approvalStatus: 'draft' | 'pending_approval' | 'approved' | 'rejected' | 'sent' | 'converted';
   pdfUrl?: string;
 }

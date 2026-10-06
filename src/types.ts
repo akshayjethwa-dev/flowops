@@ -179,6 +179,9 @@ export interface QuoteItem {
   discount?: number;
   gstPercent: number; // e.g. 18
   total: number;
+  specs?: string;
+  bomLines?: any[];
+  routingStages?: string[];
 }
 
 export interface QuotationTotals {
@@ -207,6 +210,8 @@ export interface Quote {
   id: string;
   tenantId: string;
   rfqId: string;
+  rfqNumber?: string;
+  customerId?: string;
   quoteNumber: string;
   customerName: string;
   email?: string;
@@ -223,27 +228,50 @@ export interface Quote {
   pdfVersion?: number;
   pdfVersions?: QuotationVersion[];
   downloadUrl?: string;
-  status: 'draft' | 'pending_approval' | 'sent' | 'approved' | 'rejected';
+  status: 'draft' | 'pending_approval' | 'sent' | 'approved' | 'rejected' | 'converted';
   plantId?: string;
   createdBy: string;
   createdAt: any;
   approvalState?: QuoteApprovalState;
   versions?: QuoteVersionRecord[];
   currentVersion?: number;
+  orderId?: string;
+  orderNumber?: string;
+  customerPoNumber?: string;
+  convertedAt?: string;
+  convertedBy?: string;
+  bomData?: any;
+  routingData?: any;
 }
 
 export interface Order {
   id: string;
   tenantId: string;
   quoteId: string;
+  quoteNumber?: string;
+  rfqId?: string;
+  rfqNumber?: string;
+  customerId?: string;
   orderNumber: string;
+  customerPoNumber?: string;
+  poDate?: string;
   plantId?: string; // Scoped Plant
   customerName: string;
+  customerEmail?: string;
   phone?: string;
+  billingAddress?: string;
+  shippingAddress?: string;
   items: QuoteItem[];
+  subtotal?: number;
+  taxAmount?: number;
+  discountTotal?: number;
   totalAmount: number;
   deliveryDate?: string;
   status: 'pending' | 'in-production' | 'produced' | 'dispatched' | 'completed' | 'cancelled';
+  bomData?: any;
+  routingData?: any;
+  termsAndConditions?: string;
+  notes?: string;
   createdBy: string;
   createdAt: any;
 }
@@ -260,11 +288,18 @@ export interface ProductionJob {
   id: string;
   tenantId: string;
   orderId: string;
+  orderNumber?: string;
+  quoteNumber?: string;
+  customerPoNumber?: string;
   plantId?: string; // Scoped Plant
   itemName: string;
   quantity: number;
   currentStage: string;
   stagesHistory: ProductionStageChange[];
+  routingStages?: string[];
+  bomComponents?: any[];
+  unitPrice?: number;
+  specs?: string;
   notes?: string;
   updatedBy: string;
   updatedAt: any;
@@ -516,6 +551,7 @@ export type ActivityEntityType =
   | 'rfq'
   | 'quotation'
   | 'job'
+  | 'order'
   | 'dispatch'
   | 'user'
   | 'auth'
@@ -848,3 +884,5 @@ export type {
   ShiftPattern,
   Organization,
 } from './types/plant';
+
+export * from './types/subcontractor';

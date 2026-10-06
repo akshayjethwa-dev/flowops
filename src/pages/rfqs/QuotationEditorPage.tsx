@@ -30,11 +30,14 @@ import {
   Check,
   X,
   FileText,
-  Printer
+  Printer,
+  Sparkles
 } from 'lucide-react';
 import { FileUploader } from '../../components/FileUploader';
 import { AttachmentsList } from '../../components/AttachmentsList';
 import { FileSymlink } from 'lucide-react';
+import { Quote } from '../../types';
+import { RfqToOrderConversionModal } from '../../components/quotations/RfqToOrderConversionModal';
 
 
 export const QuotationEditorPage: React.FC = () => {
@@ -166,6 +169,44 @@ export const QuotationEditorPage: React.FC = () => {
       totalAmount: subtotal + taxTotal
     };
   }, [items]);
+
+  // 1-Click RFQ-to-Order Conversion State
+  const [conversionModalOpen, setConversionModalOpen] = useState(false);
+
+  const quoteForConversion: Quote = useMemo(() => {
+    return {
+      id: quotation?.id || `quo_${rfq?.id || Date.now()}`,
+      tenantId: tenantId || '',
+      rfqId: rfq?.id || '',
+      rfqNumber: rfq?.rfqNumber || '',
+      customerId: rfq?.customerId || '',
+      quoteNumber: quotationNumber || `QUO-${new Date().getFullYear()}-001`,
+      customerName: rfq?.customerName || 'Customer',
+      email: rfq?.email || '',
+      phone: rfq?.phone || '',
+      items: items.map((it, idx) => ({
+        id: `itm_${idx}`,
+        name: it.description,
+        hsn: '7308',
+        quantity: it.quantity,
+        unit: 'pcs',
+        unitPrice: it.unitPrice,
+        discount: 0,
+        gstPercent: it.taxRate || 18,
+        total: it.lineTotal,
+        specs: ''
+      })),
+      subtotal: totals.subtotal,
+      gstAmount: totals.taxTotal,
+      discountTotal: 0,
+      total: totals.totalAmount,
+      validUntil: new Date(Date.now() + (validityDays || 30) * 24 * 3600 * 1000).toISOString().split('T')[0],
+      notes,
+      status: (status === 'Accepted' ? 'approved' : status.toLowerCase()) as any,
+      createdBy: profile?.uid || 'user',
+      createdAt: date
+    };
+  }, [quotation, rfq, tenantId, quotationNumber, items, totals, validityDays, notes, status, profile, date]);
 
   // Add Item to Estimate
   const handleAddItem = () => {
@@ -823,6 +864,17 @@ export const QuotationEditorPage: React.FC = () => {
                   <MessageSquare className="h-4 w-4 text-emerald-205" />
                   <span>{sendingWa ? 'Pushing alert...' : 'Send via WhatsApp'}</span>
                 </button>
+
+                {/* 1-Click Convert to Sales Order */}
+                <button
+                  type="button"
+                  onClick={() => setConversionModalOpen(true)}
+                  className="bg-emerald-600 hover:bg-emerald-500 text-white font-mono text-[10px] uppercase tracking-wider font-bold px-4 py-2.5 rounded-lg cursor-pointer transition flex items-center space-x-1.5 shadow-sm hover:scale-[1.01]"
+                  title="1-Click conversion: carries forward BOM, routing, customer PO reference, and pricing into Sales Order"
+                >
+                  <Sparkles className="h-4 w-4 text-emerald-200" />
+                  <span>Convert to Sales Order (1-Click)</span>
+                </button>
               </div>
 
             </div>
@@ -854,6 +906,18 @@ export const QuotationEditorPage: React.FC = () => {
             setItems(prev => [...prev, newItem]);
             setCostEngineModalOpen(false);
             toastSuccess('Cost Engine Line Added', `Injected ₹${result.unitPrice}/pc item based on ${activeTemplate.name} rules.`);
+          }}
+        />
+      )}
+
+      {/* 1-Click RFQ-to-Order Conversion Modal */}
+      {conversionModalOpen && (
+        <RfqToOrderConversionModal
+          isOpen={conversionModalOpen}
+          quote={quoteForConversion}
+          onClose={() => setConversionModalOpen(false)}
+          onOrderCreated={(createdOrder) => {
+            navigate('/orders', { state: { preselectedOrderId: createdOrder.id } });
           }}
         />
       )}
