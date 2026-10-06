@@ -188,7 +188,7 @@ service cloud.firestore {
         && data.quoteNumber is string
         && data.customerName is string
         && data.customerName.size() <= 200
-        && data.status in ['draft', 'sent', 'approved', 'rejected']
+        && data.status in ['draft', 'pending_approval', 'sent', 'approved', 'rejected']
         && data.total is number
         && data.createdBy == request.auth.uid
         && data.createdAt == request.time;
@@ -505,6 +505,18 @@ service cloud.firestore {
       }
 
       match /serviceTickets/{ticketId} {
+        allow read, write: if isTenantMember(tenantId);
+      }
+
+      match /bomValidations/{validationId} {
+        allow read, write: if isTenantMember(tenantId);
+      }
+
+      match /costingTemplates/{templateId} {
+        allow read, write: if isTenantMember(tenantId);
+      }
+
+      match /approvalWorkflowConfig/{configId} {
         allow read, write: if isTenantMember(tenantId);
       }
 

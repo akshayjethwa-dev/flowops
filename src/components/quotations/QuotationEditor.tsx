@@ -5,20 +5,30 @@ import { Quote, QuoteItem, Customer, QuotationTotals } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
 import { db } from '../../firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
-import { useCreateQuotation } from '../../hooks/useQuotations';
+import { useCreateQuotation, useUpdateQuotation } from '../../hooks/useQuotations';
 import { LineItemsTable } from './LineItemsTable';
 import { QuotationTotalsPanel } from './QuotationTotalsPanel';
 import { 
   calculateQuotationTotals, 
-  generateQuotationNumber 
+  generateQuotationNumber,
+  calculateLineItemAmount
 } from '../../utils/quotationUtils';
 import { 
-  FileText, Calendar, Plus, Clock, Save, FileCheck, Check, AlertCircle, ShoppingBag 
+  FileText, Calendar, Plus, Clock, Save, FileCheck, Check, AlertCircle, ShoppingBag, Calculator, Sparkles, History, RotateCcw 
 } from 'lucide-react';
+import { useCostEngine } from '../../hooks/useCostEngine';
+import { InteractiveCostEstimatorModal } from '../cost-engine/InteractiveCostEstimatorModal';
+import { 
+  getApprovalWorkflowConfig, 
+  evaluateQuoteApproval, 
+  dispatchApprovalNotification,
+  createQuoteRevision
+} from '../../services/quoteApprovalService';
 
 interface QuotationEditorProps {
   prefillRFQ?: any;
   clearPrefillRFQ: () => void;
+  editingQuote?: Quote | null;
   onSaved: (newQuote: Quote) => void;
   onCancel: () => void;
 }
@@ -26,27 +36,73 @@ interface QuotationEditorProps {
 export const QuotationEditor: React.FC<QuotationEditorProps> = ({ 
   prefillRFQ, 
   clearPrefillRFQ, 
+  editingQuote,
   onSaved, 
   onCancel 
 }) => {
   const { tenant, profile } = useAuth();
-  const { createQuotation, loading: saving, error: saveError } = useCreateQuotation();
+  const { createQuotation, loading: creating, error: createError } = useCreateQuotation();
+  const { updateQuotation, loading: updating, error: updateError } = useUpdateQuotation();
+  const saving = creating || updating;
+  const saveError = createError || updateError;
+
+  const isRevision = Boolean(editingQuote);
+  const nextVersionNumber = editingQuote ? (editingQuote.currentVersion || (editingQuote.versions?.length ? editingQuote.versions.length : 1)) + 1 : 1;
 
   // State Management
-  const [customerName, setCustomerName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [email, setEmail] = useState('');
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [customerName, setCustomerName] = useState(editingQuote?.customerName || '');
+  const [phone, setPhone] = useState(editingQuote?.phone || '');
+  const [email, setEmail] = useState(editingQuote?.email || '');
+  const [date, setDate] = useState(editingQuote?.date || new Date().toISOString().split('T')[0]);
   const [validDays, setValidDays] = useState(30);
-  const [items, setItems] = useState<QuoteItem[]>([]);
+  const [items, setItems] = useState<QuoteItem[]>(editingQuote?.items || []);
   
   // Terms Prepopulation
-  const [termsAndConditions, setTermsAndConditions] = useState('');
-  const [notes, setNotes] = useState('');
+  const [termsAndConditions, setTermsAndConditions] = useState(editingQuote?.termsAndConditions || '');
+  const [notes, setNotes] = useState(editingQuote?.notes || '');
+  const [changeSummary, setChangeSummary] = useState(
+    editingQuote?.status === 'rejected'
+      ? `Revision addressing rejection: ${editingQuote.approvalState?.rejectionReason || 'Adjusted margins and rates'}`
+      : ''
+  );
 
   // Customer Master Suggestions
   const [allCustomers, setAllCustomers] = useState<Customer[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
+
+  // Cost Engine integration
+  const { activeTemplate } = useCostEngine(tenant?.id);
+  const [costEngineModalOpen, setCostEngineModalOpen] = useState(false);
+
+  const handleApplyCostEngine = (result: {
+    partName: string;
+    quantity: number;
+    unitPrice: number;
+    breakdown: any;
+    specSummary: string;
+  }) => {
+    const calculatedTotal = calculateLineItemAmount({
+      quantity: result.quantity,
+      unitPrice: result.unitPrice,
+      discount: 0,
+      gstPercent: 18
+    });
+
+    const newItem: QuoteItem = {
+      id: `itm_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+      name: `${result.partName} [${result.specSummary}]`,
+      hsn: '7308',
+      quantity: result.quantity,
+      unit: 'PCS',
+      unitPrice: result.unitPrice,
+      discount: 0,
+      gstPercent: 18,
+      total: calculatedTotal
+    };
+
+    setItems(prev => [...prev, newItem]);
+    setCostEngineModalOpen(false);
+  };
 
   const isSandbox = localStorage.getItem('isSandboxMode') === 'true' || !db;
 
@@ -197,7 +253,84 @@ export const QuotationEditor: React.FC<QuotationEditorProps> = ({
     const calculatedValidity = new Date(new Date(date).getTime() + Number(validDays) * 24 * 3600 * 1000)
       .toISOString().split('T')[0];
 
+    // Branch 1: If editing/revising existing quote, snapshot revision and update
+    if (editingQuote) {
+      const config = await getApprovalWorkflowConfig(tenant.id);
+      const revisedQuote = createQuoteRevision(
+        editingQuote,
+        {
+          customerName: customerName.trim(),
+          email: email.trim() || undefined,
+          phone: phone.trim() || undefined,
+          items,
+          subtotal: totals.subtotal,
+          gstAmount: totals.taxTotal,
+          discountTotal: totals.discountTotal,
+          total: totals.grandTotal,
+          validUntil: calculatedValidity,
+          date,
+          termsAndConditions,
+          notes: notes.trim() || undefined,
+        },
+        { uid: profile?.uid || 'user', name: profile?.name || 'Sales Staff', email: profile?.email || '' },
+        changeSummary.trim() || notes.trim() || `Revision v${nextVersionNumber}.0 modifications`,
+        config
+      );
+
+      try {
+        await updateQuotation(editingQuote.id, revisedQuote);
+        clearPrefillRFQ();
+
+        if (revisedQuote.approvalState?.requiresApproval) {
+          await dispatchApprovalNotification({
+            tenantId: tenant.id,
+            type: 'approval_requested',
+            quote: revisedQuote,
+            actor: {
+              uid: profile?.uid || 'user',
+              name: profile?.name || 'Sales Staff',
+              email: profile?.email || ''
+            }
+          });
+        }
+
+        onSaved(revisedQuote);
+      } catch (err) {
+        console.error('Revision update error:', err);
+      }
+      return;
+    }
+
+    // Branch 2: Standard new quote creation
     const generatedNumber = generateQuotationNumber(tenant.id);
+
+    // Evaluate approval workflow against value & discount thresholds
+    const config = await getApprovalWorkflowConfig(tenant.id);
+    const approvalState = evaluateQuoteApproval(
+      { total: totals.grandTotal, discountTotal: totals.discountTotal, subtotal: totals.subtotal, items },
+      config,
+      { uid: profile?.uid || 'user', name: profile?.name || 'Sales Staff', email: profile?.email || '' }
+    );
+
+    const initialVersion = {
+      version: 1,
+      versionLabel: 'v1.0',
+      createdAt: new Date().toISOString(),
+      createdBy: {
+        uid: profile?.uid || 'user',
+        name: profile?.name || 'Sales Staff',
+        email: profile?.email || ''
+      },
+      changeSummary: notes.trim() || 'Initial drafted formulation',
+      items,
+      subtotal: totals.subtotal,
+      discountTotal: totals.discountTotal,
+      gstAmount: totals.taxTotal,
+      total: totals.grandTotal,
+      approvalStatus: approvalState.requiresApproval ? ('pending_approval' as const) : status
+    };
+
+    const finalStatus = approvalState.requiresApproval ? ('pending_approval' as const) : status;
 
     const payload: Omit<Quote, 'id' | 'tenantId' | 'createdBy' | 'createdAt'> = {
       rfqId: prefillRFQ?.id || 'direct_quote',
@@ -214,12 +347,29 @@ export const QuotationEditor: React.FC<QuotationEditorProps> = ({
       date,
       termsAndConditions,
       notes: notes.trim() || undefined,
-      status
+      status: finalStatus,
+      approvalState,
+      currentVersion: 1,
+      versions: [initialVersion]
     };
 
     try {
       const newQuote = await createQuotation(payload);
       clearPrefillRFQ();
+
+      if (approvalState.requiresApproval) {
+        await dispatchApprovalNotification({
+          tenantId: tenant.id,
+          type: 'approval_requested',
+          quote: newQuote,
+          actor: {
+            uid: profile?.uid || 'user',
+            name: profile?.name || 'Sales Staff',
+            email: profile?.email || ''
+          }
+        });
+      }
+
       onSaved(newQuote);
     } catch (err) {
       console.error(err);
@@ -232,12 +382,31 @@ export const QuotationEditor: React.FC<QuotationEditorProps> = ({
       {/* FORM TITLE */}
       <div className="flex justify-between items-center pb-4.5 border-b border-slate-150">
         <div className="flex items-center space-x-2.5">
-          <div className="bg-sky-50 text-sky-600 p-2 rounded-xl border border-sky-100">
-            <FileText className="h-5.5 w-5.5" />
+          <div className={`p-2 rounded-xl border ${
+            isRevision 
+              ? 'bg-amber-50 text-amber-600 border-amber-200' 
+              : 'bg-sky-50 text-sky-600 border-sky-100'
+          }`}>
+            {isRevision ? <History className="h-5.5 w-5.5" /> : <FileText className="h-5.5 w-5.5" />}
           </div>
           <div>
-            <h3 className="text-base font-extrabold tracking-tight text-slate-900">Custom B2B Quotation Desk</h3>
-            <p className="text-xs text-slate-500">Draft raw models or compile multi-item technical PDFs.</p>
+            <div className="flex items-center space-x-2">
+              <h3 className="text-base font-extrabold tracking-tight text-slate-900">
+                {isRevision 
+                  ? `Quotation Revision: ${editingQuote?.quoteNumber} (Target v${nextVersionNumber}.0)` 
+                  : 'Custom B2B Quotation Desk'}
+              </h3>
+              {isRevision && (
+                <span className="bg-amber-100 text-amber-800 border border-amber-300 font-mono font-bold text-[10px] px-2 py-0.5 rounded-full uppercase">
+                  v{nextVersionNumber}.0 Revision Draft
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-slate-500">
+              {isRevision 
+                ? `Revising previous version v${editingQuote?.currentVersion || 1}.0. All edits will snapshot into official audit version history.` 
+                : 'Draft raw models or compile multi-item technical PDFs.'}
+            </p>
           </div>
         </div>
 
@@ -246,9 +415,27 @@ export const QuotationEditor: React.FC<QuotationEditorProps> = ({
           type="button"
           className="text-slate-450 hover:text-slate-700 bg-white border border-slate-250 hover:bg-slate-50 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer"
         >
-          Discard Draft
+          {isRevision ? 'Cancel Revision' : 'Discard Draft'}
         </button>
       </div>
+
+      {/* REVISION NOTICE & PREVIOUS REJECTION FEEDBACK BANNER */}
+      {isRevision && editingQuote?.status === 'rejected' && editingQuote.approvalState?.rejectionReason && (
+        <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl flex items-start space-x-3 text-xs text-rose-900">
+          <AlertCircle className="h-4 w-4 text-rose-600 shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <span className="font-bold uppercase font-mono text-[10px] text-rose-800 tracking-wider block">
+              Previous Managerial Rejection Reason:
+            </span>
+            <p className="font-semibold italic">
+              "{editingQuote.approvalState.rejectionReason}"
+            </p>
+            <p className="text-[11px] text-rose-700 pt-0.5">
+              Please adjust component margins, discounts, or labor rates accordingly. Submitting will advance this quote to v{nextVersionNumber}.0 and re-route for authorization.
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="space-y-6">
         
@@ -361,7 +548,12 @@ export const QuotationEditor: React.FC<QuotationEditorProps> = ({
 
         {/* SECTION 3: EDITABLE LINE ITEMS TABLE */}
         <div className="pt-2">
-          <LineItemsTable items={items} onChangeItems={setItems} />
+          <LineItemsTable 
+            items={items} 
+            onChangeItems={setItems}
+            onOpenCostEngine={() => setCostEngineModalOpen(true)}
+            activeTemplateName={activeTemplate ? `${activeTemplate.name} (${activeTemplate.version})` : undefined}
+          />
         </div>
 
         {/* SECTION 4: TEXT BLOCKS & FINANCES ROW */}
@@ -380,6 +572,27 @@ export const QuotationEditor: React.FC<QuotationEditorProps> = ({
               />
             </div>
 
+            {/* REVISION CHANGE SUMMARY FIELD */}
+            {isRevision && (
+              <div className="space-y-1 bg-amber-50/50 p-3 rounded-xl border border-amber-200">
+                <label className="text-amber-900 font-bold flex items-center space-x-1.5">
+                  <History className="h-3.5 w-3.5 text-amber-600" />
+                  <span>Revision Change Summary (Logged to Audit Trail & Version History) *</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={changeSummary}
+                  onChange={(e) => setChangeSummary(e.target.value)}
+                  placeholder="e.g. Reduced line item markup by 5% and renegotiated subcontract rate per Director instructions."
+                  className="w-full bg-white border border-amber-300 rounded-lg px-3 py-2 text-xs font-medium text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-amber-500"
+                />
+                <p className="text-[10px] text-amber-700/80 font-mono">
+                  This note will be attached to v{nextVersionNumber}.0 in the version history changelog.
+                </p>
+              </div>
+            )}
+
             <div className="space-y-1">
               <label className="text-slate-600 font-bold">Internal Reference Notes (Non-Printable)</label>
               <input
@@ -393,8 +606,22 @@ export const QuotationEditor: React.FC<QuotationEditorProps> = ({
           </div>
 
           {/* Cost Panel */}
-          <div className="lg:col-span-5">
+          <div className="lg:col-span-5 space-y-3">
             <QuotationTotalsPanel totals={totals} />
+
+            {totals.grandTotal > 100000 && (
+              <div className="bg-amber-50 border border-amber-200/80 rounded-xl p-3 text-xs text-amber-900 flex items-start space-x-2.5">
+                <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                <div className="leading-tight">
+                  <span className="font-bold block text-[11px] uppercase tracking-wider font-mono text-amber-800">
+                    Commercial Policy Threshold (&gt;₹1,00,000)
+                  </span>
+                  <p className="text-[11px] text-amber-700/90 mt-0.5">
+                    Quote total of ₹{totals.grandTotal.toLocaleString('en-IN')} exceeds ₹1L. Saving will automatically route through Director Authorization before client release.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
 
         </div>
@@ -444,6 +671,16 @@ export const QuotationEditor: React.FC<QuotationEditorProps> = ({
         </div>
 
       </div>
+
+      {activeTemplate && (
+        <InteractiveCostEstimatorModal
+          isOpen={costEngineModalOpen}
+          onClose={() => setCostEngineModalOpen(false)}
+          template={activeTemplate}
+          initialPartName={customerName ? `Precision Part - ${customerName}` : 'Custom Manufactured Component'}
+          onApplyToQuote={handleApplyCostEngine}
+        />
+      )}
 
     </div>
   );

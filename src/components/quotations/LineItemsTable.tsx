@@ -2,12 +2,14 @@
 
 import React from 'react';
 import { QuoteItem } from '../../types';
-import { Plus, Trash2, Hash, Percent, DollarSign, Layers } from 'lucide-react';
+import { Plus, Trash2, Hash, Percent, DollarSign, Layers, Calculator, Sparkles } from 'lucide-react';
 import { calculateLineItemAmount } from '../../utils/quotationUtils';
 
 interface LineItemsTableProps {
   items: QuoteItem[];
   onChangeItems: (items: QuoteItem[]) => void;
+  onOpenCostEngine?: () => void;
+  activeTemplateName?: string;
 }
 
 export const LineItemRow: React.FC<{
@@ -149,7 +151,12 @@ export const LineItemRow: React.FC<{
   );
 };
 
-export const LineItemsTable: React.FC<LineItemsTableProps> = ({ items, onChangeItems }) => {
+export const LineItemsTable: React.FC<LineItemsTableProps> = ({ 
+  items, 
+  onChangeItems,
+  onOpenCostEngine,
+  activeTemplateName
+}) => {
   const handleAddNewItem = () => {
     const newItem: QuoteItem = {
       id: `itm_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
@@ -177,14 +184,33 @@ export const LineItemsTable: React.FC<LineItemsTableProps> = ({ items, onChangeI
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center bg-slate-50 border-b border-slate-200 py-3 px-4 rounded-lg">
-        <h4 className="text-xs uppercase font-mono tracking-wider font-extrabold text-slate-600 flex items-center space-x-1.5">
-          <Layers className="h-4 w-4 text-sky-500" />
-          <span>Line Items Breakdown</span>
-        </h4>
-        <span className="text-[10px] font-mono text-slate-400 bg-white border border-slate-200 px-2 py-0.5 rounded">
-          {items.length} Component Lines Listed
-        </span>
+      <div className="flex flex-wrap justify-between items-center bg-slate-50 border-b border-slate-200 py-3 px-4 rounded-lg gap-2">
+        <div className="flex items-center space-x-2">
+          <h4 className="text-xs uppercase font-mono tracking-wider font-extrabold text-slate-600 flex items-center space-x-1.5">
+            <Layers className="h-4 w-4 text-sky-500" />
+            <span>Line Items Breakdown</span>
+          </h4>
+          <span className="text-[10px] font-mono text-slate-400 bg-white border border-slate-200 px-2 py-0.5 rounded">
+            {items.length} Component Lines Listed
+          </span>
+        </div>
+
+        {onOpenCostEngine && (
+          <button
+            type="button"
+            onClick={onOpenCostEngine}
+            className="text-xs font-mono font-bold bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200 px-3 py-1.5 rounded-lg flex items-center space-x-1.5 transition-colors cursor-pointer shadow-3xs"
+            title="Calculate exact manufacturing part price using your configurable costing rules"
+          >
+            <Calculator className="h-3.5 w-3.5 text-sky-600" />
+            <span>⚡ Cost Engine Calculator</span>
+            {activeTemplateName && (
+              <span className="text-[9px] bg-sky-200 text-sky-900 px-1.5 py-0.2 rounded font-mono font-bold ml-1">
+                {activeTemplateName}
+              </span>
+            )}
+          </button>
+        )}
       </div>
 
       {/* DESKTOP TABLE VIEW */}
@@ -369,15 +395,28 @@ export const LineItemsTable: React.FC<LineItemsTableProps> = ({ items, onChangeI
         )}
       </div>
 
-      {/* APPEND ACTION BUTTON */}
-      <button
-        type="button"
-        onClick={handleAddNewItem}
-        className="w-full border-2 border-dashed border-slate-300 hover:border-sky-500 hover:bg-sky-50/20 text-slate-500 hover:text-sky-650 py-3 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center justify-center space-x-1.5 transition-all cursor-pointer shadow-3xs"
-      >
-        <Plus className="h-4 w-4" />
-        <span>Add Component Particular Line</span>
-      </button>
+      {/* APPEND ACTION BUTTONS */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <button
+          type="button"
+          onClick={handleAddNewItem}
+          className="border-2 border-dashed border-slate-300 hover:border-slate-400 hover:bg-slate-50 text-slate-600 py-3 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center justify-center space-x-1.5 transition-all cursor-pointer shadow-3xs"
+        >
+          <Plus className="h-4 w-4" />
+          <span>Add Manual Line Item</span>
+        </button>
+
+        {onOpenCostEngine && (
+          <button
+            type="button"
+            onClick={onOpenCostEngine}
+            className="border-2 border-dashed border-sky-300 hover:border-sky-500 bg-sky-50/40 hover:bg-sky-50 text-sky-800 py-3 rounded-lg text-xs font-mono font-bold uppercase tracking-wider flex items-center justify-center space-x-2 transition-all cursor-pointer shadow-3xs"
+          >
+            <Calculator className="h-4 w-4 text-sky-600" />
+            <span>⚡ Calculate Part via Cost Engine</span>
+          </button>
+        )}
+      </div>
     </div>
   );
 };

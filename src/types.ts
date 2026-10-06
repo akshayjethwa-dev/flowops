@@ -200,6 +200,9 @@ export interface QuotationVersion {
   createdAt: string;
 }
 
+import { QuoteApprovalState, QuoteVersionRecord } from './types/quoteApproval';
+export * from './types/quoteApproval';
+
 export interface Quote {
   id: string;
   tenantId: string;
@@ -220,10 +223,13 @@ export interface Quote {
   pdfVersion?: number;
   pdfVersions?: QuotationVersion[];
   downloadUrl?: string;
-  status: 'draft' | 'sent' | 'approved' | 'rejected';
+  status: 'draft' | 'pending_approval' | 'sent' | 'approved' | 'rejected';
   plantId?: string;
   createdBy: string;
   createdAt: any;
+  approvalState?: QuoteApprovalState;
+  versions?: QuoteVersionRecord[];
+  currentVersion?: number;
 }
 
 export interface Order {
@@ -797,7 +803,10 @@ export type NotificationType =
   | "new_rfq" 
   | "dispatch_sent" 
   | "stage_changed" 
-  | "reminder_sent";
+  | "reminder_sent"
+  | "quote_approval_request"
+  | "quote_approved"
+  | "quote_rejected";
 
 export interface AppNotification {
   id: string;
@@ -807,7 +816,7 @@ export interface AppNotification {
   title: string;
   message: string;
   entityId: string;
-  entityType: 'payment' | 'order' | 'rfq' | 'inventory';
+  entityType: 'payment' | 'order' | 'rfq' | 'inventory' | 'quote' | 'quotation';
   link: string;
   read: boolean;
   createdAt: any;

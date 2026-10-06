@@ -6,10 +6,9 @@ import { useAuth } from '../../hooks/useAuth';
 import { useRfqDetail } from '../../hooks/useRfqDetail';
 import { useQuotation } from '../../hooks/useQuotation';
 import { useToast } from '../../context/ToastContext';
-<<<<<<< HEAD
-=======
+
 import { GuardedAction } from '../../components/layout/GuardedAction';
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
+
 import { 
   ArrowLeft, 
   Layers, 
@@ -31,12 +30,17 @@ import {
   FileCheck,
   Building,
   Printer,
-  CheckCircle2
+  CheckCircle2,
+  FileSpreadsheet,
+  Calculator,
+  Sliders
 } from 'lucide-react';
 import { RfqStatus } from '../../types';
 import { FileUploader } from '../../components/FileUploader';
 import { AttachmentsList } from '../../components/AttachmentsList';
 import { FileSymlink } from 'lucide-react';
+import { useCostEngine } from '../../hooks/useCostEngine';
+import { InteractiveCostEstimatorModal } from '../../components/cost-engine/InteractiveCostEstimatorModal';
 
 
 export const RfqDetailPage: React.FC = () => {
@@ -60,6 +64,10 @@ export const RfqDetailPage: React.FC = () => {
 
   // Load standard customized quotation if saved
   const { quotation } = useQuotation(tenant?.id, rfqId);
+
+  // Cost Engine state
+  const [costModalOpen, setCostModalOpen] = useState(false);
+  const { activeTemplate } = useCostEngine(tenant?.id);
 
   // Convert to order state and handler
   const [converting, setConverting] = useState(false);
@@ -144,10 +152,8 @@ export const RfqDetailPage: React.FC = () => {
     setWaSending(true);
 
     try {
-<<<<<<< HEAD
-      // Append to local WhatsApp logs
-=======
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
+
+
       const newMsg = {
         message: waMessage.trim(),
         sentAt: new Date().toLocaleTimeString(),
@@ -156,10 +162,8 @@ export const RfqDetailPage: React.FC = () => {
 
       setWsLogsLocal(prev => [newMsg, ...prev]);
       
-<<<<<<< HEAD
-      // Also write timeline
-=======
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
+
+
       addTimelineEvent(
         'WhatsApp Alert Sent',
         `Dispatched text: "${waMessage.trim().length > 60 ? waMessage.trim().slice(0, 57) + '...' : waMessage.trim()}" to ${rfq.phone || 'client'}`,
@@ -177,10 +181,8 @@ export const RfqDetailPage: React.FC = () => {
   return (
     <div className="space-y-6 font-sans">
       
-<<<<<<< HEAD
-      {/* Return to Listing */}
-=======
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
+
+
       <button
         onClick={() => navigate('/rfqs')}
         className="inline-flex items-center space-x-1 text-slate-450 hover:text-slate-800 text-[10px] font-mono tracking-wider uppercase cursor-pointer"
@@ -189,10 +191,8 @@ export const RfqDetailPage: React.FC = () => {
         <span>Inquiries Registry Pool</span>
       </button>
 
-<<<<<<< HEAD
-      {/* Ribbon Header Banner */}
-=======
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
+
+
       <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="space-y-1">
           <div className="flex items-center space-x-2">
@@ -205,50 +205,51 @@ export const RfqDetailPage: React.FC = () => {
           </div>
           <h2 className="text-xl font-black tracking-tight text-slate-900 mt-1 flex items-center space-x-2">
             <span>{rfq.rfqNumber || `Enquiry Worksheet #${rfqId}`}</span>
-<<<<<<< HEAD
-            <span className="text-[#3b82f6] text-xs font-mono font-bold font-normal">({rfq.priority || 'Medium'} Priority)</span>
-=======
+
             <span className="text-[#3b82f6] text-xs font-mono font-normal">({rfq.priority || 'Medium'} Priority)</span>
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
+
           </h2>
           <p className="text-xs text-slate-500 font-medium">
             Acquired via {rfq.source || 'Email'} • Standard pricing turnaround metrics active.
           </p>
         </div>
 
-<<<<<<< HEAD
-        {/* Actions cluster */}
-=======
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
+
+
         <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => window.print()}
             className="border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 px-4 py-3 rounded-lg font-mono text-[10px] uppercase font-black tracking-wider flex items-center space-x-1.5 cursor-pointer shadow-3xs transition-all pointer-events-auto shrink-0 select-none"
-<<<<<<< HEAD
-            title="Print this RFQ worksheet profile"
-=======
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
           >
             <Printer className="h-4 w-4 text-slate-400" />
             <span>Print Worksheet</span>
           </button>
 
-<<<<<<< HEAD
-          {/* Primary Call-to-Action based on Quotation completeness */}
           <button
-            onClick={handlePrimaryCTA}
-            className={`font-bold font-mono text-[10px] uppercase tracking-wider px-5 py-3 rounded-lg cursor-pointer transition shadow-xs flex items-center space-x-2 shrink-0 ${
-              hasAssociatedQuote 
-                ? 'bg-slate-900 hover:bg-slate-800 text-white' 
-                : 'bg-[#ef4444] hover:bg-red-650 text-white'
-            }`}
+            onClick={() => navigate('/bom-scrubber', { 
+              state: { 
+                rfqId: rfq.id, 
+                rfqNumber: rfq.rfqNumber || rfq.id, 
+                customerName: rfq.customerName 
+              } 
+            })}
+            className="border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 px-4 py-3 rounded-lg font-mono text-[10px] uppercase font-black tracking-wider flex items-center space-x-1.5 cursor-pointer shadow-3xs transition-all shrink-0 select-none"
+            title="Automated BOM Scrubbing: Check stock, supplier catalogs, lead times & real-time pricing"
           >
-            <Sparkles className="h-4 w-4 shrink-0 text-white" />
-            <span>{hasAssociatedQuote ? 'Manage/Edit Estimation Sheet' : '🎯 Formulate & Dispatch Quotation'}</span>
+            <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
+            <span>Scrub Customer BOM</span>
           </button>
 
-          {/* Convert to Order trigger button */}
-=======
+          <button
+            onClick={() => setCostModalOpen(true)}
+            className="border border-sky-300 bg-sky-50 hover:bg-sky-100 text-sky-800 px-4 py-3 rounded-lg font-mono text-[10px] uppercase font-black tracking-wider flex items-center space-x-1.5 cursor-pointer shadow-3xs transition-all shrink-0 select-none"
+            title="Configurable Cost Engine: Calculate part pricing using your custom shop labor, machine rates, material markups, and subcontract rules"
+          >
+            <Calculator className="h-4 w-4 text-sky-600" />
+            <span>Cost Engine Rules</span>
+          </button>
+
+
           {/* 🔒 RBAC Guard: Estimation Editing */}
           <GuardedAction action="manage:quotation">
             <button
@@ -265,7 +266,7 @@ export const RfqDetailPage: React.FC = () => {
           </GuardedAction>
 
           {/* 🔒 RBAC Guard: Order Generation */}
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
+
           {rfq.orderId ? (
             <button
               onClick={() => navigate('/orders', { state: { preselectedOrderId: rfq.orderId } })}
@@ -276,16 +277,7 @@ export const RfqDetailPage: React.FC = () => {
             </button>
           ) : (
             rfq.status === 'Won' && (
-<<<<<<< HEAD
-              <button
-                onClick={handleConvertToOrder}
-                disabled={converting}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold font-mono text-[10px] uppercase tracking-wider px-5 py-3 rounded-lg cursor-pointer transition shadow-xs flex items-center space-x-1.5 shrink-0 hover:scale-[1.02] active:scale-[0.98]"
-              >
-                <FileCheck className="h-4 w-4 shrink-0 text-white" />
-                <span>{converting ? 'Converting...' : '🎯 Convert to Order'}</span>
-              </button>
-=======
+
               <GuardedAction action="manage:order">
                 <button
                   onClick={handleConvertToOrder}
@@ -296,7 +288,7 @@ export const RfqDetailPage: React.FC = () => {
                   <span>{converting ? 'Converting...' : '🎯 Convert to Order'}</span>
                 </button>
               </GuardedAction>
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
+
             )
           )}
         </div>
@@ -304,14 +296,9 @@ export const RfqDetailPage: React.FC = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-<<<<<<< HEAD
-        {/* Column Left (2 cols wide): specs details & items list */}
+
         <div className="lg:col-span-2 space-y-6">
-          
-          {/* Card 1: Customer Profile Overview */}
-=======
-        <div className="lg:col-span-2 space-y-6">
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
+
           <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-2xs space-y-4">
             <h3 className="text-xs uppercase font-mono font-bold text-slate-400 tracking-wider flex items-center space-x-2">
               <Building className="h-4 w-4 text-sky-500" />
@@ -364,10 +351,8 @@ export const RfqDetailPage: React.FC = () => {
             </div>
           </div>
 
-<<<<<<< HEAD
-          {/* Card 2: Items list table */}
-=======
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
+
+
           <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-2xs space-y-4">
             <h3 className="text-xs uppercase font-mono font-bold text-slate-400 tracking-wider flex items-center space-x-2">
               <Layers className="h-4 w-4 text-sky-500" />
@@ -408,10 +393,8 @@ export const RfqDetailPage: React.FC = () => {
               </div>
             )}
 
-<<<<<<< HEAD
-            {/* Description Remarks */}
-=======
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
+
+
             {rfq.description && (
               <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 space-y-1.5 text-xs">
                 <span className="text-[9px] font-mono font-bold text-slate-400 uppercase">Additional procurement remarks</span>
@@ -420,10 +403,8 @@ export const RfqDetailPage: React.FC = () => {
             )}
           </div>
 
-<<<<<<< HEAD
-          {/* Card: Engineering Drawings & Attachment Specs */}
-=======
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
+
+
           <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-2xs space-y-4">
             <h3 className="text-xs uppercase font-mono font-bold text-slate-400 tracking-wider flex items-center space-x-2">
               <FileSymlink className="h-4 w-4 text-sky-500" />
@@ -439,16 +420,7 @@ export const RfqDetailPage: React.FC = () => {
                   userProfile={profile} 
                   userRole={profile?.role} 
                 />
-<<<<<<< HEAD
-                <div className="pt-2">
-                  <FileUploader 
-                    entityType="rfq" 
-                    entityId={rfqId!} 
-                    tenantId={tenant.id} 
-                    userProfile={profile} 
-                  />
-                </div>
-=======
+
                 <GuardedAction action="manage:rfq">
                   <div className="pt-2">
                     <FileUploader 
@@ -459,15 +431,13 @@ export const RfqDetailPage: React.FC = () => {
                     />
                   </div>
                 </GuardedAction>
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
+
               </>
             )}
           </div>
 
-<<<<<<< HEAD
-          {/* Card 3: Quotation Summary and CTA */}
-=======
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
+
+
           <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-2xs space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-xs uppercase font-mono font-bold text-slate-400 tracking-wider flex items-center space-x-2">
@@ -475,14 +445,7 @@ export const RfqDetailPage: React.FC = () => {
                 <span>Quotation Dispatched Metrics</span>
               </h3>
               {hasAssociatedQuote && (
-<<<<<<< HEAD
-                <button
-                  onClick={handlePrimaryCTA}
-                  className="text-[9px] font-mono hover:underline font-extrabold text-sky-600 uppercase"
-                >
-                  Edit Sheet
-                </button>
-=======
+
                 <GuardedAction action="manage:quotation">
                   <button
                     onClick={handlePrimaryCTA}
@@ -491,7 +454,7 @@ export const RfqDetailPage: React.FC = () => {
                     Edit Sheet
                   </button>
                 </GuardedAction>
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
+
               )}
             </div>
 
@@ -539,16 +502,54 @@ export const RfqDetailPage: React.FC = () => {
                 ) : (
                   <div className="border border-sky-100 bg-sky-50/20 rounded-xl p-4 space-y-3 text-xs">
                     <div className="flex items-center justify-between font-mono">
-                      <span className="font-bold text-sky-850">Quote Reference: {primaryQuote?.quoteNumber}</span>
-                      <span className="bg-emerald-50 text-emerald-800 font-bold border border-emerald-100 text-[9px] px-2 py-0.5 rounded-full uppercase">Approved / Logged</span>
+                      <div className="flex items-center space-x-2">
+                        <span className="font-bold text-sky-850">Quote Reference: {primaryQuote?.quoteNumber}</span>
+                        <span className="bg-slate-100 text-slate-700 border border-slate-200 text-[9px] px-1.5 py-0.5 rounded font-mono font-bold">
+                          v{primaryQuote?.currentVersion || 1}.0
+                        </span>
+                      </div>
+                      <span className={`font-bold border text-[9px] px-2.5 py-0.5 rounded-full uppercase ${
+                        primaryQuote?.status === 'approved'
+                          ? 'bg-emerald-50 text-emerald-800 border-emerald-150'
+                          : primaryQuote?.status === 'pending_approval'
+                          ? 'bg-amber-100 text-amber-900 border-amber-300 animate-pulse'
+                          : primaryQuote?.status === 'rejected'
+                          ? 'bg-rose-50 text-rose-800 border-rose-150'
+                          : primaryQuote?.status === 'sent'
+                          ? 'bg-blue-50 text-blue-800 border-blue-150'
+                          : 'bg-slate-100 text-slate-700 border-slate-200'
+                      }`}>
+                        {primaryQuote?.status === 'pending_approval' ? 'Awaiting Approval' : primaryQuote?.status?.toUpperCase()}
+                      </span>
                     </div>
+
+                    {primaryQuote?.status === 'pending_approval' && (
+                      <div className="p-2 bg-amber-50 rounded-lg border border-amber-200 text-[11px] text-amber-900 flex items-center justify-between">
+                        <span>Awaiting {primaryQuote?.approvalState?.pendingRoleTitle || 'Director'} sign-off (&gt;₹1L / discount rule).</span>
+                        <button
+                          type="button"
+                          onClick={() => navigate('/rfqs?tab=quotes')}
+                          className="text-amber-800 font-bold underline text-[10px] cursor-pointer"
+                        >
+                          Review in Quotations
+                        </button>
+                      </div>
+                    )}
+
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 py-2 border-y border-dashed border-sky-100 text-[11px] font-mono text-slate-650">
                       <div>Subtotal: ₹{primaryQuote?.subtotal?.toLocaleString('en-IN') || '0.00'}</div>
                       <div>GST (18%): ₹{primaryQuote?.gstAmount?.toLocaleString('en-IN') || '0.00'}</div>
                       <div className="font-bold text-slate-900">Total: ₹{primaryQuote?.total?.toLocaleString('en-IN') || '0.00'}</div>
                     </div>
-                    <div className="text-[10px] text-slate-450 font-mono">
-                      Legacy Quote format detected. Access standard quote pipelines to adjust.
+                    <div className="flex items-center justify-between text-[10px] text-slate-450 font-mono">
+                      <span>{primaryQuote?.items?.length || 0} line items configured</span>
+                      <button
+                        type="button"
+                        onClick={() => navigate('/rfqs?tab=quotes')}
+                        className="text-sky-600 font-bold hover:underline cursor-pointer"
+                      >
+                        Manage in Quotation Desk →
+                      </button>
                     </div>
                   </div>
                 )}
@@ -560,14 +561,7 @@ export const RfqDetailPage: React.FC = () => {
                 <p className="text-[11px] text-slate-500 max-w-sm mx-auto leading-relaxed">
                   Sales estimators have not prepared a commercial quote. Launch quotation formulation now.
                 </p>
-<<<<<<< HEAD
-                <button
-                  onClick={handlePrimaryCTA}
-                  className="bg-indigo-650 hover:bg-indigo-700 text-white font-mono text-[9px] uppercase tracking-wider font-bold px-4 py-2 rounded-lg cursor-pointer transition shadow-xs"
-                >
-                  🎯 Draft Commercial Quote
-                </button>
-=======
+
                 <GuardedAction action="manage:quotation">
                   <button
                     onClick={handlePrimaryCTA}
@@ -576,22 +570,17 @@ export const RfqDetailPage: React.FC = () => {
                     🎯 Draft Commercial Quote
                   </button>
                 </GuardedAction>
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
+
               </div>
             )}
           </div>
 
         </div>
 
-<<<<<<< HEAD
-        {/* Column Right (1 col wide): Status controls, activity timeline, and WhatsApp simulator logs */}
+
         <div className="space-y-6">
           
-          {/* Box 1: RFQ status controls */}
-=======
-        <div className="space-y-6">
-          
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
+
           <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-2xs space-y-4">
             <h3 className="text-xs uppercase font-mono font-bold text-slate-400 tracking-wider">
               Worksheet Lifecycle
@@ -612,20 +601,7 @@ export const RfqDetailPage: React.FC = () => {
                 <label className="text-[9px] font-mono font-bold text-slate-450 block uppercase tracking-wide">
                   Worksheet Status
                 </label>
-<<<<<<< HEAD
-                <div className="relative mt-1">
-                  <select
-                    value={rfq.status}
-                    onChange={(e) => updateRfqFields({ status: e.target.value as RfqStatus })}
-                    className="w-full font-mono text-xs bg-slate-50 border border-slate-200 rounded-lg p-2.5 font-bold text-slate-800 focus:bg-white focus:outline-hidden"
-                  >
-                    <option value="New">🟢 New (Unprocessed)</option>
-                    <option value="In Progress">🟡 In Progress</option>
-                    <option value="Quoted">🔵 Quoted & Shared</option>
-                    <option value="Won">🏆 Won (Order Booked)</option>
-                    <option value="Lost">❌ Lost / Declined</option>
-                  </select>
-=======
+
                 <div className="mt-1">
                   {/* 🔒 RBAC Guard: Read-only for management/unauthorized */}
                   <GuardedAction 
@@ -648,49 +624,21 @@ export const RfqDetailPage: React.FC = () => {
                       <option value="Lost">❌ Lost / Declined</option>
                     </select>
                   </GuardedAction>
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
+
                 </div>
               </div>
             </div>
           </div>
 
-<<<<<<< HEAD
-          {/* Box 2: Timeline Activity Logger */}
-=======
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
+
+
           <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-2xs space-y-4">
             <h3 className="text-xs uppercase font-mono font-bold text-slate-400 tracking-wider flex items-center space-x-1.5">
               <Clock className="h-4 w-4 text-sky-500" />
               <span>Logs & Activity Timeline</span>
             </h3>
 
-<<<<<<< HEAD
-            {/* Quick notes logging form */}
-            <form onSubmit={handleAddTimelineMsg} className="space-y-2">
-              <input
-                type="text"
-                placeholder="Log milestone tag (e.g. Call Client, Specs confirmed)"
-                className="w-full bg-slate-50 border border-slate-200 rounded-lg p-1.5 text-[10px] font-mono focus:outline-hidden focus:bg-white"
-                value={customEventTitle}
-                onChange={(e) => setCustomEventTitle(e.target.value)}
-              />
-              <div className="flex space-x-1.5">
-                <input
-                  type="text"
-                  placeholder="Review observations details..."
-                  className="w-full flex-grow bg-slate-50 border border-slate-200 rounded-lg p-1.5 text-xs text-slate-700 focus:outline-hidden focus:bg-white font-sans"
-                  value={notesInput}
-                  onChange={(e) => setNotesInput(e.target.value)}
-                />
-                <button
-                  type="submit"
-                  className="bg-slate-900 hover:bg-slate-800 text-white font-bold p-1.5 rounded-lg flex items-center justify-center shrink-0"
-                >
-                  <Send className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            </form>
-=======
+
             <GuardedAction action="manage:rfq">
               <form onSubmit={handleAddTimelineMsg} className="space-y-2">
                 <input
@@ -717,7 +665,7 @@ export const RfqDetailPage: React.FC = () => {
                 </div>
               </form>
             </GuardedAction>
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
+
 
             <div className="flow-root pt-2 select-none">
               <ul className="-mb-8">
@@ -750,10 +698,8 @@ export const RfqDetailPage: React.FC = () => {
             </div>
           </div>
 
-<<<<<<< HEAD
-          {/* Box 3: WhatsApp log messaging outbox */}
-=======
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
+
+
           <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-2xs space-y-4">
             <h3 className="text-xs uppercase font-mono font-bold text-slate-400 tracking-wider flex items-center space-x-1.5">
               <MessageSquare className="h-4 w-4 text-emerald-500" />
@@ -761,26 +707,7 @@ export const RfqDetailPage: React.FC = () => {
             </h3>
 
             {rfq.phone ? (
-<<<<<<< HEAD
-              <form onSubmit={handleSimulateWhatsApp} className="space-y-2">
-                <textarea
-                  rows={2}
-                  placeholder={`Send WhatsApp update to ${rfq.customerName}...`}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-sans focus:outline-hidden text-slate-700 focus:bg-white"
-                  value={waMessage}
-                  required
-                  onChange={(e) => setWaMessage(e.target.value)}
-                />
-                <button
-                  type="submit"
-                  disabled={waSending}
-                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-mono uppercase tracking-wider font-bold py-2 rounded-lg cursor-pointer transition flex items-center justify-center space-x-1"
-                >
-                  <Send className="h-3 w-3" />
-                  <span>{waSending ? 'Sending alert...' : 'Simulate WhatsApp Outbound'}</span>
-                </button>
-              </form>
-=======
+
               <GuardedAction action="manage:rfq">
                 <form onSubmit={handleSimulateWhatsApp} className="space-y-2">
                   <textarea
@@ -801,25 +728,21 @@ export const RfqDetailPage: React.FC = () => {
                   </button>
                 </form>
               </GuardedAction>
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
+
             ) : (
               <div className="text-[10px] text-slate-450 font-mono border border-dashed rounded-lg p-3 text-center">
                 Configure phone parameters to open outbox simulation alerts.
               </div>
             )}
 
-<<<<<<< HEAD
-            {/* Simulated WhatsApp history */}
-=======
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
+
+
             {(wsLogsLocal.length > 0 || whatsappLogs.length > 0) ? (
               <div className="pt-2 select-none">
                 <span className="text-[9px] font-mono font-bold text-slate-400 uppercase tracking-wide block mb-2">Simulated Outbox thread</span>
                 <div className="space-y-2 max-h-48 overflow-y-auto">
-<<<<<<< HEAD
-                  {/* Local Simulated Outbox */}
-=======
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
+
+
                   {wsLogsLocal.map((msg, index) => (
                     <div key={index} className="p-2 border border-emerald-100 bg-emerald-50/30 rounded-lg text-xs leading-relaxed">
                       <p className="text-slate-800 font-sans">{msg.message}</p>
@@ -828,10 +751,8 @@ export const RfqDetailPage: React.FC = () => {
                       </div>
                     </div>
                   ))}
-<<<<<<< HEAD
-                  {/* Database logged Messages */}
-=======
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
+
+
                   {whatsappLogs.map(log => (
                     <div key={log.id} className="p-2 border border-slate-150 bg-slate-50/50 rounded-lg text-xs leading-relaxed">
                       <p className="text-slate-650 font-sans">{log.message}</p>
@@ -849,10 +770,33 @@ export const RfqDetailPage: React.FC = () => {
 
       </div>
 
+      {/* ── Configurable Cost Engine Estimator Modal ── */}
+      {activeTemplate && rfq && (
+        <InteractiveCostEstimatorModal
+          isOpen={costModalOpen}
+          onClose={() => setCostModalOpen(false)}
+          template={activeTemplate}
+          initialPartName={rfq.items?.[0]?.name || rfq.rfqNumber || 'Industrial Manufactured Component'}
+          initialQuantity={rfq.items?.[0]?.quantity || 100}
+          onApplyToQuote={(result) => {
+            setCostModalOpen(false);
+            navigate(`/rfqs/${rfq.id}/quotation`, {
+              state: {
+                prefillRFQ: rfq,
+                prefilledItem: {
+                  name: `${result.partName} [${result.specSummary}]`,
+                  quantity: result.quantity,
+                  unitPrice: result.unitPrice
+                }
+              }
+            });
+            toastSuccess(`Calculated ₹${result.unitPrice}/unit using ${activeTemplate.name} rules! Injected to quotation.`);
+          }}
+        />
+      )}
+
     </div>
   );
-<<<<<<< HEAD
+
 };
-=======
-};
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
+

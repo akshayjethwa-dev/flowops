@@ -21,6 +21,8 @@ import { DashboardPage } from './pages/dashboard/DashboardPage';
 import { PaymentsTrackerPage } from './pages/PaymentsTrackerPage';
 import { RFQsPage } from './pages/rfqs/RFQsPage';
 import { MultiChannelIntakeHub } from './pages/rfqs/MultiChannelIntakeHub';
+import { BomScrubberPage } from './pages/rfqs/BomScrubberPage';
+import { CostEnginePage } from './pages/rfqs/CostEnginePage';
 import { RfqCreateForm } from './pages/rfqs/RfqCreateForm';
 import { RfqDetailPage } from './pages/rfqs/RfqDetailPage';
 import { QuotationEditorPage } from './pages/rfqs/QuotationEditorPage';
@@ -110,6 +112,42 @@ export default function App() {
                   element={
                     <ProtectedRoute allowedRoles={['admin', 'manager', 'sales', 'management']}>
                       <MultiChannelIntakeHub />
+                    </ProtectedRoute>
+                  } 
+                />
+
+                <Route 
+                  path="bom-scrubber" 
+                  element={
+                    <ProtectedRoute allowedRoles={['admin', 'manager', 'sales', 'management', 'operator', 'store_keeper', 'production', 'viewer']}>
+                      <BomScrubberPage />
+                    </ProtectedRoute>
+                  } 
+                />
+
+                <Route 
+                  path="rfqs/bom" 
+                  element={
+                    <ProtectedRoute allowedRoles={['admin', 'manager', 'sales', 'management', 'operator', 'store_keeper', 'production', 'viewer']}>
+                      <BomScrubberPage />
+                    </ProtectedRoute>
+                  } 
+                />
+
+                <Route 
+                  path="cost-engine" 
+                  element={
+                    <ProtectedRoute allowedRoles={['admin', 'manager', 'sales', 'management']}>
+                      <CostEnginePage />
+                    </ProtectedRoute>
+                  } 
+                />
+
+                <Route 
+                  path="rfqs/cost-engine" 
+                  element={
+                    <ProtectedRoute allowedRoles={['admin', 'manager', 'sales', 'management']}>
+                      <CostEnginePage />
                     </ProtectedRoute>
                   } 
                 />

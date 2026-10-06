@@ -17,7 +17,8 @@ import {
   ArrowLeft, 
   Sparkles, 
   Layers, 
-  Share2 
+  Share2,
+  FileSpreadsheet
 } from 'lucide-react';
 
 export const MultiChannelIntakeHub: React.FC = () => {
@@ -86,8 +87,16 @@ export const MultiChannelIntakeHub: React.FC = () => {
           </p>
         </div>
 
-        {/* Quick Tabs Counter */}
+        {/* Quick Tabs Counter & Scrubber Button */}
         <div className="flex items-center space-x-2 shrink-0 self-start sm:self-center">
+          <button
+            onClick={() => navigate('/bom-scrubber')}
+            className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-lg text-xs font-mono font-bold flex items-center space-x-1.5 cursor-pointer shadow-3xs transition-colors"
+          >
+            <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
+            <span>Scrub Customer BOM</span>
+          </button>
+
           <div className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 shadow-3xs flex items-center space-x-2">
             <span className="text-[10px] font-mono font-bold uppercase text-slate-400">Queue State:</span>
             <span className="text-xs font-mono font-bold text-amber-600">{pendingCount} Pending</span>

@@ -9,7 +9,10 @@ import {
   Truck, 
   FileText, 
   CheckCircle,
-  Check
+  Check,
+  ShieldAlert,
+  ShieldCheck,
+  XCircle
 } from 'lucide-react';
 import { useNotifications } from '../hooks/useNotifications';
 import { AppNotification, NotificationType } from '../types';
@@ -84,6 +87,21 @@ export const NotificationBell: React.FC = () => {
         return {
           icon: CheckCircle,
           iconClass: 'text-indigo-600 bg-indigo-50 border border-indigo-100',
+        };
+      case 'quote_approval_request':
+        return {
+          icon: ShieldAlert,
+          iconClass: 'text-amber-600 bg-amber-50 border border-amber-200',
+        };
+      case 'quote_approved':
+        return {
+          icon: ShieldCheck,
+          iconClass: 'text-emerald-600 bg-emerald-50 border border-emerald-200',
+        };
+      case 'quote_rejected':
+        return {
+          icon: XCircle,
+          iconClass: 'text-rose-600 bg-rose-50 border border-rose-200',
         };
       case 'reminder_sent':
       default:

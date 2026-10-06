@@ -335,12 +335,58 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["id", "tenantId", "userId", "type", "title", "message", "entityId", "entityType", "link", "read", "createdAt"]
+    },
+    "BomValidation": {
+      "title": "BomValidation",
+      "description": "Scrubbed and validated customer Bill of Materials record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "bomTitle": { "type": "string" },
+        "rfqId": { "type": "string" },
+        "totalItems": { "type": "number" },
+        "totalComponentCost": { "type": "number" },
+        "suggestedQuotePrice": { "type": "number" },
+        "quotabilityScore": { "type": "number" },
+        "criticalPathLeadTimeDays": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "tenantId", "bomTitle", "createdAt"]
+    },
+    "CostingTemplate": {
+      "title": "CostingTemplate",
+      "description": "Versioned costing template with labor rates, MHR, material markups, subcontracting rules, and overheads",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "name": { "type": "string" },
+        "version": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "draft", "archived"] },
+        "isDefault": { "type": "boolean" },
+        "description": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "tenantId", "name", "version", "createdAt"]
     }
   },
   "firestore": {
     "tenants": {
       "schema": "Tenant",
       "description": "Store manufacturing companies using the platform"
+    },
+    "tenants/{tenantId}/costingTemplates": {
+      "schema": "CostingTemplate",
+      "description": "Versioned costing rules and templates scoped to tenant"
+    },
+    "tenants/{tenantId}/bomValidations": {
+      "schema": "BomValidation",
+      "description": "Scrubbed customer BOM records and validation results"
+    },
+    "tenants/{tenantId}/approvalWorkflowConfig": {
+      "schema": "QuoteApprovalWorkflowConfig",
+      "description": "Configurable multi-level quote approval thresholds and rule chains"
     },
     "tenants/{tenantId}/activity": {
       "schema": "ActivityLog",

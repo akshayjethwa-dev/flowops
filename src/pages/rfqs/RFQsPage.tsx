@@ -5,10 +5,12 @@ import { RfqsListPage } from './RfqsListPage';
 import { QuotationsSection } from '../../components/QuotationsSection';
 import { MultiChannelIntakeHub } from './MultiChannelIntakeHub';
 import { RFQ, Order } from '../../types';
-import { FileText, FolderInput, Inbox, Sparkles } from 'lucide-react';
+import { FileText, FolderInput, Inbox, Sparkles, FileSpreadsheet, Sliders } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useIntakeInquiries } from '../../hooks/useIntakeInquiries';
+import { BomScrubberView } from '../../components/bom-scrubber/BomScrubberView';
+import { CostEnginePage } from './CostEnginePage';
 
 export const RFQsPage: React.FC = () => {
   const navigate = useNavigate();
@@ -16,13 +18,13 @@ export const RFQsPage: React.FC = () => {
   const { tenant } = useAuth();
   const { inquiries } = useIntakeInquiries(tenant?.id);
 
-  const [activeTab, setActiveTab] = useState<'rfqs' | 'intake' | 'quotes'>('rfqs');
+  const [activeTab, setActiveTab] = useState<'rfqs' | 'intake' | 'bom' | 'quotes' | 'cost-engine'>('rfqs');
   const [prefillRFQ, setPrefillRFQ] = useState<RFQ | null>(null);
 
   // Synchronise with React Router location state if navigated with activeTab / prefill triggers
   useEffect(() => {
     if (location.state) {
-      const stateObj = location.state as { activeTab?: 'rfqs' | 'intake' | 'quotes'; prefillRFQ?: RFQ };
+      const stateObj = location.state as { activeTab?: 'rfqs' | 'intake' | 'bom' | 'quotes' | 'cost-engine'; prefillRFQ?: RFQ };
       if (stateObj.activeTab) {
         setActiveTab(stateObj.activeTab);
       }
@@ -94,6 +96,24 @@ export const RFQsPage: React.FC = () => {
         </button>
 
         <button
+          onClick={() => {
+            setActiveTab('bom');
+            setPrefillRFQ(null);
+          }}
+          className={`pb-3 text-xs uppercase font-mono font-bold tracking-wider hover:text-slate-900 cursor-pointer flex items-center space-x-1.5 border-b-2 transition-all whitespace-nowrap ${
+            activeTab === 'bom' 
+              ? 'border-sky-600 text-slate-900' 
+              : 'border-transparent text-slate-400'
+          }`}
+        >
+          <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
+          <span>BOM Scrubber & Validation</span>
+          <span className="bg-sky-100 text-sky-800 font-mono text-[9px] px-1.5 py-0.2 rounded-full font-bold">
+            NEW
+          </span>
+        </button>
+
+        <button
           onClick={() => setActiveTab('quotes')}
           className={`pb-3 text-xs uppercase font-mono font-bold tracking-wider hover:text-slate-900 cursor-pointer flex items-center space-x-1.5 border-b-2 transition-all whitespace-nowrap ${
             activeTab === 'quotes' 
@@ -104,10 +124,35 @@ export const RFQsPage: React.FC = () => {
           <FileText className="h-4 w-4" />
           <span>Quotations Desk {prefillRFQ && ' (Prefill Active)'}</span>
         </button>
+
+        <button
+          onClick={() => {
+            setActiveTab('cost-engine');
+            setPrefillRFQ(null);
+          }}
+          className={`pb-3 text-xs uppercase font-mono font-bold tracking-wider hover:text-slate-900 cursor-pointer flex items-center space-x-1.5 border-b-2 transition-all whitespace-nowrap ${
+            activeTab === 'cost-engine' 
+              ? 'border-sky-600 text-slate-900' 
+              : 'border-transparent text-slate-400'
+          }`}
+        >
+          <Sliders className="h-4 w-4 text-sky-600" />
+          <span>Cost Engine Rules</span>
+          <span className="bg-emerald-100 text-emerald-800 font-mono text-[9px] px-1.5 py-0.2 rounded-full font-bold">
+            CONFIG
+          </span>
+        </button>
       </div>
 
       {activeTab === 'rfqs' && <RfqsListPage onOpenIntake={() => setActiveTab('intake')} />}
       {activeTab === 'intake' && <MultiChannelIntakeHub />}
+      {activeTab === 'bom' && (
+        <BomScrubberView
+          onPushToQuotation={(items) => {
+            setActiveTab('quotes');
+          }}
+        />
+      )}
       {activeTab === 'quotes' && (
         <QuotationsSection
           prefillRFQ={prefillRFQ}
@@ -115,6 +160,7 @@ export const RFQsPage: React.FC = () => {
           onInitiateOrder={handleInitiateOrder}
         />
       )}
+      {activeTab === 'cost-engine' && <CostEnginePage />}
     </div>
   );
 };

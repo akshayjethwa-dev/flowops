@@ -1,0 +1,357 @@
+// src/services/supplierCatalogData.ts
+
+import { SupplierCatalogMasterItem } from '../types/bomScrubber';
+
+export const DEFAULT_SUPPLIER_CATALOG: SupplierCatalogMasterItem[] = [
+  // ── Raw Materials & Steels ───────────────────────────────────
+  {
+    id: 'sup-1',
+    supplierName: 'Tata Steel Industrial Products',
+    supplierLocation: 'Jamshedpur / Mumbai Hub',
+    partNumber: 'TS-EN8-RD45',
+    manufacturer: 'Tata Steel',
+    description: 'EN8 / 080M40 Bright Drawn Carbon Steel Round Bar Dia 45mm x 3m',
+    materialGrade: 'EN8 Normalized',
+    category: 'raw_material',
+    moq: 50,
+    leadTimeDays: 7,
+    baseUnitPrice: 88, // ₹ per kg or per piece based on standard bar
+    currency: 'INR',
+    lifecycleStatus: 'ACTIVE',
+    alternates: ['JSL-CS45-RD', 'SAIL-EN8-45'],
+    contactEmail: 'industrial.sales@tatasteel.com',
+    contactPhone: '+91 22 6665 8282'
+  },
+  {
+    id: 'sup-2',
+    supplierName: 'Tata Steel Industrial Products',
+    supplierLocation: 'Jamshedpur / Mumbai Hub',
+    partNumber: 'TS-EN19-RD60',
+    manufacturer: 'Tata Steel',
+    description: 'EN19 / 709M40 Alloy Steel Annealed Round Bar Dia 60mm',
+    materialGrade: 'EN19 / AISI 4140',
+    category: 'raw_material',
+    moq: 25,
+    leadTimeDays: 14,
+    baseUnitPrice: 142,
+    currency: 'INR',
+    lifecycleStatus: 'ACTIVE',
+    alternates: ['MUSCO-EN19-60'],
+    contactEmail: 'industrial.sales@tatasteel.com'
+  },
+  {
+    id: 'sup-3',
+    supplierName: 'Jindal Stainless Ltd (JSL)',
+    supplierLocation: 'Hisar / Pune Stockyard',
+    partNumber: 'JSL-SS304-PL10',
+    manufacturer: 'Jindal Stainless',
+    description: 'Stainless Steel 304 Hot Rolled Pickled Plate 10mm Thk',
+    materialGrade: 'SS 304 / 1.4301',
+    category: 'raw_material',
+    moq: 10,
+    leadTimeDays: 5,
+    baseUnitPrice: 265,
+    currency: 'INR',
+    lifecycleStatus: 'ACTIVE',
+    alternates: ['OUTOKUMPU-304-10'],
+    contactEmail: 'sales.pune@jindalstainless.com'
+  },
+  {
+    id: 'sup-4',
+    supplierName: 'Jindal Stainless Ltd (JSL)',
+    supplierLocation: 'Hisar / Pune Stockyard',
+    partNumber: 'JSL-SS316L-RD50',
+    manufacturer: 'Jindal Stainless',
+    description: 'Stainless Steel 316L Marine Grade Bright Round Bar 50mm',
+    materialGrade: 'SS 316L / 1.4404',
+    category: 'raw_material',
+    moq: 15,
+    leadTimeDays: 10,
+    baseUnitPrice: 395,
+    currency: 'INR',
+    lifecycleStatus: 'ACTIVE',
+    alternates: ['VIRAJ-316L-50'],
+    contactEmail: 'sales.pune@jindalstainless.com'
+  },
+  {
+    id: 'sup-5',
+    supplierName: 'Hindalco Industries Ltd',
+    supplierLocation: 'Belagavi / Renukoot',
+    partNumber: 'HIN-AL6061-RD40',
+    manufacturer: 'Hindalco',
+    description: 'Aluminium Alloy 6061-T6 Aircraft Grade Extruded Round Bar 40mm',
+    materialGrade: 'Alloy 6061-T6',
+    category: 'raw_material',
+    moq: 20,
+    leadTimeDays: 8,
+    baseUnitPrice: 340,
+    currency: 'INR',
+    lifecycleStatus: 'ACTIVE',
+    alternates: ['NALCO-6061-40']
+  },
+  {
+    id: 'sup-6',
+    supplierName: 'Kalyani Steels & Forgings',
+    supplierLocation: 'Pune MIDC',
+    partNumber: 'KAL-VAC-INGOT-42CR',
+    manufacturer: 'Kalyani Specialty',
+    description: 'Electro-Slag Remelted (ESR) 42CrMo4 Heavy Vacuum Forging Billet',
+    materialGrade: '42CrMo4 ESR',
+    category: 'raw_material',
+    moq: 5,
+    leadTimeDays: 45, // Long Lead Item!
+    baseUnitPrice: 480,
+    currency: 'INR',
+    lifecycleStatus: 'ACTIVE',
+    alternates: ['BFL-42CR-ESR'],
+    notes: 'Long production cycle due to vacuum degassing & ESR melt schedule (6-8 weeks standard).'
+  },
+  {
+    id: 'sup-7',
+    supplierName: 'Special Metals Global Alloy',
+    supplierLocation: 'Imported via Nhava Sheva',
+    partNumber: 'SM-INCONEL-718-BAR',
+    manufacturer: 'Special Metals Corp',
+    description: 'Nickel Superalloy Inconel 718 Hot Finished Aged Bar Dia 35mm',
+    materialGrade: 'Inconel 718 / UNS N07718',
+    category: 'raw_material',
+    moq: 2,
+    leadTimeDays: 75, // Critical Lead Time!
+    baseUnitPrice: 4850,
+    currency: 'INR',
+    lifecycleStatus: 'ACTIVE',
+    alternates: [],
+    notes: 'Imported specialized aerospace alloy. Subject to import customs clearance & ITAR/DFARS docs.'
+  },
+
+  // ── Fasteners & Hardware ─────────────────────────────────────
+  {
+    id: 'sup-8',
+    supplierName: 'Unbrako Fasteners (Deepak Fasteners)',
+    supplierLocation: 'Ludhiana / Chakan Depot',
+    partNumber: 'UNB-M12X50-10.9',
+    manufacturer: 'Unbrako',
+    description: 'M12 x 50mm Socket Head Cap Screw Grade 10.9 High Tensile Black',
+    materialGrade: 'Alloy Steel 10.9',
+    category: 'fasteners',
+    moq: 100,
+    leadTimeDays: 2,
+    baseUnitPrice: 24.5,
+    currency: 'INR',
+    lifecycleStatus: 'ACTIVE',
+    alternates: ['TVS-M12X50-10.9', 'LPS-M12X50-10.9']
+  },
+  {
+    id: 'sup-9',
+    supplierName: 'Sundram Fasteners Ltd (TVS)',
+    supplierLocation: 'Chennai / Pimpri Warehouse',
+    partNumber: 'TVS-M16X80-8.8',
+    manufacturer: 'TVS Fasteners',
+    description: 'M16 x 80mm Hex Head Bolt Grade 8.8 Yellow Zinc Passivated',
+    materialGrade: 'Medium Carbon Steel 8.8',
+    category: 'fasteners',
+    moq: 50,
+    leadTimeDays: 3,
+    baseUnitPrice: 38.0,
+    currency: 'INR',
+    lifecycleStatus: 'ACTIVE',
+    alternates: ['UNB-M16X80-8.8']
+  },
+  {
+    id: 'sup-10',
+    supplierName: 'Unbrako Fasteners',
+    supplierLocation: 'Ludhiana / Chakan Depot',
+    partNumber: 'UNB-M10-PRE-LOCK-CAD',
+    manufacturer: 'Unbrako Classic',
+    description: 'M10 Flange Locknut Cadmium Plated (Discontinued Spec)',
+    materialGrade: 'Steel Class 10 (Cadmium)',
+    category: 'fasteners',
+    moq: 500,
+    leadTimeDays: 90,
+    baseUnitPrice: 45.0,
+    currency: 'INR',
+    lifecycleStatus: 'OBSOLETE', // OBSOLETE due to RoHS Cadmium ban
+    alternates: ['UNB-M10-FLANGE-ZN-NI'],
+    notes: 'OBSOLETE / BANNED: Cadmium electroplating prohibited under RoHS/REACH compliance. Replace with Zinc-Nickel.'
+  },
+  {
+    id: 'sup-11',
+    supplierName: 'Unbrako Fasteners',
+    supplierLocation: 'Chakan Depot',
+    partNumber: 'UNB-M10-FLANGE-ZN-NI',
+    manufacturer: 'Unbrako GreenLine',
+    description: 'M10 All-Metal Prevailing Torque Flange Nut Zinc-Nickel (RoHS Compliant)',
+    materialGrade: 'High Tensile Steel Cl 10 Zn-Ni',
+    category: 'fasteners',
+    moq: 100,
+    leadTimeDays: 4,
+    baseUnitPrice: 18.5,
+    currency: 'INR',
+    lifecycleStatus: 'ACTIVE',
+    alternates: []
+  },
+
+  // ── Bearings & Bushings ──────────────────────────────────────
+  {
+    id: 'sup-12',
+    supplierName: 'SKF India Ltd',
+    supplierLocation: 'Pune / Bengaluru Factory',
+    partNumber: 'SKF-6205-2RSH',
+    manufacturer: 'SKF',
+    description: 'Deep Groove Ball Bearing 25x52x15mm with Dual Nitrile Contact Seals',
+    materialGrade: 'High Carbon Chromium Steel 100Cr6',
+    category: 'bearings',
+    moq: 10,
+    leadTimeDays: 3,
+    baseUnitPrice: 215,
+    currency: 'INR',
+    lifecycleStatus: 'ACTIVE',
+    alternates: ['FAG-6205-2RSR', 'TIMKEN-6205-2RS']
+  },
+  {
+    id: 'sup-13',
+    supplierName: 'SKF India Ltd',
+    supplierLocation: 'Pune / Bengaluru Factory',
+    partNumber: 'SKF-6205-RS-DISC',
+    manufacturer: 'SKF Vintage',
+    description: 'Single Rubber Seal Ball Bearing 6205-RS (Legacy Non-Contact Rubber Seal)',
+    materialGrade: '100Cr6',
+    category: 'bearings',
+    moq: 100,
+    leadTimeDays: 120,
+    baseUnitPrice: 310,
+    currency: 'INR',
+    lifecycleStatus: 'OBSOLETE', // OBSOLETE: superseded by 2RSH/2RS1
+    alternates: ['SKF-6205-2RSH'],
+    notes: 'OBSOLETE: Factory tooling retired in 2021. Superseded by SKF-6205-2RSH.'
+  },
+  {
+    id: 'sup-14',
+    supplierName: 'Timken India Ltd',
+    supplierLocation: 'Jamshedpur / Chennai',
+    partNumber: 'TIM-30206-TAPER',
+    manufacturer: 'Timken',
+    description: 'Metric Tapered Roller Bearing Cone & Cup Set 30x62x17.25mm',
+    materialGrade: 'Case-Carburized Alloy Steel',
+    category: 'bearings',
+    moq: 12,
+    leadTimeDays: 6,
+    baseUnitPrice: 520,
+    currency: 'INR',
+    lifecycleStatus: 'ACTIVE',
+    alternates: ['SKF-30206-J2']
+  },
+  {
+    id: 'sup-15',
+    supplierName: 'Glycodur Sliding Bushings',
+    supplierLocation: 'Wiesbaden / Pune Dealer',
+    partNumber: 'GLY-PG-252830-PB',
+    manufacturer: 'Glycodur Legacy',
+    description: 'PTFE Lead-Lined Bronze Backed Dry Bushing 25x28x30mm (Lead Alloy)',
+    materialGrade: 'CuSn8 with Pb/PTFE',
+    category: 'bearings',
+    moq: 50,
+    leadTimeDays: 80,
+    baseUnitPrice: 180,
+    currency: 'INR',
+    lifecycleStatus: 'EOL', // End of life due to lead content
+    alternates: ['GLY-PG-252830-LF'],
+    notes: 'END OF LIFE (EOL): Lead-containing sliding compound banned for automotive & drinking water valves.'
+  },
+  {
+    id: 'sup-16',
+    supplierName: 'Glycodur Sliding Bushings',
+    supplierLocation: 'Pune Distributor',
+    partNumber: 'GLY-PG-252830-LF',
+    manufacturer: 'Glycodur Lead-Free',
+    description: 'Lead-Free Composite Dry Bushing 25x28x30mm PTFE/MoS2 Layer',
+    materialGrade: 'CuSn8 Lead-Free Composite',
+    category: 'bearings',
+    moq: 20,
+    leadTimeDays: 4,
+    baseUnitPrice: 135,
+    currency: 'INR',
+    lifecycleStatus: 'ACTIVE',
+    alternates: []
+  },
+
+  // ── Hydraulics, Pneumatics & Seals ───────────────────────────
+  {
+    id: 'sup-17',
+    supplierName: 'Parker Hannifin India Pvt Ltd',
+    supplierLocation: 'Mahape Navi Mumbai',
+    partNumber: 'PKR-POLYPAK-B-1250',
+    manufacturer: 'Parker Seals',
+    description: 'Standard Polypak B-Type Hydraulic Piston & Rod Seal 1.25" ID',
+    materialGrade: 'Molythane 95A + Nitrile O-Spring',
+    category: 'seals_hydraulics',
+    moq: 25,
+    leadTimeDays: 5,
+    baseUnitPrice: 145,
+    currency: 'INR',
+    lifecycleStatus: 'ACTIVE',
+    alternates: ['HALLITE-605-1250']
+  },
+  {
+    id: 'sup-18',
+    supplierName: 'Parker Hannifin India',
+    supplierLocation: 'Mahape Navi Mumbai',
+    partNumber: 'PKR-VITON-OR-AS568-214',
+    manufacturer: 'Parker Seals',
+    description: 'Viton FKM High Temp O-Ring 0.984" ID x 0.139" C/S (Durometer 75A)',
+    materialGrade: 'Fluoroelastomer Viton A',
+    category: 'seals_hydraulics',
+    moq: 50,
+    leadTimeDays: 4,
+    baseUnitPrice: 32,
+    currency: 'INR',
+    lifecycleStatus: 'ACTIVE',
+    alternates: ['BUSAK-FKM-214']
+  },
+  {
+    id: 'sup-19',
+    supplierName: 'Bosch Rexroth India Ltd',
+    supplierLocation: 'Sanand / Bengaluru',
+    partNumber: 'REX-PROP-SPOOL-D3',
+    manufacturer: 'Bosch Rexroth',
+    description: 'Proportional Directional Spool Valve Cartridge 24V NG6 Interface',
+    materialGrade: 'Hardened Precision Steel Cartridge',
+    category: 'seals_hydraulics',
+    moq: 1,
+    leadTimeDays: 38, // Long lead item
+    baseUnitPrice: 14200,
+    currency: 'INR',
+    lifecycleStatus: 'ACTIVE',
+    alternates: ['VICKERS-KDG4V-3'],
+    notes: 'Imported precision hydraulic electronics cartridge. High lead time of 5-6 weeks.'
+  },
+
+  // ── Cutting Tools & Tooling Consumables ──────────────────────
+  {
+    id: 'sup-20',
+    supplierName: 'Sandvik Coromant India',
+    supplierLocation: 'Pune Technology Centre',
+    partNumber: 'SND-CNMG-120408-PM-4325',
+    manufacturer: 'Sandvik Coromant',
+    description: 'Carbide Turning Insert CNMG 120408 PM Grade 4325 Inveio TiCN/Al2O3',
+    materialGrade: 'Tungsten Carbide 4325',
+    category: 'tooling',
+    moq: 10,
+    leadTimeDays: 2,
+    baseUnitPrice: 420,
+    currency: 'INR',
+    lifecycleStatus: 'ACTIVE',
+    alternates: ['KEN-CNMG-120408-KCP25B', 'ISCAR-CNMG-120408-IC807']
+  }
+];
+
+/**
+ * Live market commodity index offsets simulating real-time pricing feeds
+ */
+export const MARKET_COMMODITY_INDICES = {
+  steelHotRolled: { name: 'Domestic HRC Steel Index (MCX/Spot)', indexDeltaPercent: 1.8, trend: 'up' },
+  stainlessNickel: { name: 'LME Nickel / SS Surcharge Spot', indexDeltaPercent: -0.6, trend: 'down' },
+  aluminiumExtrusion: { name: 'LME Aluminium Cash Spot', indexDeltaPercent: 2.4, trend: 'up' },
+  copperBrass: { name: 'Copper Spot Cathode Price', indexDeltaPercent: 3.1, trend: 'up' },
+  logisticsFreight: { name: 'Domestic Diesel & Freight Tariff', indexDeltaPercent: 0.5, trend: 'stable' }
+};

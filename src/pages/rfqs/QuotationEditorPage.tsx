@@ -1,10 +1,12 @@
 // src/pages/rfqs/QuotationEditorPage.tsx
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useRfqDetail } from '../../hooks/useRfqDetail';
 import { useQuotation, sendQuotationViaWhatsapp } from '../../hooks/useQuotation';
+import { useCostEngine } from '../../hooks/useCostEngine';
+import { InteractiveCostEstimatorModal } from '../../components/cost-engine/InteractiveCostEstimatorModal';
 import { DEMO_PRODUCTS } from '../../data/mockData';
 import { QuotationItem, QuotationStatus } from '../../types';
 import { useToast } from '../../context/ToastContext';
@@ -72,6 +74,29 @@ export const QuotationEditorPage: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [sendingWa, setSendingWa] = useState(false);
   const [formFeedback, setFormFeedback] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+
+  // Cost Engine integration
+  const location = useLocation();
+  const [costEngineModalOpen, setCostEngineModalOpen] = useState(false);
+  const { activeTemplate } = useCostEngine(tenant?.id);
+
+  // Handle incoming prefilledItem from Cost Engine or BOM Scrubber
+  useEffect(() => {
+    if (location.state && (location.state as any).prefilledItem) {
+      const p = (location.state as any).prefilledItem;
+      const newItem: QuotationItem = {
+        description: p.name,
+        quantity: p.quantity || 1,
+        unitPrice: p.unitPrice || 0,
+        taxRate: 18,
+        lineTotal: (p.quantity || 1) * (p.unitPrice || 0)
+      };
+      setItems(prev => {
+        if (prev.some(i => i.description === newItem.description)) return prev;
+        return [...prev, newItem];
+      });
+    }
+  }, [location.state]);
 
   // Manual append item state
   const [selectedProdId, setSelectedProdId] = useState('');
@@ -572,14 +597,26 @@ export const QuotationEditorPage: React.FC = () => {
                     </select>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={handleAddItem}
-                    className="bg-sky-600 hover:bg-sky-700 text-white font-mono text-[10px] font-bold uppercase tracking-wider px-4 py-2 rounded-lg cursor-pointer transition flex items-center space-x-1"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    <span>Append Line</span>
-                  </button>
+                  <div className="flex items-center space-x-2">
+                    <button
+                      type="button"
+                      onClick={() => setCostEngineModalOpen(true)}
+                      className="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-mono text-[10px] font-bold uppercase tracking-wider px-3 py-2 rounded-lg cursor-pointer transition flex items-center space-x-1"
+                      title="Calculate bottom-up manufacturing cost based on active shop rates"
+                    >
+                      <Calculator className="h-3.5 w-3.5 text-emerald-600" />
+                      <span>⚡ Cost Engine Price</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleAddItem}
+                      className="bg-sky-600 hover:bg-sky-700 text-white font-mono text-[10px] font-bold uppercase tracking-wider px-4 py-2 rounded-lg cursor-pointer transition flex items-center space-x-1"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      <span>Append Line</span>
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -795,6 +832,31 @@ export const QuotationEditorPage: React.FC = () => {
         </div>
 
       </div>
+
+      {/* Interactive Cost Estimator Modal */}
+      {activeTemplate && (
+        <InteractiveCostEstimatorModal
+          isOpen={costEngineModalOpen}
+          onClose={() => setCostEngineModalOpen(false)}
+          template={activeTemplate}
+          initialPartName={customDesc || rfq?.items?.[0]?.name || 'Custom Precision Part'}
+          initialQuantity={addQty || 100}
+          initialRawMaterialCost={addPrice > 0 ? addPrice : 450}
+          onApplyToQuote={(result) => {
+            const calculatedLineTotal = result.quantity * result.unitPrice;
+            const newItem: QuotationItem = {
+              description: `${result.partName} [${result.specSummary}]`,
+              quantity: result.quantity,
+              unitPrice: result.unitPrice,
+              taxRate: addTax || 18,
+              lineTotal: calculatedLineTotal
+            };
+            setItems(prev => [...prev, newItem]);
+            setCostEngineModalOpen(false);
+            toastSuccess('Cost Engine Line Added', `Injected ₹${result.unitPrice}/pc item based on ${activeTemplate.name} rules.`);
+          }}
+        />
+      )}
 
     </div>
   );

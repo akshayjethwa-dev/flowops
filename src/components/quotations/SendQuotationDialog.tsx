@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { Quote } from '../../types';
 import { useSendQuotation } from '../../hooks/useQuotations';
-import { Mail, MessageSquare, Send, CheckCircle, AlertTriangle, X } from 'lucide-react';
+import { Mail, MessageSquare, Send, CheckCircle, AlertTriangle, X, ShieldAlert } from 'lucide-react';
 
 interface SendQuotationDialogProps {
   quote: Quote;
@@ -18,6 +18,35 @@ export const SendQuotationDialog: React.FC<SendQuotationDialogProps> = ({ quote,
   
   const { sendWhatsApp, sendEmail, loading, error } = useSendQuotation();
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  if (quote.status === 'pending_approval') {
+    return (
+      <div className="bg-white border border-amber-300 rounded-xl p-5 shadow-md flex flex-col space-y-4 max-w-sm w-full font-sans">
+        <div className="flex justify-between items-center border-b border-amber-100 pb-2.5">
+          <div className="flex items-center space-x-2 text-amber-800">
+            <ShieldAlert className="h-5 w-5 text-amber-600" />
+            <h4 className="text-sm font-bold tracking-tight">Authorization Required</h4>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="bg-amber-50 p-3.5 rounded-xl border border-amber-200 text-xs text-amber-900 space-y-2">
+          <p className="font-bold">Transmission Locked: Pending Approval</p>
+          <p className="text-[11px] leading-relaxed text-amber-800">
+            Quote #{quote.quoteNumber} (₹{quote.total.toLocaleString('en-IN')}) requires {quote.approvalState?.pendingRoleTitle || 'Director'} sign-off before official client transmission to prevent unauthorized discounts.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs uppercase py-2.5 rounded-lg cursor-pointer transition-colors"
+        >
+          Return to Preview
+        </button>
+      </div>
+    );
+  }
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
