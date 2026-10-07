@@ -427,13 +427,13 @@ service cloud.firestore {
         allow read: if isTenantMember(tenantId);
 
         allow create: if isTenantMember(tenantId)
-          && getUserRole() in ['admin', 'management', 'production']
+          && getUserRole() in ['admin', 'management', 'production', 'manager']
           && isValidId(workOrderId)
           && isValidWorkOrder(incoming())
           && incoming().tenantId == tenantId;
 
         allow update: if isTenantMember(tenantId)
-          && getUserRole() in ['admin', 'management', 'production']
+          && getUserRole() in ['admin', 'management', 'production', 'manager']
           && isValidWorkOrder(incoming())
           && incoming().tenantId == tenantId;
 

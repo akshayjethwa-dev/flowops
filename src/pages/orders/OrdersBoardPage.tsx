@@ -23,8 +23,10 @@ import {
   Clock,
   Filter,
   Sliders,
-  ChevronDown
+  ChevronDown,
+  Zap
 } from 'lucide-react';
+import { GenerateWorkOrdersModal } from '../../components/orders/GenerateWorkOrdersModal';
 
 export const OrdersBoardPage: React.FC = () => {
   const navigate = useNavigate();
@@ -58,6 +60,7 @@ export const OrdersBoardPage: React.FC = () => {
       ];
 
   // States
+  const [selectedOrderForWoModal, setSelectedOrderForWoModal] = useState<Order | null>(null);
   const [selectedPlantId, setSelectedPlantId] = useState<string>(() => {
     return localStorage.getItem('production_selected_plant_id') || 'all';
   });
@@ -164,6 +167,18 @@ export const OrdersBoardPage: React.FC = () => {
 
         {/* Global Stats KPIs */}
         <div className="flex items-center space-x-3 text-right text-xs">
+          <button
+            type="button"
+            onClick={() => {
+              const target = (orders || []).find(o => !(o as any).workOrdersGenerated) || (orders || [])[0];
+              if (target) setSelectedOrderForWoModal(target);
+            }}
+            className="bg-indigo-600 hover:bg-indigo-500 text-white font-mono text-[10px] uppercase font-bold tracking-wider px-3 py-2 rounded-lg flex items-center space-x-1.5 cursor-pointer shadow-3xs transition-all hover:scale-101"
+            title="Auto-explode BOM & release shopfloor work orders from confirmed sales order"
+          >
+            <Zap className="h-3.5 w-3.5 text-indigo-200" />
+            <span>Release Work Orders</span>
+          </button>
           <div className="p-2.5 bg-slate-50 border rounded-lg">
             <span className="text-[9px] text-slate-400 font-mono block uppercase">Yield Items WIP</span>
             <span className="font-extrabold text-slate-800">{(jobs || []).filter(j => j.currentStage !== 'ready').length} active lines</span>
@@ -309,6 +324,7 @@ export const OrdersBoardPage: React.FC = () => {
                 onSelectStage={() => setActiveStageUpdateJob(job)}
                 isJobOverdue={isJobOverdue(job)}
                 onNavigateDetail={() => navigate(`/orders/${job.id}`)}
+                onOpenGenerateWo={setSelectedOrderForWoModal}
               />
             ))
           ) : (
@@ -349,6 +365,7 @@ export const OrdersBoardPage: React.FC = () => {
                       onSelectStage={() => setActiveStageUpdateJob(job)}
                       isJobOverdue={isJobOverdue(job)}
                       onNavigateDetail={() => navigate(`/orders/${job.id}`)}
+                      onOpenGenerateWo={setSelectedOrderForWoModal}
                     />
                   ))
                 ) : (
@@ -362,6 +379,18 @@ export const OrdersBoardPage: React.FC = () => {
         })}
       </div>
 
+      {/* Generate Work Orders Modal */}
+      {selectedOrderForWoModal && (
+        <GenerateWorkOrdersModal
+          isOpen={!!selectedOrderForWoModal}
+          onClose={() => setSelectedOrderForWoModal(null)}
+          order={selectedOrderForWoModal}
+          onSuccess={() => {
+            setSelectedOrderForWoModal(null);
+          }}
+        />
+      )}
+
     </div>
   );
 };
@@ -373,6 +402,7 @@ interface JobCardProps {
   onSelectStage: () => void;
   isJobOverdue: boolean;
   onNavigateDetail: () => void;
+  onOpenGenerateWo?: (order: Order) => void;
 }
 
 const JobCard: React.FC<JobCardProps> = ({ 
@@ -380,7 +410,8 @@ const JobCard: React.FC<JobCardProps> = ({
   orders, 
   onSelectStage, 
   isJobOverdue,
-  onNavigateDetail
+  onNavigateDetail,
+  onOpenGenerateWo
 }) => {
   const associatedOrder = orders.find(o => o.id === job.orderId);
 
@@ -399,6 +430,34 @@ const JobCard: React.FC<JobCardProps> = ({
               PO: {associatedOrder?.customerPoNumber || job.customerPoNumber}
             </span>
           )}
+
+          {/* WO generation status or trigger */}
+          {(associatedOrder as any)?.workOrderNumbers && (associatedOrder as any).workOrderNumbers.length > 0 ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                window.location.href = '/work-orders';
+              }}
+              className="text-[8.5px] font-mono bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 px-1 py-0.2 rounded font-bold cursor-pointer transition-colors"
+              title="Work Orders Released — Click to open shopfloor tracker"
+            >
+              ⚡ WO: {(associatedOrder as any).workOrderNumbers[0]}
+            </button>
+          ) : associatedOrder ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenGenerateWo?.(associatedOrder);
+              }}
+              className="text-[8.5px] font-mono bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-1.5 py-0.2 rounded font-bold cursor-pointer transition-colors flex items-center space-x-0.5 shadow-3xs"
+              title="Auto-explode BOM and generate linked shopfloor Work Orders"
+            >
+              <Zap className="h-2.5 w-2.5 text-indigo-600" />
+              <span>Release WO</span>
+            </button>
+          ) : null}
         </div>
 
         {isJobOverdue && (

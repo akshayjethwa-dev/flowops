@@ -20,7 +20,8 @@ import { logActivityEvent } from '../utils/activityLogger';
 import { ActivityTimeline } from './ActivityTimeline';
 import { PRODUCTION_STAGES_ENUM } from '../data/mockData';
 import { sendWhatsAppNotification } from '../utils/whatsapp';
-import { Layers, Calendar, ArrowRight, ClipboardList, PenTool, CheckCircle2, MessageSquare, Plus, Clock } from 'lucide-react';
+import { Layers, Calendar, ArrowRight, ClipboardList, PenTool, CheckCircle2, MessageSquare, Plus, Clock, Zap, Boxes } from 'lucide-react';
+import { GenerateWorkOrdersModal } from './orders/GenerateWorkOrdersModal';
 
 interface ProductionSectionProps {
   preselectedOrderId: string | null;
@@ -44,6 +45,7 @@ export const ProductionSection: React.FC<ProductionSectionProps> = ({
   const [expandedJobLogsId, setExpandedJobLogsId] = useState<Record<string, boolean>>({});
   const [stageNotes, setStageNotes] = useState('');
   const [selectedStage, setSelectedStage] = useState<string>('cutting');
+  const [orderForWorkOrders, setOrderForWorkOrders] = useState<Order | null>(null);
 
   // Load Orders & Jobs
   useEffect(() => {
@@ -492,6 +494,16 @@ export const ProductionSection: React.FC<ProductionSectionProps> = ({
                             Quote: #{order.quoteNumber}
                           </span>
                         )}
+                        {(order as any).workOrderNumbers && (order as any).workOrderNumbers.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => navigate('/work-orders')}
+                            className="text-[10px] font-mono bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 px-1.5 py-0.5 rounded font-bold ml-1.5 cursor-pointer transition-colors"
+                            title="Work Orders Generated - Click to open shopfloor tracker"
+                          >
+                            ⚡ WO: {(order as any).workOrderNumbers.join(', ')}
+                          </button>
+                        )}
                         <span className="text-[10px] font-mono text-slate-400 ml-2">
                           Est: {order.deliveryDate ? new Date(order.deliveryDate).toLocaleDateString() : 'N/A'}
                         </span>
@@ -531,6 +543,15 @@ export const ProductionSection: React.FC<ProductionSectionProps> = ({
 
                     <div className="flex items-center space-x-1.5">
                       <button
+                        onClick={() => setOrderForWorkOrders(order)}
+                        className="bg-indigo-600 hover:bg-indigo-500 text-white font-mono font-bold text-[10px] uppercase tracking-wider px-2.5 py-1.5 rounded flex items-center space-x-1 cursor-pointer transition-all shrink-0 shadow-2xs hover:scale-101"
+                        title="Auto-explode BOM and generate linked shopfloor Work Orders"
+                      >
+                        <Zap className="h-3 w-3 text-indigo-200" />
+                        <span>{((order as any).workOrderNumbers?.length || 0) > 0 ? 'Work Orders' : '⚡ Generate Work Orders'}</span>
+                      </button>
+
+                      <button
                         onClick={() => navigate('/payments', { state: { preselectedOrderForInvoice: order } })}
                         className="border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold text-[10px] uppercase tracking-wider px-2.5 py-1.5 rounded flex items-center space-x-1 cursor-pointer transition-all shrink-0"
                         title="Generate Invoice & Track Payments"
@@ -563,6 +584,18 @@ export const ProductionSection: React.FC<ProductionSectionProps> = ({
           <p className="text-xs text-slate-400 text-center py-4">No active manufacturing orders found.</p>
         )}
       </div>
+
+      {/* Sales Order → Work Order Generation Modal */}
+      {orderForWorkOrders && (
+        <GenerateWorkOrdersModal
+          isOpen={!!orderForWorkOrders}
+          onClose={() => setOrderForWorkOrders(null)}
+          order={orderForWorkOrders}
+          onSuccess={(workOrders, updatedOrder) => {
+            setOrders(prev => prev.map(o => o.id === updatedOrder.id ? updatedOrder : o));
+          }}
+        />
+      )}
 
     </div>
   );

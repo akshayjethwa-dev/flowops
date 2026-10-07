@@ -28,6 +28,7 @@ import { RfqDetailPage } from './pages/rfqs/RfqDetailPage';
 import { QuotationEditorPage } from './pages/rfqs/QuotationEditorPage';
 import { OrdersPage } from './pages/orders/OrdersPage';
 import { JobDetailPage } from './pages/orders/JobDetailPage';
+import { ProductionPage } from './pages/ProductionPage';
 import { DispatchPage } from './pages/dispatch/DispatchPage';
 import { DispatchDetailPage } from './pages/dispatch/DispatchDetailPage';
 import { CustomersListPage } from './pages/customers/CustomersListPage';
@@ -212,6 +213,15 @@ export default function App() {
                   element={
                     <ProtectedRoute allowedRoles={['admin', 'manager', 'operator', 'quality_inspector', 'store_keeper', 'production', 'management', 'viewer']}>
                       <JobDetailPage />
+                    </ProtectedRoute>
+                  } 
+                />
+
+                <Route 
+                  path="work-orders" 
+                  element={
+                    <ProtectedRoute allowedRoles={['admin', 'manager', 'operator', 'quality_inspector', 'store_keeper', 'production', 'management', 'sales', 'viewer']}>
+                      <ProductionPage />
                     </ProtectedRoute>
                   } 
                 />

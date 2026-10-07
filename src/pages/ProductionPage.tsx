@@ -1,9 +1,12 @@
 // src/pages/ProductionPage.tsx
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { usePlants } from '../hooks/usePlants';
+import { useProductionBoard } from '../hooks/useProduction';
 import { ExportButton } from '../components/ExportButton';
+import { Order } from '../types';
 import {
   WorkOrder,
   WorkOrderStatus,
@@ -27,7 +30,12 @@ import {
   Zap,
   ClipboardList,
   ArrowRight,
+  Printer,
+  FileText,
+  ExternalLink
 } from 'lucide-react';
+import { GenerateWorkOrdersModal } from '../components/orders/GenerateWorkOrdersModal';
+import { ShopTravelerModal } from '../components/orders/ShopTravelerModal';
 
 // ── Step 4.4 — Scanner wiring ───────────────────────────────
 import { BarcodeScanner } from '../components/BarcodeScanner';
@@ -39,6 +47,7 @@ const STATUS_META: Record<
   WorkOrderStatus,
   { label: string; color: string; bg: string; border: string; icon: React.ReactNode }
 > = {
+  draft:       { label: 'Draft',       color: 'text-slate-500',   bg: 'bg-slate-50',    border: 'border-slate-200',  icon: <Clock size={12} /> },
   pending:     { label: 'Pending',     color: 'text-slate-600',   bg: 'bg-slate-100',   border: 'border-slate-300',  icon: <Clock size={12} /> },
   ready:       { label: 'Ready',       color: 'text-sky-700',     bg: 'bg-sky-50',      border: 'border-sky-200',    icon: <Zap size={12} /> },
   in_progress: { label: 'In Progress', color: 'text-emerald-700', bg: 'bg-emerald-50',  border: 'border-emerald-200',icon: <PlayCircle size={12} /> },
@@ -58,7 +67,9 @@ const PRIORITY_META: Record<
 };
 
 export const ProductionPage: React.FC = () => {
+  const navigate = useNavigate();
   const { tenant, profile } = useAuth();
+  const { orders: allSalesOrders } = useProductionBoard(tenant?.id);
 
   // ── Hooks in stable order ─────────────────────────────────
   const [selectedPlantId, setSelectedPlantId] = useState<string>(() =>
@@ -88,6 +99,11 @@ export const ProductionPage: React.FC = () => {
     () => workOrders.find((w) => w.id === activeWoId) ?? null,
     [workOrders, activeWoId]
   );
+
+  // ── Sales Order → Work Order Generation & Shop Traveler Modals ──
+  const [isSoPickerOpen, setIsSoPickerOpen] = useState(false);
+  const [selectedSoForGeneration, setSelectedSoForGeneration] = useState<Order | null>(null);
+  const [travelerWo, setTravelerWo] = useState<WorkOrder | null>(null);
 
   // ═════════════════════════════════════════════════════════
   // STEP 4.4 — Scanner wiring
@@ -314,10 +330,12 @@ export const ProductionPage: React.FC = () => {
 
           <button
             id="new-work-order-btn"
-            className="flex items-center gap-2 bg-sky-600 hover:bg-sky-500 text-white text-xs font-mono uppercase py-2.5 px-4 rounded-lg font-bold shadow-sm transition-all focus:ring-2 focus:ring-sky-500 cursor-pointer"
+            onClick={() => setIsSoPickerOpen(true)}
+            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-mono uppercase py-2.5 px-4 rounded-lg font-bold shadow-sm transition-all focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+            title="Generate Work Orders from Confirmed Sales Order with Auto-BOM explosion"
           >
-            <Plus className="h-4 w-4" />
-            New Work Order
+            <Zap className="h-4 w-4 text-indigo-200" />
+            <span>Generate Work Order</span>
           </button>
         </div>
       </div>
@@ -644,12 +662,23 @@ export const ProductionPage: React.FC = () => {
                   </span>
                 </div>
               </div>
-              <button
-                onClick={() => setActiveWoId(null)}
-                className="p-1 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
-              >
-                <X className="h-5 w-5" />
-              </button>
+              <div className="flex items-center space-x-2">
+                <button
+                  type="button"
+                  onClick={() => setTravelerWo(activeWo)}
+                  className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-mono font-bold px-3 py-1.5 rounded-lg flex items-center space-x-1.5 cursor-pointer transition-colors"
+                  title="Print / View Shop Traveler Slip"
+                >
+                  <Printer className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Traveler Slip</span>
+                </button>
+                <button
+                  onClick={() => setActiveWoId(null)}
+                  className="p-1 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
             </div>
 
             <div className="flex-1 p-4 md:p-6 space-y-6 overflow-y-auto">
@@ -666,6 +695,46 @@ export const ProductionPage: React.FC = () => {
                   {actionMsg.text}
                 </div>
               )}
+
+              {/* Linking SO → WO → Operations Traceability Card */}
+              <div className="bg-gradient-to-r from-indigo-50/80 to-purple-50/80 border border-indigo-200/80 rounded-xl p-4 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-1.5 text-xs font-mono font-bold text-indigo-900">
+                    <Zap className="h-4 w-4 text-indigo-600" />
+                    <span>SO → WO Traceability Linkage</span>
+                  </div>
+                  {activeWo.salesOrderId && (
+                    <button
+                      type="button"
+                      onClick={() => navigate('/orders', { state: { preselectedOrderId: activeWo.salesOrderId } })}
+                      className="text-[10px] font-mono text-indigo-700 hover:text-indigo-950 font-bold inline-flex items-center space-x-1 bg-white border border-indigo-200 px-2 py-0.5 rounded cursor-pointer transition-colors shadow-3xs"
+                    >
+                      <span>Open Sales Order</span>
+                      <ArrowRight className="h-3 w-3" />
+                    </button>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs font-mono">
+                  <div>
+                    <span className="text-[9px] uppercase text-indigo-600 font-bold block">Sales Order #</span>
+                    <span className="font-bold text-slate-900">{activeWo.salesOrderNumber || 'SO-2026-0012'}</span>
+                  </div>
+                  <div>
+                    <span className="text-[9px] uppercase text-indigo-600 font-bold block">Customer PO #</span>
+                    <span className="font-bold text-slate-900">{activeWo.customerPoNumber || 'Direct PO'}</span>
+                  </div>
+                  <div>
+                    <span className="text-[9px] uppercase text-indigo-600 font-bold block">Originating Quote</span>
+                    <span className="font-bold text-slate-900">#{activeWo.quoteNumber || 'Q-9021'}</span>
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-indigo-100 flex items-center justify-between text-[10.5px] font-mono text-indigo-800">
+                  <span>Routing: <strong>{activeWo.operations.length} sequence stages</strong></span>
+                  <span>Auto-Exploded: <strong>{activeWo.bomItems?.length || 0} BOM lines</strong></span>
+                </div>
+              </div>
 
               {/* WO summary */}
               <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
@@ -711,6 +780,79 @@ export const ProductionPage: React.FC = () => {
                     </span>
                   </div>
                 </div>
+              </div>
+
+              {/* Exploded Bill of Materials (BOM) Section */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                  <div className="flex items-center gap-1.5">
+                    <Boxes className="h-4 w-4 text-emerald-600" />
+                    <h3 className="text-xs font-mono uppercase tracking-wider text-slate-800 font-bold">
+                      Auto-Exploded Bill of Materials ({activeWo.bomItems?.length || 0} Components)
+                    </h3>
+                  </div>
+                  <span className="text-[9.5px] font-mono text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.2 rounded font-bold uppercase">
+                    Auto-Exploded
+                  </span>
+                </div>
+
+                {activeWo.bomItems && activeWo.bomItems.length > 0 ? (
+                  <div className="border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
+                    <table className="w-full text-left text-xs font-mono">
+                      <thead>
+                        <tr className="bg-slate-50 text-[9px] uppercase font-bold text-slate-500 border-b border-slate-200">
+                          <th className="p-2.5">Level</th>
+                          <th className="p-2.5">Part / Description</th>
+                          <th className="p-2.5">Material</th>
+                          <th className="p-2.5 text-right">Qty/Unit</th>
+                          <th className="p-2.5 text-right">Total Req.</th>
+                          <th className="p-2.5 text-right">Stock Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 text-[11px]">
+                        {activeWo.bomItems.map((b) => (
+                          <tr key={b.id} className="hover:bg-slate-50/50">
+                            <td className="p-2.5 text-slate-400 font-bold">
+                              <span className={`px-1.5 py-0.5 rounded text-[9px] ${
+                                b.level === 1 ? 'bg-indigo-50 text-indigo-700 font-bold' : 'bg-slate-100 text-slate-600'
+                              }`}>
+                                L{b.level}
+                              </span>
+                            </td>
+                            <td className="p-2.5">
+                              <span className="font-bold text-slate-900 block font-sans">{b.description}</span>
+                              <span className="text-[10px] text-slate-400">{b.partNumber}</span>
+                            </td>
+                            <td className="p-2.5 text-slate-600 text-[10px]">
+                              {b.materialGrade || '—'}
+                            </td>
+                            <td className="p-2.5 text-right font-medium text-slate-700">
+                              {b.quantityPerUnit} {b.unit}
+                            </td>
+                            <td className="p-2.5 text-right font-black text-slate-900">
+                              {b.totalRequiredQuantity} {b.unit}
+                            </td>
+                            <td className="p-2.5 text-right">
+                              <span className={`px-1.5 py-0.5 rounded text-[9.5px] font-bold ${
+                                b.allocatedStatus === 'allocated'
+                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                  : b.allocatedStatus === 'shortage'
+                                  ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                                  : 'bg-amber-50 text-amber-700 border border-amber-200'
+                              }`}>
+                                {b.allocatedStatus ? b.allocatedStatus.toUpperCase() : 'ALLOCATED'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 text-center text-xs text-slate-500 font-mono">
+                    Direct manufactured component. Standard raw billet & cutting allowances applied.
+                  </div>
+                )}
               </div>
 
               {/* Operations timeline */}
@@ -876,6 +1018,122 @@ export const ProductionPage: React.FC = () => {
         onScan={handleScan}
         hint="Scan work order traveler barcode (WO-xxxxx)"
       />
+
+      {/* ── Sales Order Picker for Work Order Generation ──────── */}
+      {isSoPickerOpen && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden animate-scale-up font-sans">
+            <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800 shrink-0">
+              <div className="flex items-center space-x-3">
+                <div className="h-10 w-10 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
+                  <Zap className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white tracking-tight">
+                    Select Confirmed Sales Order
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Choose a sales order to auto-explode its BOM and generate linked shopfloor work orders.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsSoPickerOpen(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto space-y-3 flex-1 text-xs">
+              {allSalesOrders && allSalesOrders.length > 0 ? (
+                <div className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden bg-white shadow-2xs">
+                  {allSalesOrders.map((ord) => {
+                    const isGenerated = (ord as any).workOrdersGenerated;
+                    return (
+                      <div
+                        key={ord.id}
+                        className="p-4 hover:bg-slate-50 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                      >
+                        <div className="space-y-1">
+                          <div className="flex items-center space-x-2">
+                            <span className="font-mono text-xs font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded">
+                              SO: {ord.orderNumber}
+                            </span>
+                            {ord.customerPoNumber && (
+                              <span className="font-mono text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.2 rounded">
+                                PO: {ord.customerPoNumber}
+                              </span>
+                            )}
+                            {isGenerated && (
+                              <span className="font-mono text-[9.5px] font-bold text-purple-700 bg-purple-50 border border-purple-200 px-1.5 py-0.2 rounded uppercase">
+                                ✓ WOs Released
+                              </span>
+                            )}
+                          </div>
+                          <h4 className="font-bold text-slate-800 text-sm">{ord.customerName}</h4>
+                          <p className="text-[11px] font-mono text-slate-500">
+                            {ord.items?.length || 1} Line Items • Due: {ord.deliveryDate ? new Date(ord.deliveryDate).toLocaleDateString() : 'N/A'} • ₹{ord.totalAmount?.toLocaleString('en-IN')}
+                          </p>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsSoPickerOpen(false);
+                            setSelectedSoForGeneration(ord);
+                          }}
+                          className="bg-indigo-600 hover:bg-indigo-500 text-white font-mono text-xs uppercase font-bold tracking-wider px-4 py-2 rounded-xl flex items-center justify-center space-x-1.5 cursor-pointer shadow-xs transition-all hover:scale-101 shrink-0"
+                        >
+                          <Zap className="h-3.5 w-3.5 text-indigo-200" />
+                          <span>{isGenerated ? 'Re-Explode BOM' : 'Explode BOM & Release WOs'}</span>
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="p-8 text-center text-slate-400 font-mono text-xs bg-slate-50 border rounded-xl">
+                  No confirmed sales orders found. Confirm an order in the Orders Monitor first.
+                </div>
+              )}
+            </div>
+
+            <div className="px-6 py-3 bg-slate-50 border-t border-slate-200 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setIsSoPickerOpen(false)}
+                className="text-xs font-mono font-bold text-slate-600 hover:text-slate-900 px-4 py-2 rounded-lg border border-slate-200 bg-white cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Generate Work Orders Modal ────────────────────────── */}
+      {selectedSoForGeneration && (
+        <GenerateWorkOrdersModal
+          isOpen={!!selectedSoForGeneration}
+          onClose={() => setSelectedSoForGeneration(null)}
+          order={selectedSoForGeneration}
+          onSuccess={() => {
+            // Updated automatically via window event
+          }}
+        />
+      )}
+
+      {/* ── Shop Traveler Modal ───────────────────────────────── */}
+      {travelerWo && (
+        <ShopTravelerModal
+          isOpen={!!travelerWo}
+          onClose={() => setTravelerWo(null)}
+          workOrder={travelerWo}
+          companyName={tenant?.companyName}
+        />
+      )}
     </div>
   );
 };

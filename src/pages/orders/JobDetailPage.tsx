@@ -1,6 +1,6 @@
 // src/pages/orders/JobDetailPage.tsx
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useJobDetail } from '../../hooks/useProduction';
@@ -19,11 +19,20 @@ import {
   Building,
   FileText,
   DollarSign,
-  AlertCircle
+  AlertCircle,
+  Zap,
+  Printer,
+  Boxes,
+  CheckCircle2,
+  ArrowRight
 } from 'lucide-react';
 import { FileUploader } from '../../components/FileUploader';
 import { AttachmentsList } from '../../components/AttachmentsList';
 import { FileSymlink } from 'lucide-react';
+import { GenerateWorkOrdersModal } from '../../components/orders/GenerateWorkOrdersModal';
+import { ShopTravelerModal } from '../../components/orders/ShopTravelerModal';
+import { useWorkOrders, WorkOrder } from '../../hooks/useWorkOrders';
+import { Order } from '../../types';
 
 const defaultStages = [
   { value: 'cutting', label: 'Material Cutting' },
@@ -39,6 +48,7 @@ export const JobDetailPage: React.FC = () => {
   const navigate = useNavigate();
   const { tenant, profile } = useAuth();
   const { job, order, loading, error, addJobComment, updateJobStage } = useJobDetail(tenant?.id, jobId);
+  const { workOrders } = useWorkOrders(tenant?.id);
 
   const [commentText, setCommentText] = useState('');
   const [addingComment, setAddingComment] = useState(false);
@@ -48,6 +58,24 @@ export const JobDetailPage: React.FC = () => {
   const [stageChangeNotes, setStageChangeNotes] = useState('');
   const [updatingStage, setUpdatingStage] = useState(false);
   const [stageFeedback, setStageFeedback] = useState<string | null>(null);
+
+  // Sales Order → Work Order Generation & Traveler Modal State
+  const [showGenerateWoModal, setShowGenerateWoModal] = useState(false);
+  const [showTravelerModal, setShowTravelerModal] = useState(false);
+  const [travelerWorkOrder, setTravelerWorkOrder] = useState<WorkOrder | null>(null);
+
+  // Find linked work orders for this order/job
+  const linkedWorkOrders = useMemo(() => {
+    if (!order && !job) return [];
+    const targetOrderId = order?.id || job?.orderId;
+    const targetOrderNumber = order?.orderNumber || job?.orderNumber;
+    return workOrders.filter(
+      (w) =>
+        (targetOrderId && w.salesOrderId === targetOrderId) ||
+        (targetOrderNumber && w.salesOrderNumber === targetOrderNumber) ||
+        (w.partName && job?.itemName && w.partName.toLowerCase() === job.itemName.toLowerCase())
+    );
+  }, [workOrders, order, job]);
 
   useEffect(() => {
     if (job?.currentStage) {
@@ -267,6 +295,119 @@ export const JobDetailPage: React.FC = () => {
             ) : (
               <div className="p-8 text-center text-xs text-slate-400 font-mono border border-dashed rounded-xl">
                 No stages movement historical notes logged.
+              </div>
+            )}
+          </div>
+
+          {/* SALES ORDER → WORK ORDER GENERATION & TRACEABILITY */}
+          <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-2xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+              <div className="flex items-center space-x-2.5">
+                <div className="h-8 w-8 rounded-lg bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-600">
+                  <Zap className="h-4 w-4" />
+                </div>
+                <div>
+                  <h3 className="text-xs font-mono font-bold text-slate-900 uppercase tracking-wider">
+                    Sales Order → Work Order Generation
+                  </h3>
+                  <span className="text-[11px] text-slate-500 font-sans block">
+                    Linking: SO #{order?.orderNumber || job.orderNumber || job.orderId} → Work Orders → Routing Operations
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                {linkedWorkOrders.length > 0 ? (
+                  <span className="text-[10px] font-mono text-purple-700 bg-purple-50 border border-purple-200 px-2 py-0.5 rounded font-bold uppercase">
+                    ✓ {linkedWorkOrders.length} WO(s) Released
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-mono text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded font-bold uppercase">
+                    Pending WO Generation
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* If Work Orders are already generated */}
+            {linkedWorkOrders.length > 0 ? (
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {linkedWorkOrders.map((wo) => (
+                    <div
+                      key={wo.id}
+                      className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2 text-xs font-mono"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded">
+                          {wo.orderNumber}
+                        </span>
+                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.2 rounded uppercase">
+                          {wo.status}
+                        </span>
+                      </div>
+                      <div className="text-slate-800 font-sans font-bold">
+                        {wo.partName}
+                      </div>
+                      <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-200/60">
+                        <span>Batch: {wo.quantity} pcs</span>
+                        <span>{wo.operations.length} Operations</span>
+                      </div>
+                      <div className="flex items-center space-x-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTravelerWorkOrder(wo);
+                            setShowTravelerModal(true);
+                          }}
+                          className="flex-1 bg-white hover:bg-slate-100 text-indigo-700 border border-indigo-200 rounded-lg py-1 px-2 text-[10px] font-bold flex items-center justify-center space-x-1 cursor-pointer transition-colors"
+                        >
+                          <Printer className="h-3 w-3" />
+                          <span>Traveler Slip</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => navigate('/work-orders')}
+                          className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg py-1 px-2 text-[10px] font-bold flex items-center justify-center space-x-1 cursor-pointer transition-colors shadow-3xs"
+                        >
+                          <span>Shopfloor Track</span>
+                          <ArrowRight className="h-3 w-3" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex justify-end pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowGenerateWoModal(true)}
+                    className="text-[11px] font-mono text-slate-500 hover:text-indigo-600 font-bold underline cursor-pointer"
+                  >
+                    Re-explode BOM or configure additional work orders →
+                  </button>
+                </div>
+              </div>
+            ) : (
+              /* If Work Orders NOT yet generated */
+              <div className="bg-gradient-to-r from-indigo-50/60 to-purple-50/60 border border-indigo-150 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <h4 className="font-bold text-slate-900 text-xs font-mono uppercase tracking-wide">
+                    Automated BOM Explosion & Routing Release
+                  </h4>
+                  <p className="text-xs text-slate-600 font-sans max-w-xl">
+                    Auto-explode this confirmed order's bill of materials, allocate stock inventory, assign machine center sequence operations, and generate sequential Work Orders without manual handoff.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowGenerateWoModal(true)}
+                  className="bg-indigo-600 hover:bg-indigo-500 text-white font-mono text-xs uppercase font-bold tracking-wider px-4 py-2.5 rounded-xl flex items-center justify-center space-x-1.5 cursor-pointer shadow-xs transition-all hover:scale-101 shrink-0"
+                >
+                  <Zap className="h-4 w-4 text-indigo-200" />
+                  <span>⚡ Auto-Explode BOM & Release WOs</span>
+                </button>
               </div>
             )}
           </div>
@@ -591,6 +732,53 @@ export const JobDetailPage: React.FC = () => {
         </div>
 
       </div>
+
+      {/* Generate Work Orders Modal */}
+      {showGenerateWoModal && (
+        <GenerateWorkOrdersModal
+          isOpen={showGenerateWoModal}
+          onClose={() => setShowGenerateWoModal(false)}
+          order={order || ({
+            id: job.orderId || jobId!,
+            tenantId: tenant?.id || '',
+            quoteId: (job as any).quoteId || 'Q-9021',
+            orderNumber: job.orderNumber || 'SO-2026-0012',
+            customerName: (job as any).customerName || 'B2B Client',
+            phone: '',
+            totalAmount: (job.unitPrice || 0) * (job.quantity || 1),
+            deliveryDate: (job as any).deliveryDate || new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10),
+            status: 'confirmed',
+            createdBy: profile?.uid || 'planner',
+            items: [{
+              id: job.id,
+              name: job.itemName,
+              quantity: job.quantity,
+              unitPrice: job.unitPrice || 0,
+              total: (job.unitPrice || 0) * (job.quantity || 1),
+              gstPercent: 18,
+              specs: job.specs,
+              bomLines: job.bomComponents
+            }],
+            createdAt: new Date().toISOString()
+          } as unknown as Order)}
+          onSuccess={() => {
+            setShowGenerateWoModal(false);
+          }}
+        />
+      )}
+
+      {/* Shop Traveler Slip Modal */}
+      {showTravelerModal && travelerWorkOrder && (
+        <ShopTravelerModal
+          isOpen={showTravelerModal}
+          onClose={() => {
+            setShowTravelerModal(false);
+            setTravelerWorkOrder(null);
+          }}
+          workOrder={travelerWorkOrder}
+          companyName={tenant?.companyName}
+        />
+      )}
 
     </div>
   );

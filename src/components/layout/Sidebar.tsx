@@ -28,7 +28,8 @@ import {
   Inbox,
   FileSpreadsheet,
   Sliders,
-  Building2
+  Building2,
+  Zap
 } from 'lucide-react';
 import { UserRole } from '../../types';
 import { getRoleTitle, getRoleBadgeColor } from '../../utils/permissions';
@@ -64,6 +65,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => 
     { to: '/cost-engine', label: 'Cost Engine Rules', icon: Sliders, roles: ['admin', 'manager', 'sales', 'management'] },
     { to: '/subcontractors', label: 'Subcontractor RFQs', icon: Building2, roles: ['admin', 'manager', 'sales', 'production', 'management', 'store_keeper', 'viewer'] },
     { to: '/orders', label: 'Production Line', icon: Layers, roles: ['admin', 'manager', 'operator', 'quality_inspector', 'store_keeper', 'production', 'management', 'viewer'] },
+    { to: '/work-orders', label: 'Work Orders', icon: Zap, roles: ['admin', 'manager', 'operator', 'quality_inspector', 'store_keeper', 'production', 'management', 'sales', 'viewer'] },
     { to: '/inventory', label: 'Inventory', icon: Package, roles: ['admin', 'manager', 'store_keeper', 'operator', 'quality_inspector', 'production', 'management', 'sales', 'dispatch', 'viewer'] },
     { to: '/dispatch', label: 'Logistics Desk', icon: Truck, roles: ['admin', 'manager', 'dispatch', 'store_keeper', 'management', 'viewer'] },
     { to: '/customers', label: 'Customers', icon: Users, roles: ['admin', 'manager', 'sales', 'management', 'viewer'] },

@@ -50,15 +50,12 @@ export async function logActivityEvent({
   action: customAction,
   entityLabel: customEntityLabel
 }: LogActivityParams): Promise<boolean> {
-<<<<<<< HEAD
   if (!tenantId) return false;
-=======
   // STRICT GUARD: Prevent logging attempts if tenantId or userId is missing
   if (!tenantId || !actor?.userId) {
     console.warn("Activity logger skipped: Missing tenantId or userId in auth context.");
     return false;
   }
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
 
   // Derive module matching schema: "rfq" | "order" | "dispatch" | "payment" | "inventory" | "whatsapp"
   let derivedModule: 'rfq' | 'order' | 'dispatch' | 'payment' | 'inventory' | 'whatsapp' = 'rfq';
@@ -153,7 +150,6 @@ export async function logActivityEvent({
       return false;
     }
   } else {
-<<<<<<< HEAD
     try {
       const eventId = baseEvent.id;
 
@@ -183,7 +179,6 @@ export async function logActivityEvent({
     }
   }
 }
-=======
     const eventId = baseEvent.id;
     const liveEventWithTimestamp = {
       ...baseEvent,
@@ -218,4 +213,3 @@ export async function logActivityEvent({
     return tenantWriteSuccess;
   }
 }
->>>>>>> 978af1b45531d5d8c7c4bfd41dd51fd2989cd145
