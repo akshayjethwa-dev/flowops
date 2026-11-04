@@ -38,8 +38,10 @@ import {
   Building,
   User,
   CreditCard,
-  FileSpreadsheet
+  FileSpreadsheet,
+  RotateCcw
 } from 'lucide-react';
+import { SalesReturnCreditNoteModal } from '../components/dispatch/SalesReturnCreditNoteModal';
 
 // OutstandingSummaryWidget component
 const OutstandingSummaryWidget: React.FC<{ invoices: Invoice[] }> = ({ invoices }) => {
@@ -288,6 +290,7 @@ export const PaymentsTrackerPage: React.FC = () => {
   const [createDrawerOpen, setCreateDrawerOpen] = useState(false);
   const [recordPaymentOpen, setRecordPaymentOpen] = useState(false);
   const [reminderConfirmOpen, setReminderConfirmOpen] = useState(false);
+  const [creditNoteModalOpen, setCreditNoteModalOpen] = useState(false);
 
   // New Invoice Form state
   const [newInvInvoiceNumber, setNewInvInvoiceNumber] = useState('');
@@ -1224,6 +1227,12 @@ export const PaymentsTrackerPage: React.FC = () => {
                             ₹{selectedInvoice.outstanding.toLocaleString('en-IN')}
                           </span>
                         </div>
+                        {selectedInvoice.totalCredited && selectedInvoice.totalCredited > 0 && (
+                          <div className="flex justify-between border-t border-rose-100 pt-1 text-rose-700 text-xs font-mono">
+                            <span>Sales Return Credited:</span>
+                            <span className="font-bold">-₹{selectedInvoice.totalCredited.toLocaleString('en-IN')}</span>
+                          </div>
+                        )}
                       </div>
 
                       {/* MARK AS SENT FOR DRAFT BILLS */}
@@ -1235,6 +1244,17 @@ export const PaymentsTrackerPage: React.FC = () => {
                           Mark as Sent to Customer
                         </button>
                       )}
+
+                      {/* ISSUE CREDIT NOTE (SALES RETURN) */}
+                      <button
+                        type="button"
+                        onClick={() => setCreditNoteModalOpen(true)}
+                        className="w-full bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 py-2 rounded-lg text-xs font-mono font-bold uppercase tracking-wider mt-2.5 transition-colors cursor-pointer flex items-center justify-center space-x-1.5"
+                        title="Accept partial or full return and issue statutory credit note"
+                      >
+                        <RotateCcw className="h-3.5 w-3.5 text-rose-600" />
+                        <span>Issue Credit Note (Sales Return)</span>
+                      </button>
                     </div>
 
                     {/* INCREMENTAL RECEIPTS (PAYMENT RECORDS TABLE) */}
@@ -1495,6 +1515,23 @@ export const PaymentsTrackerPage: React.FC = () => {
           </div>
         )}
       </AnimatePresence>
+
+      {/* SALES RETURN CREDIT NOTE MODAL */}
+      {creditNoteModalOpen && selectedInvoice && (
+        <SalesReturnCreditNoteModal
+          isOpen={creditNoteModalOpen}
+          onClose={() => setCreditNoteModalOpen(false)}
+          invoice={selectedInvoice}
+          onSuccess={(cn) => {
+            setSelectedInvoice(prev => prev ? {
+              ...prev,
+              creditNoteIds: [...(prev.creditNoteIds || []), cn.id],
+              totalCredited: (prev.totalCredited || 0) + cn.totalAmount,
+              outstanding: Math.max(0, prev.outstanding - cn.totalAmount)
+            } : null);
+          }}
+        />
+      )}
 
     </div>
   );

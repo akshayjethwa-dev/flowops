@@ -369,6 +369,55 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["id", "tenantId", "name", "version", "createdAt"]
+    },
+    "CreditNote": {
+      "title": "CreditNote",
+      "description": "Statutory GST Credit Note issued against invoices for partial or full sales returns",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "creditNoteNumber": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "invoiceId": { "type": "string" },
+        "invoiceNumber": { "type": "string" },
+        "dispatchId": { "type": "string" },
+        "dispatchNumber": { "type": "string" },
+        "orderId": { "type": "string" },
+        "orderNumber": { "type": "string" },
+        "customerId": { "type": "string" },
+        "customerName": { "type": "string" },
+        "issueDate": { "type": "string" },
+        "reason": { "type": "string" },
+        "items": { "type": "array" },
+        "subtotal": { "type": "number" },
+        "taxAmount": { "type": "number" },
+        "totalAmount": { "type": "number" },
+        "status": { "type": "string", "enum": ["issued", "applied", "cancelled"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "creditNoteNumber", "tenantId", "invoiceId", "invoiceNumber", "totalAmount", "status", "createdAt"]
+    },
+    "Invoice": {
+      "title": "Invoice",
+      "description": "Statutory GST Tax Invoice linked to outward dispatch records or sales orders",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "invoiceNumber": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "orderId": { "type": "string" },
+        "orderNumber": { "type": "string" },
+        "dispatchId": { "type": "string" },
+        "dispatchNumber": { "type": "string" },
+        "customerId": { "type": "string" },
+        "customerName": { "type": "string" },
+        "total": { "type": "number" },
+        "totalPaid": { "type": "number" },
+        "outstanding": { "type": "number" },
+        "status": { "type": "string", "enum": ["draft", "sent", "partial", "paid", "overdue"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "invoiceNumber", "tenantId", "orderId", "orderNumber", "customerId", "customerName", "total", "status", "createdAt"]
     }
   },
   "firestore": {
@@ -456,6 +505,14 @@
     "notifications": {
       "schema": "Notification",
       "description": "In-app alerts and notifications about events scoped to user or tenant"
+    },
+    "invoices": {
+      "schema": "Invoice",
+      "description": "Statutory GST Tax Invoices linked to dispatches and orders"
+    },
+    "creditNotes": {
+      "schema": "CreditNote",
+      "description": "Sales return credit notes issued against specific invoices"
     }
   }
 }

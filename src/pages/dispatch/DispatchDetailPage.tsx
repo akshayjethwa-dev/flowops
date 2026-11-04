@@ -1,6 +1,6 @@
 // src/pages/dispatch/DispatchDetailPage.tsx
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useDispatchDetail } from '../../hooks/useDispatch';
@@ -27,26 +27,63 @@ import {
 } from 'lucide-react';
 import { FileUploader } from '../../components/FileUploader';
 import { AttachmentsList } from '../../components/AttachmentsList';
-import { FileSymlink } from 'lucide-react';
+import { FileSymlink, Boxes, RotateCcw, Receipt } from 'lucide-react';
 import { fqcService } from '../../services/fqcService';
 import { CertificateOfConformanceModal } from '../../components/fqc/CertificateOfConformanceModal';
 import { qualityHoldService } from '../../services/qualityHoldService';
-
+import { cancelAndVoidDispatch } from '../../services/partialDispatchService';
+import { useToast } from '../../context/ToastContext';
+import { GeneratePartialInvoiceModal } from '../../components/dispatch/GeneratePartialInvoiceModal';
+import { SalesReturnCreditNoteModal } from '../../components/dispatch/SalesReturnCreditNoteModal';
+import { checkInvoiceExistsForDispatch, getCreditNotesForInvoice } from '../../services/partialInvoiceService';
+import { Invoice, CreditNote } from '../../types';
 
 export const DispatchDetailPage: React.FC = () => {
   const { dispatchId } = useParams<{ dispatchId: string }>();
   const navigate = useNavigate();
   const { tenant, profile } = useAuth();
+  const { toastSuccess, toastError } = useToast();
   const { dispatchItem, loading, error, updateDispatchStatus } = useDispatchDetail(tenant?.id, dispatchId);
 
   const [updating, setUpdating] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [showCocModal, setShowCocModal] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+
+  // Invoicing & Credit Note state
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [showCreditNoteModal, setShowCreditNoteModal] = useState(false);
+  const [linkedInvoice, setLinkedInvoice] = useState<Invoice | null>(null);
+  const [creditNotes, setCreditNotes] = useState<CreditNote[]>([]);
+  const [refreshInvoicingKey, setRefreshInvoicingKey] = useState(0);
+
+  // Load linked invoice & credit notes
+  useEffect(() => {
+    if (!tenant?.id || !dispatchItem) return;
+
+    checkInvoiceExistsForDispatch(tenant.id, dispatchItem).then(res => {
+      if (res.exists && res.invoice) {
+        setLinkedInvoice(res.invoice);
+        getCreditNotesForInvoice(tenant.id, res.invoice.id).then(cns => {
+          setCreditNotes(cns);
+        });
+      } else {
+        setLinkedInvoice(null);
+        setCreditNotes([]);
+      }
+    });
+  }, [tenant?.id, dispatchItem?.id, dispatchItem?.isInvoiced, refreshInvoicingKey]);
 
   const releaseCheck = dispatchItem?.orderId ? fqcService.checkDispatchReleaseEligibility(dispatchItem.orderId) : null;
   const holdCheck = dispatchItem?.orderId ? qualityHoldService.checkDispatchBlock(dispatchItem.orderId) : null;
 
   const handleUpdateStatus = async (newStatus: 'Planned' | 'Dispatched' | 'Delivered' | 'Cancelled' | 'shipped' | 'delivered') => {
+    if (newStatus === 'Cancelled') {
+      setShowCancelModal(true);
+      return;
+    }
+
     if ((newStatus === 'Dispatched' || newStatus === 'shipped' || newStatus === 'Delivered') && holdCheck?.isBlocked) {
       setFeedback(`Blocked: Quality Hold active on batch/WO. ${holdCheck.blockReason}`);
       return;
@@ -61,6 +98,33 @@ export const DispatchDetailPage: React.FC = () => {
       setFeedback(`Adjustment Failed: ${err.message || 'Error occurred'}`);
     } finally {
       setUpdating(false);
+    }
+  };
+
+  const handleConfirmCancel = async () => {
+    if (!tenant?.id || !dispatchId || !profile) return;
+    setCancelling(true);
+    setFeedback(null);
+    try {
+      const result = await cancelAndVoidDispatch(tenant.id, dispatchId, profile.name || 'Dispatch Clerk');
+      setFeedback(`Dispatch #${result.voidedDispatch.dispatchNumber} voided. Restored quantities to Order #${result.restoredOrder.orderNumber}.`);
+      if (result.flaggedBackorder) {
+        toastSuccess(
+          'Dispatch Voided & Quantities Restored',
+          `Restored quantities to Order #${result.restoredOrder.orderNumber}. Backorder #${result.flaggedBackorder.backorderNumber} flagged for review.`
+        );
+      } else {
+        toastSuccess(
+          'Dispatch Voided & Quantities Restored',
+          `Restored quantities to Order #${result.restoredOrder.orderNumber}.`
+        );
+      }
+      setShowCancelModal(false);
+    } catch (err: any) {
+      setFeedback(`Cancellation failed: ${err.message || 'Error'}`);
+      toastError('Cancellation Failed', err.message);
+    } finally {
+      setCancelling(false);
     }
   };
 
@@ -136,16 +200,51 @@ export const DispatchDetailPage: React.FC = () => {
             </p>
           </div>
 
-          <div className="flex items-center space-x-2 shrink-0 self-start sm:self-center">
+          <div className="flex flex-wrap items-center gap-2 shrink-0 self-start sm:self-center">
+            {dispatchItem.status !== 'Cancelled' && (
+              dispatchItem.isInvoiced || linkedInvoice ? (
+                <div className="flex items-center space-x-2">
+                  <button
+                    type="button"
+                    onClick={() => navigate('/payments')}
+                    className="border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 px-3 py-2 rounded-lg font-mono text-[10px] uppercase font-bold tracking-wider flex items-center space-x-1.5 cursor-pointer shadow-3xs transition"
+                    title="View linked Tax Invoice in Finance"
+                  >
+                    <Receipt className="h-4 w-4 text-emerald-600 shrink-0" />
+                    <span>Invoiced #{linkedInvoice?.invoiceNumber || dispatchItem.invoiceNumber}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowCreditNoteModal(true)}
+                    className="border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-800 px-3 py-2 rounded-lg font-mono text-[10px] uppercase font-bold tracking-wider flex items-center space-x-1.5 cursor-pointer shadow-3xs transition"
+                    title="Accept Sales Return and generate statutory Credit Note (Acceptance Criteria EC 2)"
+                  >
+                    <RotateCcw className="h-4 w-4 text-rose-600 shrink-0" />
+                    <span>Sales Return (Credit Note)</span>
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setShowInvoiceModal(true)}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-lg font-mono text-[10px] uppercase font-bold tracking-wider flex items-center space-x-1.5 cursor-pointer shadow-xs transition"
+                  title="Generate Tax Invoice for only the quantity dispatched"
+                >
+                  <Receipt className="h-4 w-4 shrink-0" />
+                  <span>Generate Invoice</span>
+                </button>
+              )
+            )}
+
             <button
               onClick={() => window.print()}
-              className="border border-slate-205 bg-white hover:bg-slate-50 text-slate-700 px-3.5 py-2 rounded-lg font-mono text-[10px] uppercase font-black tracking-wider flex items-center space-x-1.5 cursor-pointer shadow-3xs transition-all select-none mr-2"
+              className="border border-slate-205 bg-white hover:bg-slate-50 text-slate-700 px-3 py-2 rounded-lg font-mono text-[10px] uppercase font-black tracking-wider flex items-center space-x-1.5 cursor-pointer shadow-3xs transition-all select-none"
               title="Print standard delivery / dispatch consignment slip"
             >
               <Printer className="h-4 w-4 text-slate-400 shrink-0" />
               <span>Print Slip</span>
             </button>
-            <span className="text-[10px] font-mono text-slate-450 uppercase">Current Status:</span>
             <span className={`px-3 py-1 font-mono font-extrabold uppercase rounded-full text-[10px] border tracking-wider shadow-3xs ${getStatusColor(dispatchItem.status)}`}>
               {dispatchItem.status}
             </span>
@@ -173,6 +272,37 @@ export const DispatchDetailPage: React.FC = () => {
             </span>
           </div>
         </div>
+
+        {/* Cancellation status alert */}
+        {dispatchItem.status === 'Cancelled' && (
+          <div className="p-3.5 bg-rose-50 border-2 border-rose-300 rounded-xl text-rose-900 flex items-start space-x-3">
+            <AlertOctagon className="h-5 w-5 text-rose-600 shrink-0 mt-0.5" />
+            <div className="text-xs">
+              <strong className="font-bold text-rose-950 block text-sm">Consignment Voided & Cancelled</strong>
+              <p className="mt-0.5 text-rose-800 leading-relaxed font-sans">
+                All dispatched line quantities have been restored back to the parent Sales Order. Any linked follow-on backorder has been flagged for supervisor review.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Partial consignment banner */}
+        {(dispatchItem.isPartialDispatch || dispatchItem.backorderNumber) && dispatchItem.status !== 'Cancelled' && (
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 flex items-center justify-between text-xs">
+            <div className="flex items-center space-x-2">
+              <Boxes className="h-4 w-4 text-amber-600 shrink-0" />
+              <div>
+                <span className="font-bold">Partial Consignment Dispatch</span>
+                <span className="text-amber-700 block text-[11px] font-sans">
+                  Balance quantity carried forward to linked <strong>Backorder #{dispatchItem.backorderNumber}</strong> ({dispatchItem.totalRemainingQty || 0} units balance).
+                </span>
+              </div>
+            </div>
+            <span className="font-mono text-[10px] font-bold px-2 py-0.5 bg-amber-100 text-amber-800 rounded">
+              Backorder Auto-Created
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Primary Split content areas */}
@@ -198,11 +328,23 @@ export const DispatchDetailPage: React.FC = () => {
                   <div key={idx} className="py-4 flex justify-between items-start text-xs font-mono first:pt-0 last:pb-0">
                     <div>
                       <p className="font-bold text-slate-805 font-sans mb-1">{itm.name}</p>
-                      <p className="text-[10px] text-slate-400">Component Unit rate: ₹{itm.unitPrice.toLocaleString('en-IN')}</p>
+                      <div className="flex flex-wrap items-center gap-3 text-[10px] text-slate-500">
+                        <span>Rate: ₹{itm.unitPrice.toLocaleString('en-IN')}</span>
+                        {typeof itm.orderedQty === 'number' && (
+                          <span className="font-bold text-slate-700">Total Ordered: {itm.orderedQty}</span>
+                        )}
+                        {typeof itm.remainingQty === 'number' && (
+                          <span className="font-bold text-amber-700">Balance: {itm.remainingQty}</span>
+                        )}
+                      </div>
                     </div>
                     <div className="text-right">
-                      <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded font-extrabold text-[10px]">Qty: {itm.quantity}</span>
-                      <p className="text-[10px] font-bold text-slate-700 mt-1">₹{(itm.total || (itm.quantity * itm.unitPrice)).toLocaleString('en-IN')}</p>
+                      <span className="bg-indigo-50 border border-indigo-200 text-indigo-800 px-2.5 py-0.5 rounded font-extrabold text-[10px]">
+                        Dispatched Qty: {itm.quantity}
+                      </span>
+                      <p className="text-[10px] font-bold text-slate-700 mt-1">
+                        ₹{(itm.total || (itm.quantity * itm.unitPrice)).toLocaleString('en-IN')}
+                      </p>
                     </div>
                   </div>
                 ))
@@ -467,6 +609,84 @@ export const DispatchDetailPage: React.FC = () => {
           order={releaseCheck.fqcOrder}
           isOpen={showCocModal}
           onClose={() => setShowCocModal(false)}
+        />
+      )}
+
+      {/* Cancellation & Voiding Confirmation Modal */}
+      {showCancelModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4 font-sans animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-start space-x-3">
+              <div className="p-2.5 rounded-full bg-rose-100 text-rose-600 shrink-0">
+                <AlertOctagon className="h-6 w-6" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-base font-bold text-slate-900">Void & Cancel Consignment?</h3>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  Are you sure you want to cancel dispatch <strong>#{dispatchItem.dispatchNumber || dispatchItem.invoiceNumber}</strong>?
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-xs space-y-1.5 text-amber-900 font-mono">
+              <div className="flex items-center space-x-1.5 font-bold">
+                <RotateCcw className="h-3.5 w-3.5 text-amber-600" />
+                <span>Automated Cancellation Reversals:</span>
+              </div>
+              <ul className="list-disc pl-5 space-y-1 text-[11px] text-amber-800 font-sans">
+                <li>Dispatch record will be marked as <strong>Cancelled & Voided</strong>.</li>
+                <li>Dispatched quantities will be <strong>restored to the parent Sales Order</strong>.</li>
+                <li>Parent order status will revert to <strong>Partially Dispatched</strong> or <strong>In Production</strong>.</li>
+                <li>Linked follow-on Backorders will be <strong>flagged for review</strong> (preserved for audit history, not deleted).</li>
+              </ul>
+            </div>
+
+            <div className="flex justify-end space-x-2 pt-2">
+              <button
+                type="button"
+                disabled={cancelling}
+                onClick={() => setShowCancelModal(false)}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-mono font-bold rounded-lg transition cursor-pointer"
+              >
+                Keep Active
+              </button>
+              <button
+                type="button"
+                disabled={cancelling}
+                onClick={handleConfirmCancel}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white text-xs font-mono font-bold rounded-lg transition cursor-pointer flex items-center space-x-1.5"
+              >
+                <AlertOctagon className="h-3.5 w-3.5" />
+                <span>{cancelling ? 'Voiding Consignment...' : 'Confirm Void & Restore'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Generate Partial Invoice Modal */}
+      {showInvoiceModal && dispatchItem && (
+        <GeneratePartialInvoiceModal
+          isOpen={showInvoiceModal}
+          onClose={() => setShowInvoiceModal(false)}
+          dispatch={dispatchItem}
+          onSuccess={(inv) => {
+            setLinkedInvoice(inv);
+            setRefreshInvoicingKey(k => k + 1);
+          }}
+        />
+      )}
+
+      {/* Sales Return Credit Note Modal (EC 2) */}
+      {showCreditNoteModal && linkedInvoice && (
+        <SalesReturnCreditNoteModal
+          isOpen={showCreditNoteModal}
+          onClose={() => setShowCreditNoteModal(false)}
+          invoice={linkedInvoice}
+          onSuccess={(cn) => {
+            setCreditNotes(prev => [cn, ...prev]);
+            setRefreshInvoicingKey(k => k + 1);
+          }}
         />
       )}
 

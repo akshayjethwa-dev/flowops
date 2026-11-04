@@ -24,7 +24,8 @@ import {
   Filter,
   Sliders,
   ChevronDown,
-  Zap
+  Zap,
+  Boxes
 } from 'lucide-react';
 import { GenerateWorkOrdersModal } from '../../components/orders/GenerateWorkOrdersModal';
 
@@ -428,6 +429,20 @@ const JobCard: React.FC<JobCardProps> = ({
           {(associatedOrder?.customerPoNumber || job.customerPoNumber) && (
             <span className="text-[8.5px] font-mono bg-indigo-50 text-indigo-700 border border-indigo-150 px-1 py-0.2 rounded font-bold truncate max-w-[120px]" title={`Customer PO: ${associatedOrder?.customerPoNumber || job.customerPoNumber}`}>
               PO: {associatedOrder?.customerPoNumber || job.customerPoNumber}
+            </span>
+          )}
+
+          {(associatedOrder?.status === 'Partially Dispatched' || ((associatedOrder as any)?.backorderIds?.length > 0)) && (
+            <span 
+              onClick={(e) => {
+                e.stopPropagation();
+                window.location.href = '/work-orders';
+              }}
+              className="text-[8.5px] font-mono bg-amber-100 text-amber-800 border border-amber-300 px-1.5 py-0.2 rounded font-bold cursor-pointer hover:bg-amber-200 transition flex items-center gap-0.5"
+              title="Order has active follow-on backorders in queue"
+            >
+              <Boxes className="h-2 w-2" />
+              <span>Backorder</span>
             </span>
           )}
 

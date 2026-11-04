@@ -55,6 +55,10 @@ import { BarcodeScanner } from '../components/BarcodeScanner';
 import { useScanToIdentify } from '../hooks/useScanToIdentify';
 import { ScanResult } from '../services/scannerService';
 
+// ── Backorders Queue Integration ────────────────────────────
+import { BackordersProductionQueue } from '../components/production/BackordersProductionQueue';
+import { getBackordersSync } from '../services/partialDispatchService';
+
 // ── Status metadata ─────────────────────────────────────────
 const STATUS_META: Record<
   WorkOrderStatus,
@@ -127,6 +131,22 @@ export const ProductionPage: React.FC = () => {
   const [isSoPickerOpen, setIsSoPickerOpen] = useState(false);
   const [selectedSoForGeneration, setSelectedSoForGeneration] = useState<Order | null>(null);
   const [travelerWo, setTravelerWo] = useState<WorkOrder | null>(null);
+
+  // ── Backorders Queue & View Switcher ──────────────────────
+  const [mainQueueTab, setMainQueueTab] = useState<'work_orders' | 'backorders'>('work_orders');
+  
+  const linkedBackorders = useMemo(() => {
+    if (!tenant?.id) return [];
+    try {
+      return getBackordersSync(tenant.id);
+    } catch {
+      return [];
+    }
+  }, [tenant?.id, mainQueueTab]);
+
+  const activeBackordersCount = useMemo(() => {
+    return linkedBackorders.filter(b => b.status !== 'fulfilled' && b.status !== 'cancelled').length;
+  }, [linkedBackorders]);
 
   // ═════════════════════════════════════════════════════════
   // STEP 4.4 — Scanner wiring
@@ -480,8 +500,56 @@ export const ProductionPage: React.FC = () => {
         </div>
       )}
 
-      {/* 2. KPI Board */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* ── View Mode Switcher: Work Orders Queue vs Backorders Queue ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-2.5 rounded-xl border border-slate-200 shadow-2xs">
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={() => setMainQueueTab('work_orders')}
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-mono uppercase font-bold transition cursor-pointer ${
+              mainQueueTab === 'work_orders'
+                ? 'bg-slate-900 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            <ClipboardList className="h-4 w-4 text-sky-400" />
+            <span>Work Orders Queue</span>
+            <span className={`px-1.5 py-0.2 rounded text-[10px] font-mono ${
+              mainQueueTab === 'work_orders' ? 'bg-sky-500 text-white' : 'bg-slate-200 text-slate-700'
+            }`}>
+              {filteredWorkOrders.length}
+            </span>
+          </button>
+
+          <button
+            id="backorders-queue-tab"
+            onClick={() => setMainQueueTab('backorders')}
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-mono uppercase font-bold transition cursor-pointer ${
+              mainQueueTab === 'backorders'
+                ? 'bg-amber-600 text-white shadow-xs'
+                : 'text-amber-900 bg-amber-50 hover:bg-amber-100/80 border border-amber-200'
+            }`}
+          >
+            <Boxes className="h-4 w-4" />
+            <span>Backorders Queue</span>
+            <span className={`px-1.5 py-0.2 rounded text-[10px] font-mono ${
+              mainQueueTab === 'backorders' ? 'bg-amber-700 text-white' : 'bg-amber-200 text-amber-900 font-extrabold'
+            }`}>
+              {activeBackordersCount}
+            </span>
+          </button>
+        </div>
+
+        <div className="flex items-center gap-2 text-xs font-mono text-slate-500">
+          <span>Plant Filter: <strong>{selectedPlantId === 'all' ? 'All Plants' : plants.find(p => p.id === selectedPlantId)?.name || selectedPlantId}</strong></span>
+        </div>
+      </div>
+
+      {mainQueueTab === 'backorders' ? (
+        <BackordersProductionQueue plantId={selectedPlantId} />
+      ) : (
+        <>
+          {/* 2. KPI Board */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard icon={<ClipboardList size={18} />} label="Total Work Orders" value={kpi.total} />
         <KpiCard icon={<PlayCircle size={18} />}   label="In Progress"       value={kpi.inProgress} accent="emerald" />
         <KpiCard icon={<Zap size={18} />}          label="Ready to Start"    value={kpi.ready} accent="sky" />
@@ -674,6 +742,19 @@ export const ProductionPage: React.FC = () => {
                             }
                             return null;
                           })()}
+                          {linkedBackorders.some(b => (b.originalOrderNumber === wo.orderNumber || b.orderNumber === wo.orderNumber || (wo.salesOrderNumber && b.originalOrderNumber === wo.salesOrderNumber)) && b.status !== 'fulfilled' && b.status !== 'cancelled') && (
+                            <span 
+                              className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-amber-100 text-amber-800 border border-amber-300 flex items-center gap-1 cursor-pointer hover:bg-amber-200 transition"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setMainQueueTab('backorders');
+                              }}
+                              title="Has active follow-on backorders in queue. Click to open Backorders Queue."
+                            >
+                              <Boxes className="w-2.5 h-2.5" />
+                              Backorder
+                            </span>
+                          )}
                         </div>
                       </td>
                       <td className="py-4 px-4">
@@ -776,6 +857,8 @@ export const ProductionPage: React.FC = () => {
           </div>
         )}
       </div>
+      </>
+      )}
 
       {/* 5. Detail Side Drawer — Start / Complete Operation */}
       {activeWo && (

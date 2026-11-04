@@ -269,6 +269,8 @@ export const ProductionSection: React.FC<ProductionSectionProps> = ({
 
   const getOrderStatusBadge = (status: string) => {
     switch (status) {
+      case 'Partially Dispatched':
+      case 'partially-dispatched': return 'bg-amber-100 text-amber-800 border-amber-300 font-bold';
       case 'pending': return 'bg-amber-50 text-amber-800 border-amber-200/80';
       case 'in-production': return 'bg-indigo-50 text-indigo-800 border-indigo-200/80 animate-pulse';
       case 'produced': return 'bg-blue-50 text-blue-800 border-blue-200/80';
@@ -504,6 +506,16 @@ export const ProductionSection: React.FC<ProductionSectionProps> = ({
                             ⚡ WO: {(order as any).workOrderNumbers.join(', ')}
                           </button>
                         )}
+                        {(order.status === 'Partially Dispatched' || ((order as any).backorderIds && (order as any).backorderIds.length > 0)) && (
+                          <span 
+                            onClick={() => navigate('/work-orders')}
+                            className="inline-flex items-center gap-1 text-[10px] font-mono bg-amber-100 text-amber-800 border border-amber-300 px-1.5 py-0.5 rounded font-bold ml-1.5 cursor-pointer hover:bg-amber-200"
+                            title="Order has active backorders in shopfloor queue. Click to view."
+                          >
+                            <Boxes className="h-2.5 w-2.5" />
+                            <span>Backorder</span>
+                          </span>
+                        )}
                         <span className="text-[10px] font-mono text-slate-400 ml-2">
                           Est: {order.deliveryDate ? new Date(order.deliveryDate).toLocaleDateString() : 'N/A'}
                         </span>
@@ -560,12 +572,12 @@ export const ProductionSection: React.FC<ProductionSectionProps> = ({
                         <span>Create Invoice</span>
                       </button>
 
-                      {allJobsReady && order.status !== 'dispatched' && order.status !== 'completed' ? (
+                      {(allJobsReady || order.status === 'Partially Dispatched' || order.status === 'partially-dispatched') && order.status !== 'dispatched' && order.status !== 'completed' ? (
                         <button
                           onClick={() => onInitiateDispatch(order)}
                           className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs uppercase tracking-wider px-3.5 py-1.5 rounded flex items-center space-x-1.5 shadow-xs cursor-pointer hover:scale-102 transition-transform"
                         >
-                          <span>Move to Dispatch</span>
+                          <span>{order.status === 'Partially Dispatched' || order.status === 'partially-dispatched' ? 'Dispatch Remaining' : 'Move to Dispatch'}</span>
                           <ArrowRight className="h-3.5 w-3.5 text-white" />
                         </button>
                       ) : order.status === 'dispatched' ? (

@@ -524,6 +524,10 @@ service cloud.firestore {
         allow read, write: if isTenantMember(tenantId);
       }
 
+      match /creditNotes/{noteId} {
+        allow read, write: if isTenantMember(tenantId);
+      }
+
       match /loginAuditLogs/{logId} {
         allow read: if isTenantMember(tenantId) && getUserRole() in ['admin', 'manager', 'management'];
         allow create: if isSignedIn();
@@ -661,6 +665,14 @@ service cloud.firestore {
     match /activityLog/{logId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn() && isValidActivityLog(incoming());
+      allow update, delete: if false;
+    }
+
+    // 14. Credit Notes
+    match /creditNotes/{noteId} {
+      allow get: if isTenantMember(resource.data.tenantId);
+      allow list: if isSignedIn() && resource.data.tenantId == getUserTenantId();
+      allow create: if isSignedIn() && isTenantMember(incoming().tenantId);
       allow update, delete: if false;
     }
   }

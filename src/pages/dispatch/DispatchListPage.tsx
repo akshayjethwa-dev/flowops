@@ -17,11 +17,15 @@ import {
   ClipboardList,
   Truck,
   ShieldCheck,
-  AlertOctagon
+  AlertOctagon,
+  Boxes,
+  Receipt
 } from 'lucide-react';
-import { Order } from '../../types';
+import { Order, Backorder, Dispatch } from '../../types';
 import { DispatchReleaseGateBadge } from '../../components/fqc/DispatchReleaseGateBadge';
 import { qualityHoldService } from '../../services/qualityHoldService';
+import { getBackordersSync } from '../../services/partialDispatchService';
+import { GeneratePartialInvoiceModal } from '../../components/dispatch/GeneratePartialInvoiceModal';
 
 export const DispatchListPage: React.FC = () => {
   const navigate = useNavigate();
@@ -67,11 +71,20 @@ export const DispatchListPage: React.FC = () => {
   );
 
   const location = useLocation();
-  const routeState = location.state as { preselectedOrderForDispatch?: Order } | null;
+  const routeState = location.state as { 
+    preselectedOrderForDispatch?: Order;
+    sourceBackorderId?: string;
+    sourceBackorderNumber?: string;
+  } | null;
+
+  const [sourceBackorderId, setSourceBackorderId] = useState<string | undefined>();
+  const [sourceBackorderNumber, setSourceBackorderNumber] = useState<string | undefined>();
 
   useEffect(() => {
     if (routeState?.preselectedOrderForDispatch) {
       setPreselectedOrder(routeState.preselectedOrderForDispatch);
+      setSourceBackorderId(routeState.sourceBackorderId);
+      setSourceBackorderNumber(routeState.sourceBackorderNumber);
       setIsCreateOpen(true);
       window.history.replaceState({}, document.title);
     }
@@ -81,8 +94,14 @@ export const DispatchListPage: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [preselectedOrder, setPreselectedOrder] = useState<Order | null>(null);
+  const [activeTab, setActiveTab] = useState<'dispatches' | 'backorders'>('dispatches');
+  const [backordersList, setBackordersList] = useState<Backorder[]>([]);
 
-  // Load orders for dispatch dropdown selection
+  // Partial Invoicing Modal state
+  const [invoicingDispatch, setInvoicingDispatch] = useState<Dispatch | null>(null);
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+
+  // Load orders & backorders for dispatch dropdown selection
   useEffect(() => {
     if (!tenant?.id) return;
 
@@ -99,16 +118,23 @@ export const DispatchListPage: React.FC = () => {
       }
     };
     loadOrdersData();
+
+    // Load backorders
+    const bos = getBackordersSync(tenant.id);
+    setBackordersList(bos);
   }, [tenant?.id, isCreateOpen]);
 
   const getStatusBadge = (st: string) => {
     switch (st?.toLowerCase()) {
       case 'planned': return 'bg-amber-100 text-amber-800 border-amber-200';
+      case 'partially dispatched':
+      case 'partially-dispatched':
+      case 'partial': return 'bg-amber-100 text-amber-800 border-amber-300 font-bold';
       case 'dispatched':
       case 'shipped': return 'bg-indigo-100 text-indigo-800 border-indigo-200';
       case 'delivered': return 'bg-emerald-100 text-emerald-800 border-emerald-200';
       case 'cancelled': return 'bg-rose-100 text-rose-800 border-rose-250';
-      default: return 'bg-slate-100 text-slate-80o border-slate-205';
+      default: return 'bg-slate-100 text-slate-800 border-slate-200';
     }
   };
 
@@ -179,30 +205,64 @@ export const DispatchListPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Reusable FilterBar standard with Saved Views */}
-      <FilterBar
-        entityType="dispatches"
-        tenantId={tenant?.id || 'demo'}
-        filters={filters}
-        onFilterChange={(updated) => setFilters(updated)}
-        onClearFilters={() => setFilters({
-          search: '',
-          status: 'all',
-          startDate: '',
-          endDate: ''
-        })}
-        searchPlaceholder="Search dispatch items, invoice references, transporters or carrier names..."
-        statusOptions={[
-          { label: 'All Dispatches', value: 'all' },
-          { label: 'Planned / Loaded', value: 'planned' },
-          { label: 'Dispatched / Shipped', value: 'dispatched' },
-          { label: 'Delivered', value: 'delivered' },
-          { label: 'Cancelled', value: 'cancelled' }
-        ]}
-      />
+      {/* View Switcher Tabs: Dispatches vs Backorders */}
+      <div className="flex items-center space-x-2 border-b border-slate-200 pb-2">
+        <button
+          type="button"
+          onClick={() => setActiveTab('dispatches')}
+          className={`font-mono text-xs uppercase font-bold tracking-wider px-3.5 py-2 rounded-lg flex items-center space-x-2 transition-all cursor-pointer ${
+            activeTab === 'dispatches'
+              ? 'bg-slate-900 text-white shadow-xs'
+              : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+          }`}
+        >
+          <Truck className="h-3.5 w-3.5" />
+          <span>Outward Dispatches ({dispatches.length})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('backorders')}
+          className={`font-mono text-xs uppercase font-bold tracking-wider px-3.5 py-2 rounded-lg flex items-center space-x-2 transition-all cursor-pointer ${
+            activeTab === 'backorders'
+              ? 'bg-slate-900 text-white shadow-xs'
+              : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+          }`}
+        >
+          <Boxes className="h-3.5 w-3.5" />
+          <span>Follow-on Backorders ({backordersList.length})</span>
+          {backordersList.some(b => b.reviewFlagged || b.status === 'review_required') && (
+            <span className="h-2 w-2 rounded-full bg-rose-500 animate-pulse" title="Review required on backorder" />
+          )}
+        </button>
+      </div>
+
+      {activeTab === 'dispatches' && (
+        <FilterBar
+          entityType="dispatches"
+          tenantId={tenant?.id || 'demo'}
+          filters={filters}
+          onFilterChange={(updated) => setFilters(updated)}
+          onClearFilters={() => setFilters({
+            search: '',
+            status: 'all',
+            startDate: '',
+            endDate: ''
+          })}
+          searchPlaceholder="Search dispatch items, invoice references, transporters or carrier names..."
+          statusOptions={[
+            { label: 'All Dispatches', value: 'all' },
+            { label: 'Planned / Loaded', value: 'planned' },
+            { label: 'Dispatched / Shipped', value: 'dispatched' },
+            { label: 'Delivered', value: 'delivered' },
+            { label: 'Cancelled', value: 'cancelled' }
+          ]}
+        />
+      )}
 
       {/* Main visual Table of lists */}
-      {loading ? (
+      {activeTab === 'dispatches' && (
+        loading ? (
         <div className="text-center py-20 bg-white border border-slate-20o rounded-xl space-y-4">
           <div className="animate-spin h-8 w-8 border-3 border-sky-600 border-t-transparent rounded-full mx-auto" />
           <p className="text-[11px] text-slate-450 font-mono uppercase tracking-widest">Constructing logs manifest table...</p>
@@ -236,7 +296,14 @@ export const DispatchListPage: React.FC = () => {
                     
                     {/* Dispatch No */}
                     <td className="p-3.5 pl-5">
-                      <span className="font-bold text-slate-900">{disp.dispatchNumber || disp.invoiceNumber}</span>
+                      <div className="flex items-center space-x-1.5">
+                        <span className="font-bold text-slate-900">{disp.dispatchNumber || disp.invoiceNumber}</span>
+                        {disp.isPartialDispatch && (
+                          <span className="text-[9px] font-mono font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.2 rounded uppercase">
+                            Partial
+                          </span>
+                        )}
+                      </div>
                       <span className="text-[9px] text-slate-405 block font-mono">Ref: {disp.id}</span>
                     </td>
 
@@ -294,14 +361,47 @@ export const DispatchListPage: React.FC = () => {
                       </span>
                     </td>
 
-                    {/* Action trigger chevron */}
+                    {/* Action trigger buttons */}
                     <td className="p-3.5 pr-5 text-right select-none">
-                      <button
-                        onClick={() => navigate(`/dispatch/${disp.id}`)}
-                        className="p-1 px-2.5 border border-slate-200 rounded-lg hover:border-indigo-300 hover:text-indigo-655 hover:bg-indigo-50/20 transition cursor-pointer font-mono font-bold uppercase text-[9px]"
-                      >
-                        Details
-                      </button>
+                      <div className="flex items-center justify-end space-x-2">
+                        {disp.status !== 'Cancelled' && (
+                          disp.isInvoiced ? (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate('/payments');
+                              }}
+                              className="inline-flex items-center space-x-1 px-2.5 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 rounded-lg text-[9px] font-mono font-bold uppercase cursor-pointer transition"
+                              title={`Invoiced (${disp.invoiceNumber || disp.invoiceId}). Click to view in Payments.`}
+                            >
+                              <Receipt className="h-3 w-3 text-emerald-600" />
+                              <span>Invoiced</span>
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setInvoicingDispatch(disp);
+                                setShowInvoiceModal(true);
+                              }}
+                              className="inline-flex items-center space-x-1 px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[9px] font-mono font-bold uppercase shadow-2xs transition cursor-pointer"
+                              title="Generate GST Tax Invoice for only the quantity dispatched"
+                            >
+                              <Receipt className="h-3 w-3" />
+                              <span>Generate Invoice</span>
+                            </button>
+                          )
+                        )}
+
+                        <button
+                          onClick={() => navigate(`/dispatch/${disp.id}`)}
+                          className="p-1 px-2.5 border border-slate-200 rounded-lg hover:border-indigo-300 hover:text-indigo-655 hover:bg-indigo-50/20 transition cursor-pointer font-mono font-bold uppercase text-[9px]"
+                        >
+                          Details
+                        </button>
+                      </div>
                     </td>
 
                   </tr>
@@ -335,9 +435,30 @@ export const DispatchListPage: React.FC = () => {
 
                 <div className="flex items-center justify-between text-[10px] font-mono text-slate-405 pt-2 border-t">
                   <span>Date: {disp.dispatchDate || new Date(disp.dispatchedAt).toLocaleDateString()}</span>
-                  <span className="text-indigo-650 font-bold flex items-center">
-                    Review Item <ChevronRight className="h-3 w-3 ml-0.5" />
-                  </span>
+                  <div className="flex items-center space-x-2">
+                    {disp.status !== 'Cancelled' && (
+                      disp.isInvoiced ? (
+                        <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                          Invoiced
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setInvoicingDispatch(disp);
+                            setShowInvoiceModal(true);
+                          }}
+                          className="px-2 py-0.5 bg-emerald-600 text-white rounded text-[9px] font-bold uppercase"
+                        >
+                          Generate Invoice
+                        </button>
+                      )
+                    )}
+                    <span className="text-indigo-650 font-bold flex items-center">
+                      Review <ChevronRight className="h-3 w-3 ml-0.5" />
+                    </span>
+                  </div>
                 </div>
               </div>
             ))}
@@ -380,19 +501,202 @@ export const DispatchListPage: React.FC = () => {
             Create Disp Slip
           </button>
         </div>
+      ))}
+
+      {/* Backorders View */}
+      {activeTab === 'backorders' && (
+        <div className="space-y-4">
+          <div className="bg-amber-50/70 border border-amber-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+            <div className="space-y-1">
+              <div className="flex items-center space-x-2">
+                <Boxes className="h-4 w-4 text-amber-600" />
+                <h3 className="font-mono font-bold text-slate-900 uppercase tracking-wider">
+                  Follow-on Backorders & Remaining Balances
+                </h3>
+              </div>
+              <p className="text-slate-600 font-sans max-w-2xl">
+                When order lines are partially fulfilled, remaining quantities are automatically isolated into locked Backorders. 
+                Original pricing, tax rates, and customer delivery terms are snapshotted to maintain strict audit integrity.
+              </p>
+            </div>
+            <div className="text-[11px] font-mono text-amber-800 bg-amber-100/80 px-2.5 py-1 rounded-lg border border-amber-300 font-bold shrink-0">
+              Total Active: {backordersList.filter(b => b.status === 'open').length} Open
+            </div>
+          </div>
+
+          {backordersList.length > 0 ? (
+            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead className="bg-slate-50/80 border-b border-slate-200 text-slate-400 font-mono uppercase tracking-widest text-[9px] select-none">
+                    <tr>
+                      <th className="p-3.5 pl-5 font-bold">Backorder #</th>
+                      <th className="p-3.5 font-bold">Parent Order</th>
+                      <th className="p-3.5 font-bold">Customer / Consignee</th>
+                      <th className="p-3.5 font-bold">Unfulfilled Balance</th>
+                      <th className="p-3.5 font-bold">Locked Line Items Snapshot</th>
+                      <th className="p-3.5 font-bold">Target Date</th>
+                      <th className="p-3.5 text-center font-bold">Status</th>
+                      <th className="p-3.5 pr-5 text-right font-bold">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 font-sans text-slate-700">
+                    {backordersList.map(bo => {
+                      const matchedOrder = orders.find(o => o.id === bo.orderId || o.orderNumber === bo.orderNumber);
+
+                      return (
+                        <tr key={bo.id} className="hover:bg-slate-50/50 transition">
+                          <td className="p-3.5 pl-5">
+                            <span className="font-bold font-mono text-slate-900">{bo.backorderNumber}</span>
+                            <span className="text-[9px] text-slate-400 block font-mono">ID: {bo.id}</span>
+                          </td>
+
+                          <td className="p-3.5 font-mono font-semibold text-indigo-600">
+                            {bo.orderNumber}
+                          </td>
+
+                          <td className="p-3.5">
+                            <span className="font-bold text-slate-800 block">{bo.customerName}</span>
+                          </td>
+
+                          <td className="p-3.5 font-mono">
+                            <span className="px-2 py-0.5 rounded font-extrabold text-[11px] bg-amber-50 text-amber-800 border border-amber-200">
+                              {bo.totalRemainingQty} units
+                            </span>
+                          </td>
+
+                          <td className="p-3.5 text-slate-600 font-mono text-[10px] max-w-[220px]">
+                            {bo.items && bo.items.map(it => (
+                              <div key={it.lineItemId} className="truncate">
+                                • {it.name}: <strong>{it.remainingQty ?? it.backorderQty}</strong> remaining @ ₹{it.unitPrice.toLocaleString('en-IN')}
+                              </div>
+                            ))}
+                          </td>
+
+                          <td className="p-3.5 font-mono text-slate-500">
+                            {bo.deliveryDate ? new Date(bo.deliveryDate).toLocaleDateString() : 'Pending'}
+                          </td>
+
+                          <td className="p-3.5 text-center">
+                            <span className={`px-2.5 py-0.5 font-mono uppercase text-[9px] tracking-wider rounded-full border ${
+                              bo.reviewFlagged || bo.status === 'review_required'
+                                ? 'bg-rose-100 text-rose-800 border-rose-300 font-bold'
+                                : bo.status === 'open'
+                                ? 'bg-amber-100 text-amber-800 border-amber-300 font-bold'
+                                : 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                            }`}>
+                              {bo.status === 'review_required' ? 'Review Required' : bo.status}
+                            </span>
+                            {(bo.reviewReason || bo.statusReason) && (
+                              <span className="text-[8.5px] font-mono text-rose-600 block mt-0.5 max-w-[130px] mx-auto truncate" title={bo.reviewReason || bo.statusReason}>
+                                {bo.reviewReason || bo.statusReason}
+                              </span>
+                            )}
+                          </td>
+
+                          <td className="p-3.5 pr-5 text-right">
+                            {bo.status !== 'fulfilled' && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (matchedOrder) {
+                                    setPreselectedOrder(matchedOrder);
+                                    setIsCreateOpen(true);
+                                  } else {
+                                    const fallbackOrd: Order = {
+                                      id: bo.orderId || bo.originalOrderId,
+                                      tenantId: bo.tenantId,
+                                      quoteId: 'Q-BACKORDER',
+                                      orderNumber: bo.orderNumber || bo.originalOrderNumber,
+                                      customerName: bo.customerName,
+                                      phone: '',
+                                      totalAmount: bo.items.reduce((s, it) => s + (it.unitPrice * (it.remainingQty ?? it.backorderQty)), 0),
+                                      deliveryDate: bo.deliveryDate || new Date().toISOString(),
+                                      status: 'Partially Dispatched',
+                                      createdBy: 'dispatch',
+                                      items: bo.items.map(it => {
+                                        const rem = it.remainingQty ?? it.backorderQty;
+                                        return {
+                                          id: it.lineItemId,
+                                          name: it.name,
+                                          quantity: it.originalOrderedQty,
+                                          unitPrice: it.unitPrice,
+                                          total: it.unitPrice * rem,
+                                          gstPercent: 18,
+                                          specs: it.specs,
+                                          orderedQty: it.originalOrderedQty,
+                                          dispatchedQty: it.originalOrderedQty - rem,
+                                          remainingQty: rem,
+                                          dispatchStatus: 'partially-dispatched'
+                                        };
+                                      }),
+                                      createdAt: bo.createdAt
+                                    };
+                                    setPreselectedOrder(fallbackOrd);
+                                    setIsCreateOpen(true);
+                                  }
+                                }}
+                                className="bg-indigo-600 hover:bg-indigo-500 text-white font-mono text-[9px] uppercase font-bold tracking-wider px-2.5 py-1.5 rounded-lg shadow-2xs transition-colors cursor-pointer"
+                              >
+                                Dispatch Remaining →
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-white border text-center p-12 space-y-4 rounded-xl max-w-2xl mx-auto">
+              <div className="p-4 bg-amber-50 text-amber-600 rounded-full inline-block">
+                <Boxes className="h-8 w-8" />
+              </div>
+              <h3 className="font-bold text-slate-800">No Active Backorders</h3>
+              <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                All manufacturing purchase orders are currently either fully fulfilled or awaiting their initial dispatch run.
+              </p>
+            </div>
+          )}
+        </div>
       )}
 
       {/* DISPATCH CREATE SIDE FORM OVERLAY MODAL */}
       <DispatchCreateForm
         isOpen={isCreateOpen}
-        onClose={() => setIsCreateOpen(false)}
+        onClose={() => {
+          setIsCreateOpen(false);
+          setSourceBackorderId(undefined);
+          setSourceBackorderNumber(undefined);
+        }}
         availableOrders={orders}
         preselectedOrder={preselectedOrder}
+        sourceBackorderId={sourceBackorderId}
+        sourceBackorderNumber={sourceBackorderNumber}
         onSuccess={() => {
           setIsCreateOpen(false);
+          setSourceBackorderId(undefined);
+          setSourceBackorderNumber(undefined);
           reset();
         }}
       />
+
+      {/* PARTIAL INVOICE GENERATION MODAL */}
+      {showInvoiceModal && invoicingDispatch && (
+        <GeneratePartialInvoiceModal
+          isOpen={showInvoiceModal}
+          onClose={() => {
+            setShowInvoiceModal(false);
+            setInvoicingDispatch(null);
+          }}
+          dispatch={invoicingDispatch}
+          onSuccess={() => {
+            reset();
+          }}
+        />
+      )}
 
     </div>
   );

@@ -9,7 +9,8 @@ import { OrdersBoardPage } from './OrdersBoardPage';
 import { ExportButton } from '../../components/ExportButton';
 import { GuardedAction } from '../../components/layout/GuardedAction';
 import { Order } from '../../types';
-import { Layers, Kanban, TableProperties, ShoppingBag, MessageSquare, Bot, Bell } from 'lucide-react';
+import { Layers, Kanban, TableProperties, ShoppingBag, MessageSquare, Bot, Bell, Boxes } from 'lucide-react';
+import { BackordersProductionQueue } from '../../components/production/BackordersProductionQueue';
 
 export const OrdersPage: React.FC = () => {
   const location = useLocation();
@@ -19,7 +20,7 @@ export const OrdersPage: React.FC = () => {
   // Load full orders and jobs through production hook
   const { jobs, orders } = useProductionBoard(tenant?.id);
 
-  const [activeTab, setActiveTab ] = useState<'kanban' | 'analytical'>('kanban');
+  const [activeTab, setActiveTab ] = useState<'kanban' | 'analytical' | 'backorders'>('kanban');
 
   // Extract preselectedOrderId if passed state-wise
   const routerState = location.state as { preselectedOrderId?: string } | null;
@@ -149,18 +150,34 @@ export const OrdersPage: React.FC = () => {
               <TableProperties className="h-3.5 w-3.5" />
               <span>Analytical Grid</span>
             </button>
+            <button
+              id="orders-backorders-tab"
+              onClick={() => setActiveTab('backorders')}
+              className={`px-3 py-1.5 rounded-md text-[10px] uppercase font-mono tracking-wider font-extrabold cursor-pointer transition-colors flex items-center space-x-1.5 ${
+                activeTab === 'backorders' 
+                  ? 'bg-amber-600 text-white shadow-2xs font-bold' 
+                  : 'text-amber-800 hover:text-amber-900 bg-amber-50/70 hover:bg-amber-100/70'
+              }`}
+            >
+              <Boxes className="h-3.5 w-3.5" />
+              <span>Backorders Queue</span>
+            </button>
           </div>
         </div>
       </div>
 
       {activeTab === 'kanban' ? (
         <OrdersBoardPage />
-      ) : (
+      ) : activeTab === 'analytical' ? (
         <ProductionSection
           preselectedOrderId={preselectedOrderId}
           clearPreselectedOrder={() => setPreselectedOrderId(null)}
           onInitiateDispatch={handleInitiateDispatch}
         />
+      ) : (
+        <div className="bg-slate-50/60 p-4 rounded-xl border border-slate-200">
+          <BackordersProductionQueue />
+        </div>
       )}
     </div>
   );

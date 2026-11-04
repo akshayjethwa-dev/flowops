@@ -39,6 +39,10 @@ export interface LoginAuditLog {
 export interface Tenant {
   id: string;
   companyName: string;
+  name?: string;
+  plantName?: string;
+  phone?: string;
+  email?: string;
   gstin?: string;
   address?: string;
   currency: string;
@@ -182,6 +186,13 @@ export interface QuoteItem {
   specs?: string;
   bomLines?: any[];
   routingStages?: string[];
+  orderedQty?: number;
+  dispatchedQty?: number;
+  dispatchQty?: number;
+  remainingQty?: number;
+  invoicedQty?: number;
+  pendingInvoiceQty?: number;
+  dispatchStatus?: 'pending' | 'partially-dispatched' | 'partially_dispatched' | 'fully_dispatched' | 'fulfilled';
 }
 
 export interface QuotationTotals {
@@ -244,6 +255,96 @@ export interface Quote {
   routingData?: any;
 }
 
+export interface OrderDispatchHistoryItem {
+  lineItemId: string;
+  name: string;
+  orderedQty: number;
+  dispatchedQty: number;
+  remainingQtyAfter: number;
+  unitPrice: number;
+  unit?: string;
+}
+
+export interface OrderDispatchHistoryEntry {
+  dispatchId: string;
+  dispatchNumber: string;
+  timestamp: string;
+  dispatchedAt: string;
+  transporter?: string;
+  vehicleNumber?: string;
+  lrNumber?: string;
+  dispatchedBy?: string;
+  isPartial: boolean;
+  items: OrderDispatchHistoryItem[];
+  status: 'Dispatched' | 'Delivered' | 'Cancelled' | 'shipped' | 'delivered';
+  backorderId?: string;
+  backorderNumber?: string;
+}
+
+export interface BackorderItemSnapshot {
+  lineItemId: string;
+  name: string;
+  hsn?: string;
+  originalOrderedQty: number;
+  dispatchedQty: number;
+  backorderQty: number; // Remaining Qty at time of creation
+  remainingQty?: number; // Alias for backorderQty
+  unit?: string;
+  unitPrice: number; // Locked-in pricing terms at time of original order
+  discount?: number;
+  gstPercent: number;
+  total: number;
+  specs?: string;
+}
+
+export type BackorderStatus = 'open' | 'pending' | 'in_production' | 'ready_for_dispatch' | 'completed' | 'review_required' | 'cancelled' | 'fulfilled';
+
+export interface Backorder {
+  id: string;
+  tenantId: string;
+  backorderNumber: string; // e.g. "BO-ORD-991-01"
+  originalOrderId: string;
+  orderId?: string; // alias for originalOrderId
+  originalOrderNumber: string;
+  orderNumber?: string; // alias for originalOrderNumber
+  customerPoNumber?: string;
+  customerId?: string;
+  customerName: string;
+  customerEmail?: string;
+  phone?: string;
+  deliveryDate?: string;
+  originalPromisedDate?: string; // Original contract delivery date from parent order
+  targetDate?: string; // Independent shopfloor target date (can be rescheduled)
+  rescheduledAt?: string;
+  rescheduledBy?: string;
+  rescheduledReason?: string;
+  parentBackorderId?: string; // For recursive backorders (backorder of a backorder)
+  parentBackorderNumber?: string;
+  deliveryTerms?: string; // original delivery terms preserved
+  billingAddress?: string;
+  shippingAddress?: string;
+  plantId?: string;
+  items: BackorderItemSnapshot[];
+  totalRemainingQty?: number; // Total units backordered
+  totalBackorderValue: number;
+  status: BackorderStatus;
+  statusReason?: string; // e.g. "Flagged for review due to dispatch cancellation"
+  reviewReason?: string; // alias for statusReason
+  reviewFlagged?: boolean;
+  reviewNotes?: string;
+  cancellationCode?: string; // Explicit cancellation reason code
+  cancellationReason?: string; // Detailed cancellation notes
+  cancelledAt?: string;
+  cancelledBy?: string;
+  productionStage?: string; // e.g. 'cutting', 'machining', 'ready_for_dispatch'
+  productionNotes?: string;
+  sourceDispatchId: string;
+  sourceDispatchNumber: string;
+  createdAt: string;
+  createdBy: string;
+  updatedAt?: string;
+}
+
 export interface Order {
   id: string;
   tenantId: string;
@@ -267,13 +368,16 @@ export interface Order {
   discountTotal?: number;
   totalAmount: number;
   deliveryDate?: string;
-  status: 'pending' | 'in-production' | 'produced' | 'dispatched' | 'completed' | 'cancelled';
+  status: 'pending' | 'in-production' | 'produced' | 'Ready for Dispatch' | 'Partially Dispatched' | 'partially-dispatched' | 'Dispatched' | 'dispatched' | 'Fully Dispatched' | 'completed' | 'cancelled';
+  dispatchHistory?: OrderDispatchHistoryEntry[];
+  backorderIds?: string[];
   bomData?: any;
   routingData?: any;
   termsAndConditions?: string;
   notes?: string;
   createdBy: string;
   createdAt: any;
+  updatedAt?: any;
 }
 
 export interface ProductionStageChange {
@@ -318,13 +422,40 @@ export interface Dispatch {
   dispatchDate?: string;
   transporter?: string;
   vehicleNumber?: string;
+  vehicleType?: string;
   driverName?: string;
   driverPhone?: string;
+  driverDlNumber?: string;
+  dispatchBay?: string;
+  carrierGstin?: string;
+  carrierDetails?: any;
+  ewayBill?: any;
   lrNumber?: string; // Lorry Receipt tracking
   LRNumber?: string; // LRNumber uppercase variant
   destination?: string;
   itemsSummary?: string;
   items: QuoteItem[];
+  cartons?: any[];
+  totalPackages?: number;
+  totalGrossWeightKg?: number;
+  totalNetWeightKg?: number;
+  totalVolumeCbm?: number;
+  trackingRef?: string;
+  trackingUrl?: string;
+  carrierTrackingUrl?: string;
+  deliveredAt?: any;
+  deliveredBy?: string;
+  deliveryConfirmation?: any;
+  whatsappSent?: boolean;
+  whatsappSentAt?: any;
+  whatsappMessageId?: string;
+  isPartialDispatch?: boolean;
+  totalRemainingQty?: number;
+  backorderId?: string;
+  backorderNumber?: string;
+  invoiceId?: string;
+  isInvoiced?: boolean;
+  invoicedAt?: any;
   status: 'Planned' | 'Dispatched' | 'Delivered' | 'Cancelled' | 'shipped' | 'delivered';
   dispatchedAt: any;
   notes?: string;
@@ -731,6 +862,12 @@ export interface Invoice {
   tenantId: string;
   orderId: string;
   orderNumber: string;
+  dispatchId?: string;
+  dispatchNumber?: string;
+  ewayBillNumber?: string;
+  lrNumber?: string;
+  transporter?: string;
+  vehicleNumber?: string;
   plantId?: string; // Scoped Plant
   customerId: string;
   customerName: string;
@@ -739,6 +876,14 @@ export interface Invoice {
   dueDate: string;
   amount: number;
   taxAmount?: number;
+  taxBreakdown?: {
+    cgst?: number;
+    sgst?: number;
+    igst?: number;
+    hsnCode?: string;
+    rate?: number;
+    [key: string]: any;
+  };
   total: number;
   totalPaid: number;
   outstanding: number;
@@ -750,6 +895,54 @@ export interface Invoice {
   reminderSentAt?: string;
   lastReminderSentAt?: string;
   reminderCount?: number;
+  items?: any[];
+  isPartialInvoice?: boolean;
+  creditNoteIds?: string[];
+  totalCredited?: number;
+  tallySyncStatus?: string;
+  tallySyncRef?: string;
+  tallySyncedAt?: string;
+  oracleSyncStatus?: string;
+  oracleSyncRef?: string;
+  oracleSyncedAt?: string;
+  erpSyncLogs?: any[];
+}
+
+export interface CreditNoteItem {
+  lineItemId: string;
+  name: string;
+  hsn?: string;
+  returnQty: number;
+  unitPrice: number;
+  gstPercent: number;
+  taxableAmount: number;
+  gstAmount: number;
+  totalAmount: number;
+  reason?: string;
+}
+
+export interface CreditNote {
+  id: string; // e.g. "CN-INV-1001-01"
+  creditNoteNumber: string;
+  tenantId: string;
+  invoiceId: string;
+  invoiceNumber: string;
+  dispatchId?: string;
+  dispatchNumber?: string;
+  orderId?: string;
+  orderNumber?: string;
+  customerId?: string;
+  customerName?: string;
+  issueDate: string;
+  reason: string;
+  items: CreditNoteItem[];
+  subtotal: number;
+  taxAmount: number;
+  totalAmount: number;
+  status: 'issued' | 'applied' | 'cancelled';
+  createdBy: string;
+  createdByName: string;
+  createdAt: string;
 }
 
 export interface InvoiceSummary {
@@ -891,3 +1084,4 @@ export * from './types/inventoryLocation';
 export * from './types/barcodeMovement';
 export * from './types/mrp';
 export * from './types/purchaseOrder';
+export * from './types/dispatchManagement';

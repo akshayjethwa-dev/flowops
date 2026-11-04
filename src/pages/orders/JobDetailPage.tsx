@@ -24,7 +24,12 @@ import {
   Printer,
   Boxes,
   CheckCircle2,
-  ArrowRight
+  ArrowRight,
+  Truck,
+  Package,
+  History,
+  RotateCcw,
+  Receipt
 } from 'lucide-react';
 import { FileUploader } from '../../components/FileUploader';
 import { AttachmentsList } from '../../components/AttachmentsList';
@@ -32,7 +37,10 @@ import { FileSymlink } from 'lucide-react';
 import { GenerateWorkOrdersModal } from '../../components/orders/GenerateWorkOrdersModal';
 import { ShopTravelerModal } from '../../components/orders/ShopTravelerModal';
 import { useWorkOrders, WorkOrder } from '../../hooks/useWorkOrders';
-import { Order } from '../../types';
+import { DispatchCreateForm } from '../dispatch/DispatchCreateForm';
+import { getOrderLinesQuantities, getBackordersForOrder } from '../../services/partialDispatchService';
+import { GeneratePartialInvoiceModal } from '../../components/dispatch/GeneratePartialInvoiceModal';
+import { Order, Backorder, Dispatch } from '../../types';
 
 const defaultStages = [
   { value: 'cutting', label: 'Material Cutting' },
@@ -63,6 +71,74 @@ export const JobDetailPage: React.FC = () => {
   const [showGenerateWoModal, setShowGenerateWoModal] = useState(false);
   const [showTravelerModal, setShowTravelerModal] = useState(false);
   const [travelerWorkOrder, setTravelerWorkOrder] = useState<WorkOrder | null>(null);
+
+  // Partial dispatch & fulfillment modal state
+  const [showDispatchModal, setShowDispatchModal] = useState(false);
+  const [invoiceModalDispatch, setInvoiceModalDispatch] = useState<Dispatch | null>(null);
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [orderDispatches, setOrderDispatches] = useState<Dispatch[]>([]);
+  const [backorders, setBackorders] = useState<Backorder[]>([]);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  // Fallback order when not directly loaded as separate order doc
+  const effectiveOrder: Order = useMemo(() => {
+    if (order) return order;
+    return {
+      id: job?.orderId || jobId || 'ord-test-01',
+      tenantId: tenant?.id || '',
+      quoteId: (job as any)?.quoteId || 'Q-9021',
+      orderNumber: job?.orderNumber || 'SO-2026-0012',
+      customerName: (job as any)?.customerName || 'B2B Client',
+      phone: '',
+      totalAmount: (job?.unitPrice || 2500) * (job?.quantity || 100),
+      deliveryDate: (job as any)?.deliveryDate || new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10),
+      status: 'confirmed',
+      createdBy: profile?.uid || 'planner',
+      items: [{
+        id: job?.id || 'item-1',
+        name: job?.itemName || 'Manufactured Item',
+        quantity: job?.quantity || 100,
+        unitPrice: job?.unitPrice || 2500,
+        total: (job?.unitPrice || 2500) * (job?.quantity || 100),
+        gstPercent: 18,
+        specs: job?.specs,
+        bomLines: job?.bomComponents,
+        orderedQty: job?.quantity || 100,
+        dispatchedQty: 0,
+        remainingQty: job?.quantity || 100,
+        dispatchStatus: 'pending'
+      }],
+      createdAt: new Date().toISOString()
+    } as unknown as Order;
+  }, [order, job, jobId, tenant?.id, profile?.uid]);
+
+  // Load dispatches & backorders for this order
+  useEffect(() => {
+    if (!tenant?.id) return;
+    try {
+      const cachedD = localStorage.getItem(`dispatches_${tenant.id}`) || '[]';
+      const allD: Dispatch[] = JSON.parse(cachedD);
+      const targetOrderId = effectiveOrder.id;
+      const targetOrderNumber = effectiveOrder.orderNumber;
+      
+      const filteredD = allD.filter(
+        d => (targetOrderId && d.orderId === targetOrderId) || 
+             (targetOrderNumber && (d.dispatchNumber?.includes(targetOrderNumber) || (d as any).orderNumber === targetOrderNumber))
+      );
+      setOrderDispatches(filteredD);
+
+      if (targetOrderId) {
+        const bos = getBackordersForOrder(tenant.id, targetOrderId);
+        setBackorders(bos);
+      }
+    } catch (e) {
+      console.warn('Error loading order dispatches or backorders:', e);
+    }
+  }, [tenant?.id, effectiveOrder.id, effectiveOrder.orderNumber, refreshKey]);
+
+  const orderLines = useMemo(() => {
+    return getOrderLinesQuantities(effectiveOrder, orderDispatches);
+  }, [effectiveOrder, orderDispatches]);
 
   // Find linked work orders for this order/job
   const linkedWorkOrders = useMemo(() => {
@@ -259,7 +335,310 @@ export const JobDetailPage: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
         <div className="lg:col-span-2 space-y-6">
-          
+
+          {/* ORDER LINE ITEMS & DISPATCH FULFILLMENT BREAKDOWN */}
+          <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-2xs space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+              <div className="flex items-center space-x-2.5">
+                <div className="h-8 w-8 rounded-lg bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-600">
+                  <Truck className="h-4 w-4" />
+                </div>
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <h3 className="text-xs font-mono font-bold text-slate-900 uppercase tracking-wider">
+                      Order Lines & Dispatch Fulfillment
+                    </h3>
+                    <span className={`px-2 py-0.5 font-mono text-[9px] uppercase font-bold rounded-full border ${
+                      effectiveOrder.status === 'Partially Dispatched' || (effectiveOrder.status as any) === 'partially-dispatched'
+                        ? 'bg-amber-100 text-amber-800 border-amber-300'
+                        : effectiveOrder.status === 'dispatched' || effectiveOrder.status === 'completed'
+                        ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                        : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                    }`}>
+                      {effectiveOrder.status}
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-slate-500 font-sans block">
+                    SO #{effectiveOrder.orderNumber} • Partial Fulfillment & Auto-Backorder Engine
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <button
+                  type="button"
+                  onClick={() => setShowDispatchModal(true)}
+                  disabled={orderLines.every(l => l.remainingQty <= 0)}
+                  className={`font-mono text-xs uppercase font-bold tracking-wider px-3.5 py-2 rounded-xl flex items-center space-x-1.5 transition-all shadow-xs cursor-pointer ${
+                    orderLines.every(l => l.remainingQty <= 0)
+                      ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
+                      : 'bg-indigo-600 hover:bg-indigo-500 text-white hover:scale-101'
+                  }`}
+                  title={orderLines.every(l => l.remainingQty <= 0) ? 'All lines already 100% fulfilled' : 'Record a partial or full dispatch for this order'}
+                >
+                  <Truck className="h-3.5 w-3.5 text-indigo-200" />
+                  <span>Create Dispatch</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Line Items Quantities Table */}
+            <div className="overflow-x-auto border border-slate-200 rounded-xl">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-mono uppercase text-[9px] tracking-wider select-none">
+                  <tr>
+                    <th className="p-3 pl-4 font-bold">Line Item & Specs</th>
+                    <th className="p-3 text-center font-bold">Ordered Qty</th>
+                    <th className="p-3 text-center font-bold">Already Dispatched</th>
+                    <th className="p-3 text-center font-bold">Remaining Qty</th>
+                    <th className="p-3 text-center font-bold text-emerald-700 bg-emerald-50/50">Invoiced Qty</th>
+                    <th className="p-3 text-center font-bold text-amber-700 bg-amber-50/40">Pending Invoice Qty</th>
+                    <th className="p-3 text-center font-bold">Fulfillment Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 font-sans text-slate-700">
+                  {orderLines.map((line) => {
+                    const percentFulfilled = line.orderedQty > 0 
+                      ? Math.min(100, Math.round((line.alreadyDispatchedQty / line.orderedQty) * 100)) 
+                      : 0;
+
+                    return (
+                      <tr key={line.id} className="hover:bg-slate-50/60 transition">
+                        <td className="p-3 pl-4">
+                          <div className="font-bold text-slate-900">{line.name}</div>
+                          {line.specs && (
+                            <div className="text-[10px] text-slate-400 font-mono line-clamp-1">{line.specs}</div>
+                          )}
+                          <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mt-1.5 max-w-xs">
+                            <div 
+                              className={`h-full ${percentFulfilled >= 100 ? 'bg-emerald-500' : percentFulfilled > 0 ? 'bg-amber-500' : 'bg-slate-300'}`}
+                              style={{ width: `${percentFulfilled}%` }}
+                            />
+                          </div>
+                        </td>
+                        <td className="p-3 text-center font-mono font-bold text-slate-800">
+                          {line.orderedQty}
+                        </td>
+                        <td className="p-3 text-center font-mono font-bold text-indigo-700">
+                          {line.alreadyDispatchedQty}
+                        </td>
+                        {/* Remaining Qty */}
+                        <td className="p-3 text-center font-mono">
+                          <span className={`px-2 py-0.5 rounded font-extrabold text-[11px] ${
+                            line.remainingQty === 0 
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
+                              : 'bg-amber-50 text-amber-700 border border-amber-200 font-bold'
+                          }`}>
+                            {line.remainingQty}
+                          </span>
+                        </td>
+
+                        {/* Invoiced Qty (Running Total) */}
+                        <td className="p-3 text-center font-mono bg-emerald-50/20">
+                          <span className={`px-2 py-0.5 rounded font-extrabold text-[11px] ${
+                            line.invoicedQty > 0 
+                              ? 'bg-emerald-100 text-emerald-900 border border-emerald-300 font-black' 
+                              : 'text-slate-400 bg-slate-100'
+                          }`}>
+                            {line.invoicedQty}
+                          </span>
+                        </td>
+
+                        {/* Pending Invoice Qty */}
+                        <td className="p-3 text-center font-mono bg-amber-50/20">
+                          <span className={`px-2 py-0.5 rounded font-bold text-[11px] ${
+                            line.pendingInvoiceQty > 0
+                              ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                              : 'bg-slate-100 text-slate-400'
+                          }`}>
+                            {line.pendingInvoiceQty}
+                          </span>
+                        </td>
+                        <td className="p-3 text-center">
+                          {line.remainingQty === 0 ? (
+                            <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-emerald-100 text-emerald-800 border border-emerald-200">
+                              <CheckCircle className="h-3 w-3" />
+                              <span>Fulfilled</span>
+                            </span>
+                          ) : line.alreadyDispatchedQty > 0 ? (
+                            <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-amber-100 text-amber-800 border border-amber-200">
+                              <Clock className="h-3 w-3" />
+                              <span>Partially Dispatched</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-slate-100 text-slate-600 border border-slate-200">
+                              <span>Pending</span>
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Hint for Clerk */}
+            <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3 flex items-start space-x-2 text-xs text-slate-600 font-sans">
+              <Zap className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+              <span>
+                <strong>Partial Fulfillment Notice:</strong> Dispatch clerks can record partial consignments as soon as batches clear inspection. 
+                Any remaining quantity is automatically placed on an audit-locked Backorder carrying forward original commercial terms.
+              </span>
+            </div>
+
+            {/* LINKED DISPATCH HISTORY FOR THIS ORDER */}
+            <div className="pt-2 border-t border-slate-100 space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-mono font-bold text-slate-800 uppercase tracking-wider flex items-center space-x-1.5">
+                  <History className="h-3.5 w-3.5 text-indigo-500" />
+                  <span>Order Dispatch History ({orderDispatches.length})</span>
+                </h4>
+              </div>
+
+              {orderDispatches.length > 0 ? (
+                <div className="space-y-2">
+                  {orderDispatches.map((disp) => (
+                    <div 
+                      key={disp.id}
+                      className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center space-x-2">
+                          <span className="font-mono font-bold text-slate-900">
+                            {disp.dispatchNumber || disp.invoiceNumber}
+                          </span>
+                          {disp.isPartialDispatch && (
+                            <span className="text-[9px] font-mono font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.2 rounded uppercase">
+                              Partial Consignment
+                            </span>
+                          )}
+                          <span className={`text-[9px] font-mono uppercase px-1.5 py-0.2 rounded font-bold border ${
+                            disp.status === 'Cancelled' ? 'bg-rose-100 text-rose-800 border-rose-200' : 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                          }`}>
+                            {disp.status}
+                          </span>
+                        </div>
+                        <div className="text-slate-500 font-mono text-[11px] flex items-center space-x-3">
+                          <span>Date: {disp.dispatchDate ? new Date(disp.dispatchDate).toLocaleDateString() : new Date(disp.dispatchedAt).toLocaleDateString()}</span>
+                          <span>Carrier: {disp.transporter}</span>
+                          <span>LR: {disp.lrNumber || 'N/A'}</span>
+                        </div>
+                        {disp.items && disp.items.length > 0 && (
+                          <div className="text-[11px] font-mono text-indigo-700 pt-0.5">
+                            Shipped: {disp.items.map((it: any) => `${it.name}: ${it.dispatchQty ?? it.dispatchedQty ?? it.quantity ?? 0} units`).join(', ')}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex items-center space-x-2 shrink-0">
+                        {disp.status !== 'Cancelled' && (
+                          disp.isInvoiced ? (
+                            <button
+                              type="button"
+                              onClick={() => navigate('/payments')}
+                              className="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-lg px-2.5 py-1 text-[10px] font-mono font-bold uppercase transition flex items-center space-x-1 cursor-pointer"
+                              title={`Invoiced (${disp.invoiceNumber || disp.invoiceId}). Click to view.`}
+                            >
+                              <Receipt className="h-3 w-3 text-emerald-600" />
+                              <span>Invoiced</span>
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setInvoiceModalDispatch(disp);
+                                setShowInvoiceModal(true);
+                              }}
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg px-2.5 py-1 text-[10px] font-mono font-bold uppercase transition shadow-2xs flex items-center space-x-1 cursor-pointer"
+                              title="Generate GST Tax Invoice for only the quantity dispatched"
+                            >
+                              <Receipt className="h-3 w-3" />
+                              <span>Generate Invoice</span>
+                            </button>
+                          )
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/dispatch/${disp.id}`)}
+                          className="bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg px-2.5 py-1 text-[10px] font-mono font-bold uppercase transition-colors cursor-pointer"
+                        >
+                          View Dispatch →
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-4 text-center text-xs text-slate-400 font-mono border border-dashed rounded-xl">
+                  No dispatch consignments logged for this order yet.
+                </div>
+              )}
+            </div>
+
+            {/* LINKED BACKORDERS (FOLLOW-ON BALANCES) */}
+            {backorders.length > 0 && (
+              <div className="pt-2 border-t border-slate-100 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-mono font-bold text-slate-800 uppercase tracking-wider flex items-center space-x-1.5">
+                    <Boxes className="h-3.5 w-3.5 text-amber-500" />
+                    <span>Auto-Generated Follow-on Backorders ({backorders.length})</span>
+                  </h4>
+                  <span className="text-[10px] font-mono text-slate-400">
+                    Audit locked snapshot terms
+                  </span>
+                </div>
+
+                <div className="space-y-2">
+                  {backorders.map((bo) => (
+                    <div 
+                      key={bo.id}
+                      className={`p-3 border rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs ${
+                        bo.reviewFlagged || bo.status === 'review_required'
+                          ? 'bg-rose-50/60 border-rose-200'
+                          : 'bg-amber-50/40 border-amber-200'
+                      }`}
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center space-x-2">
+                          <span className="font-mono font-bold text-slate-900">
+                            {bo.backorderNumber}
+                          </span>
+                          <span className={`text-[9px] font-mono uppercase px-1.5 py-0.2 rounded font-bold border ${
+                            bo.reviewFlagged || bo.status === 'review_required'
+                              ? 'bg-rose-100 text-rose-800 border-rose-300'
+                              : 'bg-amber-100 text-amber-800 border-amber-300'
+                          }`}>
+                            {bo.status === 'review_required' ? 'Review Required (Dispatch Voided)' : bo.status}
+                          </span>
+                        </div>
+                        <div className="text-[11px] font-mono text-slate-600">
+                          Remaining Backorder Balance: <strong className="text-slate-900">{bo.totalRemainingQty ?? bo.items.reduce((s, it) => s + (it.remainingQty ?? it.backorderQty), 0)} units</strong>
+                        </div>
+                        {bo.items && bo.items.length > 0 && (
+                          <div className="text-[10px] font-mono text-slate-500">
+                            {bo.items.map(it => `${it.name}: ${it.remainingQty ?? it.backorderQty} units @ ₹${it.unitPrice.toLocaleString('en-IN')}`).join(' | ')}
+                          </div>
+                        )}
+                        {(bo.reviewReason || bo.statusReason) && (
+                          <div className="text-[10px] font-mono text-rose-700 bg-rose-100/60 p-1.5 rounded">
+                            Notice: {bo.reviewReason || bo.statusReason}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="text-[10px] font-mono text-slate-500 text-right shrink-0">
+                        <span>Created: {new Date(bo.createdAt).toLocaleDateString()}</span>
+                        <div className="text-emerald-700 font-bold">Terms Locked</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+          </div>
+
           <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-2xs space-y-5">
             <h3 className="text-xs font-mono font-bold text-slate-450 uppercase tracking-wider flex items-center space-x-1.5">
               <Clock className="h-4.5 w-4.5 text-indigo-500" />
@@ -780,6 +1159,37 @@ export const JobDetailPage: React.FC = () => {
         />
       )}
 
+      {/* Create Partial / Full Consignment Dispatch Modal */}
+      {showDispatchModal && (
+        <DispatchCreateForm
+          isOpen={showDispatchModal}
+          onClose={() => setShowDispatchModal(false)}
+          availableOrders={[effectiveOrder]}
+          preselectedOrder={effectiveOrder}
+          onSuccess={() => {
+            setShowDispatchModal(false);
+            setRefreshKey((k) => k + 1);
+          }}
+        />
+      )}
+
+      {/* Generate Partial Invoice Modal */}
+      {showInvoiceModal && invoiceModalDispatch && (
+        <GeneratePartialInvoiceModal
+          isOpen={showInvoiceModal}
+          onClose={() => {
+            setShowInvoiceModal(false);
+            setInvoiceModalDispatch(null);
+          }}
+          dispatch={invoiceModalDispatch}
+          order={effectiveOrder}
+          onSuccess={() => {
+            setRefreshKey((k) => k + 1);
+          }}
+        />
+      )}
+
     </div>
   );
 };
+
