@@ -8,7 +8,7 @@ import { useQuotation, sendQuotationViaWhatsapp } from '../../hooks/useQuotation
 import { useCostEngine } from '../../hooks/useCostEngine';
 import { InteractiveCostEstimatorModal } from '../../components/cost-engine/InteractiveCostEstimatorModal';
 import { DEMO_PRODUCTS } from '../../data/mockData';
-import { QuotationItem, QuotationStatus } from '../../types';
+import { QuotationItem, QuotationStatus, Quote, QuoteItem } from '../../types';
 import { useToast } from '../../context/ToastContext';
 import { getFriendlyErrorMessage } from '../../utils/errors';
 import { 
@@ -31,13 +31,19 @@ import {
   X,
   FileText,
   Printer,
-  Sparkles
+  Sparkles,
+  FileSymlink
 } from 'lucide-react';
 import { FileUploader } from '../../components/FileUploader';
 import { AttachmentsList } from '../../components/AttachmentsList';
-import { FileSymlink } from 'lucide-react';
-import { Quote } from '../../types';
 import { RfqToOrderConversionModal } from '../../components/quotations/RfqToOrderConversionModal';
+import { MaterialAvailabilityBadge } from '../../components/orders/MaterialAvailabilityBadge';
+import { AtpAcknowledgementModal } from '../../components/orders/AtpAcknowledgementModal';
+import { OrderAtpSummaryPanel } from '../../components/orders/OrderAtpSummaryPanel';
+import { MaterialAvailabilityService } from '../../services/materialAvailabilityService';
+import { useStockItems } from '../../hooks/useStockInventory';
+import { useMultiLevelBom } from '../../hooks/useMultiLevelBom';
+import { AtpCheckResult, OrderAtpSummary } from '../../types/materialAvailability';
 
 
 export const QuotationEditorPage: React.FC = () => {
@@ -107,6 +113,64 @@ export const QuotationEditorPage: React.FC = () => {
   const [addQty, setAddQty] = useState<number>(1);
   const [addPrice, setAddPrice] = useState<number>(0);
   const [addTax, setAddTax] = useState<number>(18); // default 18% GST
+
+  // Material Availability & ATP Hooks
+  const { items: warehouseStock, lastSyncedTimestamp } = useStockItems(tenantId);
+  const { boms: multiLevelBoms } = useMultiLevelBom(tenantId);
+  const [activeAtpAckResult, setActiveAtpAckResult] = useState<AtpCheckResult | null>(null);
+  const [lineAcknowledgements, setLineAcknowledgements] = useState<Record<string, { reason: string; by: string; at: string }>>({});
+
+  // Consolidated Order ATP Check State
+  const [atpSummary, setAtpSummary] = useState<OrderAtpSummary | null>(null);
+  const [isRunningAtpCheck, setIsRunningAtpCheck] = useState<boolean>(false);
+  const [atpProgress, setAtpProgress] = useState<{ completed: number; total: number }>({ completed: 0, total: 0 });
+
+  // Adapted QuoteItems for ATP
+  const currentQuoteItems: QuoteItem[] = useMemo(() => {
+    return items.map((itm, idx) => ({
+      id: `q_itm_${idx}`,
+      name: itm.description,
+      quantity: itm.quantity,
+      unitPrice: itm.unitPrice,
+      gstPercent: itm.taxRate,
+      total: itm.lineTotal
+    }));
+  }, [items]);
+
+  // Invalidation check (EC 3: User edits line qty after check)
+  const isAtpStaleFromEdit = atpSummary 
+    ? MaterialAvailabilityService.getOrderItemsFingerprint({ id: rfqId || 'rfq_draft', items: currentQuoteItems }) !== atpSummary.cacheKey 
+    : false;
+
+  const handleRunQuotationAtpCheck = async (forceRefresh = false) => {
+    if (currentQuoteItems.length === 0) return;
+    setIsRunningAtpCheck(true);
+    setAtpProgress({ completed: 0, total: currentQuoteItems.length });
+    try {
+      const summary = await MaterialAvailabilityService.evaluateOrderConsolidatedAtp(
+        {
+          id: rfqId || 'rfq_draft',
+          orderNumber: quotationNumber || `QTN-${rfqId || 'NEW'}`,
+          items: currentQuoteItems
+        },
+        warehouseStock,
+        [],
+        multiLevelBoms,
+        {
+          forceRefresh,
+          syncTimestamp: lastSyncedTimestamp,
+          onProgress: (completed, total) => {
+            setAtpProgress({ completed, total });
+          }
+        }
+      );
+      setAtpSummary(summary);
+    } catch (err) {
+      console.error('Quotation consolidated ATP check failed', err);
+    } finally {
+      setIsRunningAtpCheck(false);
+    }
+  };
 
   // Map incoming database values once loaded
   useEffect(() => {
@@ -574,7 +638,40 @@ export const QuotationEditorPage: React.FC = () => {
 
             {/* Line Items builder */}
             <div className="space-y-4">
-              <span className="text-xs font-mono font-bold text-slate-400 uppercase tracking-wider block">Quotation line items ledger</span>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-mono font-bold text-slate-400 uppercase tracking-wider block">
+                  Quotation line items ledger ({items.length})
+                </span>
+
+                <button
+                  type="button"
+                  onClick={() => handleRunQuotationAtpCheck()}
+                  disabled={isRunningAtpCheck || items.length === 0}
+                  className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 disabled:opacity-50 text-white rounded-lg text-xs font-mono font-bold transition flex items-center space-x-1.5 cursor-pointer shadow-3xs"
+                  title="Run 1-Click Consolidated ATP Availability Check across all quotation lines"
+                >
+                  <Sparkles className="h-3.5 w-3.5 text-indigo-200" />
+                  <span>{isRunningAtpCheck ? 'Checking...' : 'Check Availability'}</span>
+                </button>
+              </div>
+
+              {/* Consolidated Order/Quote ATP Availability Summary Panel */}
+              {(atpSummary || isRunningAtpCheck) && (
+                <OrderAtpSummaryPanel
+                  summary={atpSummary}
+                  isRunningCheck={isRunningAtpCheck}
+                  progress={atpProgress}
+                  isStaleFromEdit={isAtpStaleFromEdit}
+                  onRerunCheck={() => handleRunQuotationAtpCheck(true)}
+                  onClose={() => setAtpSummary(null)}
+                  onApplyEarliestDate={(earliestDateStr) => {
+                    toastInfo('Earliest Delivery Feasible', `Earliest feasible production completion date is ${earliestDateStr}.`);
+                  }}
+                  onAdviseSplitOrder={() => {
+                    toastInfo('Split Feasibility', 'Available items can be quoted as Phase 1 delivery.');
+                  }}
+                />
+              )}
 
               {/* Standard pre-selector */}
               <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 items-end bg-slate-50 p-4 border border-slate-200 rounded-lg">
@@ -668,7 +765,8 @@ export const QuotationEditorPage: React.FC = () => {
                     <thead>
                       <tr className="bg-slate-50/60 border-b border-slate-200 font-mono text-[9px] font-bold text-slate-400 uppercase tracking-wide">
                         <th className="py-2.5 px-4 text-left">Description Details</th>
-                        <th className="py-2.5 px-2 text-center w-20">Qty Code</th>
+                        <th className="py-2.5 px-3 text-left">Material Availability (ATP)</th>
+                        <th className="py-2.5 px-2 text-center w-20">Qty</th>
                         <th className="py-2.5 px-3 text-right w-28">Unit Price</th>
                         <th className="py-2.5 px-2 text-center w-20">GST Rate</th>
                         <th className="py-2.5 px-4 text-right w-32">Total (excl. Tax)</th>
@@ -676,28 +774,54 @@ export const QuotationEditorPage: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {items.map((itm, idx) => (
-                        <tr key={idx} className="hover:bg-slate-50/20 font-sans">
-                          {/* Desc */}
-                          <td className="py-3 px-4">
-                            <input
-                              type="text"
-                              className="w-full bg-slate-50 p-1 rounded hover:bg-white text-xs text-slate-800 font-mono focus:outline-hidden"
-                              value={itm.description}
-                              onChange={(e) => handleInlineChange(idx, 'description', e.target.value)}
-                            />
-                          </td>
+                      {items.map((itm, idx) => {
+                        const quoteItemAdapter: QuoteItem = {
+                          id: `q_itm_${idx}`,
+                          name: itm.description,
+                          quantity: itm.quantity,
+                          unitPrice: itm.unitPrice,
+                          gstPercent: itm.taxRate,
+                          total: itm.lineTotal,
+                          atpAcknowledgement: lineAcknowledgements[`q_itm_${idx}`] ? {
+                            acknowledgedBy: lineAcknowledgements[`q_itm_${idx}`].by,
+                            acknowledgedAt: lineAcknowledgements[`q_itm_${idx}`].at,
+                            reason: lineAcknowledgements[`q_itm_${idx}`].reason
+                          } : undefined
+                        };
 
-                          {/* Qty */}
-                          <td className="py-3 px-2">
-                            <input
-                              type="number"
-                              min="1"
-                              className="w-full bg-slate-50 p-1 text-center font-mono rounded hover:bg-white text-xs focus:outline-hidden"
-                              value={itm.quantity}
-                              onChange={(e) => handleInlineChange(idx, 'quantity', e.target.value)}
-                            />
-                          </td>
+                        return (
+                          <tr key={idx} className="hover:bg-slate-50/20 font-sans">
+                            {/* Desc */}
+                            <td className="py-3 px-4">
+                              <input
+                                type="text"
+                                className="w-full bg-slate-50 p-1 rounded hover:bg-white text-xs text-slate-800 font-mono focus:outline-hidden"
+                                value={itm.description}
+                                onChange={(e) => handleInlineChange(idx, 'description', e.target.value)}
+                              />
+                            </td>
+
+                            {/* ATP Availability Badge */}
+                            <td className="py-3 px-3">
+                              <MaterialAvailabilityBadge
+                                item={quoteItemAdapter}
+                                stockItems={warehouseStock}
+                                multiLevelBoms={multiLevelBoms}
+                                lastSyncedTimestamp={lastSyncedTimestamp}
+                                onOpenAcknowledgement={(atpRes) => setActiveAtpAckResult(atpRes)}
+                              />
+                            </td>
+
+                            {/* Qty */}
+                            <td className="py-3 px-2">
+                              <input
+                                type="number"
+                                min="1"
+                                className="w-full bg-slate-50 p-1 text-center font-mono rounded hover:bg-white text-xs focus:outline-hidden"
+                                value={itm.quantity}
+                                onChange={(e) => handleInlineChange(idx, 'quantity', e.target.value)}
+                              />
+                            </td>
 
                           {/* Price */}
                           <td className="py-3 px-3">
@@ -740,8 +864,9 @@ export const QuotationEditorPage: React.FC = () => {
                             </button>
                           </td>
                         </tr>
-                      ))}
-                    </tbody>
+                      );
+                    })}
+                  </tbody>
                   </table>
                 </div>
               ) : (
@@ -918,6 +1043,29 @@ export const QuotationEditorPage: React.FC = () => {
           onClose={() => setConversionModalOpen(false)}
           onOrderCreated={(createdOrder) => {
             navigate('/orders', { state: { preselectedOrderId: createdOrder.id } });
+          }}
+        />
+      )}
+
+      {/* ATP Shortfall Advisory Acknowledgement Modal */}
+      {activeAtpAckResult && (
+        <AtpAcknowledgementModal
+          isOpen={!!activeAtpAckResult}
+          atpResult={activeAtpAckResult}
+          userName={profile?.name || 'Sales Representative'}
+          userRole={profile?.role || 'sales'}
+          onClose={() => setActiveAtpAckResult(null)}
+          onConfirm={(reason) => {
+            setLineAcknowledgements(prev => ({
+              ...prev,
+              [activeAtpAckResult.orderItemId]: {
+                reason,
+                by: profile?.name || 'Sales Representative',
+                at: new Date().toISOString()
+              }
+            }));
+            toastSuccess('Shortfall Acknowledged', `Acknowledged reason logged for ${activeAtpAckResult.productName}.`);
+            setActiveAtpAckResult(null);
           }}
         />
       )}

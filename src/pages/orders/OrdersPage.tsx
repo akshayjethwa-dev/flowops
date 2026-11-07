@@ -9,8 +9,10 @@ import { OrdersBoardPage } from './OrdersBoardPage';
 import { ExportButton } from '../../components/ExportButton';
 import { GuardedAction } from '../../components/layout/GuardedAction';
 import { Order } from '../../types';
-import { Layers, Kanban, TableProperties, ShoppingBag, MessageSquare, Bot, Bell, Boxes } from 'lucide-react';
+import { Layers, Kanban, TableProperties, ShoppingBag, MessageSquare, Bot, Bell, Boxes, GitCommit } from 'lucide-react';
 import { BackordersProductionQueue } from '../../components/production/BackordersProductionQueue';
+import { OrderLifecycleManagementView } from '../../components/orders/OrderLifecycleManagementView';
+import { KanbanOrderPipelineBoard } from '../../components/orders/KanbanOrderPipelineBoard';
 
 export const OrdersPage: React.FC = () => {
   const location = useLocation();
@@ -20,7 +22,7 @@ export const OrdersPage: React.FC = () => {
   // Load full orders and jobs through production hook
   const { jobs, orders } = useProductionBoard(tenant?.id);
 
-  const [activeTab, setActiveTab ] = useState<'kanban' | 'analytical' | 'backorders'>('kanban');
+  const [activeTab, setActiveTab ] = useState<'pipeline' | 'kanban' | 'analytical' | 'backorders' | 'state_machine'>('pipeline');
 
   // Extract preselectedOrderId if passed state-wise
   const routerState = location.state as { preselectedOrderId?: string } | null;
@@ -127,7 +129,19 @@ export const OrdersPage: React.FC = () => {
           </button>
 
           {/* Tab Selection controller */}
-          <div className="flex items-center space-x-1.5 bg-slate-100 p-1.5 rounded-lg border border-slate-200 shadow-3xs shrink-0 select-none">
+          <div className="flex items-center space-x-1.5 bg-slate-100 p-1.5 rounded-lg border border-slate-200 shadow-3xs shrink-0 select-none overflow-x-auto">
+            <button
+              id="orders-pipeline-tab"
+              onClick={() => setActiveTab('pipeline')}
+              className={`px-3 py-1.5 rounded-md text-[10px] uppercase font-mono tracking-wider font-extrabold cursor-pointer transition-colors flex items-center space-x-1.5 ${
+                activeTab === 'pipeline' 
+                  ? 'bg-indigo-600 text-white shadow-2xs font-bold' 
+                  : 'text-indigo-900 hover:text-indigo-950 bg-indigo-50/70 hover:bg-indigo-100/70'
+              }`}
+            >
+              <Kanban className="h-3.5 w-3.5" />
+              <span>Order Pipeline (Kanban)</span>
+            </button>
             <button
               onClick={() => setActiveTab('kanban')}
               className={`px-3 py-1.5 rounded-md text-[10px] uppercase font-mono tracking-wider font-extrabold cursor-pointer transition-colors flex items-center space-x-1.5 ${
@@ -136,8 +150,8 @@ export const OrdersPage: React.FC = () => {
                   : 'text-slate-500 hover:text-slate-800'
               }`}
             >
-              <Kanban className="h-3.5 w-3.5" />
-              <span>Kanban Board</span>
+              <Layers className="h-3.5 w-3.5" />
+              <span>Shopfloor Jobs</span>
             </button>
             <button
               onClick={() => setActiveTab('analytical')}
@@ -162,11 +176,25 @@ export const OrdersPage: React.FC = () => {
               <Boxes className="h-3.5 w-3.5" />
               <span>Backorders Queue</span>
             </button>
+            <button
+              id="orders-state-machine-tab"
+              onClick={() => setActiveTab('state_machine')}
+              className={`px-3 py-1.5 rounded-md text-[10px] uppercase font-mono tracking-wider font-extrabold cursor-pointer transition-colors flex items-center space-x-1.5 ${
+                activeTab === 'state_machine' 
+                  ? 'bg-white text-indigo-650 shadow-2xs font-bold' 
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <GitCommit className="h-3.5 w-3.5" />
+              <span>State Machine Engine</span>
+            </button>
           </div>
         </div>
       </div>
 
-      {activeTab === 'kanban' ? (
+      {activeTab === 'pipeline' ? (
+        <KanbanOrderPipelineBoard />
+      ) : activeTab === 'kanban' ? (
         <OrdersBoardPage />
       ) : activeTab === 'analytical' ? (
         <ProductionSection
@@ -174,10 +202,12 @@ export const OrdersPage: React.FC = () => {
           clearPreselectedOrder={() => setPreselectedOrderId(null)}
           onInitiateDispatch={handleInitiateDispatch}
         />
-      ) : (
+      ) : activeTab === 'backorders' ? (
         <div className="bg-slate-50/60 p-4 rounded-xl border border-slate-200">
           <BackordersProductionQueue />
         </div>
+      ) : (
+        <OrderLifecycleManagementView />
       )}
     </div>
   );

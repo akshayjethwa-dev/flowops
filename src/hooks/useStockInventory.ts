@@ -180,6 +180,7 @@ export const useStockItems = (
   const [items, setItems] = useState<StockItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [lastSyncedTimestamp, setLastSyncedTimestamp] = useState<number>(Date.now());
 
   const isSandbox = localStorage.getItem('isSandboxMode') === 'true' || !db;
 
@@ -206,6 +207,7 @@ export const useStockItems = (
         }
 
         setItems(list);
+        setLastSyncedTimestamp(Date.now());
         setLoading(false);
       } catch (err: any) {
         setError(err.message || 'Error loading sandboxed inventory stock.');
@@ -247,6 +249,7 @@ export const useStockItems = (
         } else {
           setItems(list);
         }
+        setLastSyncedTimestamp(Date.now());
         setLoading(false);
       }, (err) => {
         handleFirestoreError(err, OperationType.LIST, colPath);
@@ -322,7 +325,8 @@ export const useStockItems = (
     rawItems: items,
     loading,
     error,
-    addStockItem
+    addStockItem,
+    lastSyncedTimestamp
   };
 };
 

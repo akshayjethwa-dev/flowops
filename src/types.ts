@@ -193,6 +193,14 @@ export interface QuoteItem {
   invoicedQty?: number;
   pendingInvoiceQty?: number;
   dispatchStatus?: 'pending' | 'partially-dispatched' | 'partially_dispatched' | 'fully_dispatched' | 'fulfilled';
+  lineItemStatus?: string; // e.g. 'enquiry' | 'quoted' | 'order_confirmed' | 'in_production' | 'partially_dispatched' | 'fully_dispatched' | 'invoiced' | 'payment_received' | 'closed';
+  producedQty?: number;
+  materialAvailability?: 'available' | 'partially_available' | 'unavailable';
+  atpAcknowledgement?: {
+    acknowledgedBy: string;
+    acknowledgedAt: string;
+    reason: string;
+  };
 }
 
 export interface QuotationTotals {
@@ -368,7 +376,18 @@ export interface Order {
   discountTotal?: number;
   totalAmount: number;
   deliveryDate?: string;
-  status: 'pending' | 'in-production' | 'produced' | 'Ready for Dispatch' | 'Partially Dispatched' | 'partially-dispatched' | 'Dispatched' | 'dispatched' | 'Fully Dispatched' | 'completed' | 'cancelled';
+  status: 'pending' | 'in-production' | 'produced' | 'Ready for Dispatch' | 'Partially Dispatched' | 'partially-dispatched' | 'partially_dispatched' | 'Dispatched' | 'dispatched' | 'Fully Dispatched' | 'completed' | 'cancelled' | 'enquiry' | 'quoted' | 'order_confirmed' | 'in_production' | 'fully_dispatched' | 'invoiced' | 'payment_received' | 'closed';
+  version?: number; // Optimistic concurrency control for state transitions (EC 3)
+  statusHistory?: any[]; // OrderStatusHistoryItem[]
+  isOnHold?: boolean; // EC: Order on hold
+  holdReason?: string;
+  holdActor?: string;
+  holdTimestamp?: string;
+  cancellationReason?: string; // EC: Order cancelled
+  cancellationActor?: string;
+  cancellationTimestamp?: string;
+  assignedOwner?: string; // Assigned sales / operations owner
+  assignedOwnerName?: string;
   dispatchHistory?: OrderDispatchHistoryEntry[];
   backorderIds?: string[];
   bomData?: any;

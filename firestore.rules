@@ -528,6 +528,22 @@ service cloud.firestore {
         allow read, write: if isTenantMember(tenantId);
       }
 
+      match /jobWorkGatePasses/{passId} {
+        allow read, write: if isTenantMember(tenantId);
+      }
+
+      match /jobWorkerStocks/{stockId} {
+        allow read, write: if isTenantMember(tenantId);
+      }
+
+      match /jobWorkGRNs/{grnId} {
+        allow read, write: if isTenantMember(tenantId);
+      }
+
+      match /vendorStockLedger/{ledgerId} {
+        allow read, write: if isTenantMember(tenantId);
+      }
+
       match /loginAuditLogs/{logId} {
         allow read: if isTenantMember(tenantId) && getUserRole() in ['admin', 'manager', 'management'];
         allow create: if isSignedIn();

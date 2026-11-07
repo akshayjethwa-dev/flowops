@@ -24,9 +24,9 @@ import {
   filterBomByAsOfDate
 } from '../services/multiLevelBomService';
 
-export function useMultiLevelBom() {
+export function useMultiLevelBom(tenantIdOverride?: string) {
   const { tenant, profile, isSandboxMode } = useAuth();
-  const tenantId = tenant?.id || 'tenant_default';
+  const tenantId = tenantIdOverride || tenant?.id || 'tenant_default';
 
   const [boms, setBoms] = useState<MultiLevelBom[]>([]);
   const [ecos, setEcos] = useState<EngineeringChangeOrder[]>([]);

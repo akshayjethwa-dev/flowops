@@ -418,6 +418,75 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["id", "invoiceNumber", "tenantId", "orderId", "orderNumber", "customerId", "customerName", "total", "status", "createdAt"]
+    },
+    "JobWorkGatePass": {
+      "title": "JobWorkGatePass",
+      "description": "Outward and Inward Job Work Delivery Challans compliant with Rule 45 CGST",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "gatePassNumber": { "type": "string" },
+        "type": { "type": "string", "enum": ["outward", "inward"] },
+        "jobWorkerId": { "type": "string" },
+        "jobWorkerName": { "type": "string" },
+        "natureOfWork": { "type": "string" },
+        "expectedReturnDate": { "type": "string" },
+        "dispatchedDate": { "type": "string" },
+        "status": { "type": "string", "enum": ["issued", "in_transit", "partially_returned", "completed", "short_closed", "cancelled"] }
+      },
+      "required": ["id", "tenantId", "gatePassNumber", "type", "jobWorkerName", "natureOfWork", "status"]
+    },
+    "JobWorkerStock": {
+      "title": "JobWorkerStock",
+      "description": "Stock balance held at external job worker / subcontractor premises",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "vendorId": { "type": "string" },
+        "vendorName": { "type": "string" },
+        "materialCode": { "type": "string" },
+        "quantityWithVendor": { "type": "number" },
+        "uom": { "type": "string" }
+      },
+      "required": ["id", "tenantId", "vendorId", "quantityWithVendor"]
+    },
+    "JobWorkGRN": {
+      "title": "JobWorkGRN",
+      "description": "Goods Receipt Note auto-generated on inward return from job worker",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "grnNumber": { "type": "string" },
+        "inwardGatePassId": { "type": "string" },
+        "outwardGatePassId": { "type": "string" },
+        "jobWorkerName": { "type": "string" },
+        "receiptDate": { "type": "string" },
+        "totalProcessedQty": { "type": "number" },
+        "totalRejectedQty": { "type": "number" },
+        "processingCharges": { "type": "number" }
+      },
+      "required": ["id", "tenantId", "grnNumber", "inwardGatePassId", "outwardGatePassId", "jobWorkerName", "receiptDate"]
+    },
+    "VendorStockLedger": {
+      "title": "VendorStockLedger",
+      "description": "Audit ledger tracking sent, returned, rejected, and balance quantities with vendors",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "vendorId": { "type": "string" },
+        "vendorName": { "type": "string" },
+        "materialCode": { "type": "string" },
+        "transactionType": { "type": "string" },
+        "refNumber": { "type": "string" },
+        "sentQty": { "type": "number" },
+        "returnedQty": { "type": "number" },
+        "balanceQty": { "type": "number" }
+      },
+      "required": ["id", "tenantId", "vendorId", "transactionType", "refNumber", "balanceQty"]
     }
   },
   "firestore": {
@@ -468,6 +537,22 @@
     "tenants/{tenantId}/stockItems/{itemId}/ledger": {
       "schema": "StockLedgerEntry",
       "description": "Grand chronological manual ledger entries for each inventory item"
+    },
+    "tenants/{tenantId}/jobWorkGatePasses": {
+      "schema": "JobWorkGatePass",
+      "description": "Job work outward and inward gate pass delivery challans"
+    },
+    "tenants/{tenantId}/jobWorkerStocks": {
+      "schema": "JobWorkerStock",
+      "description": "Live physical inventory held at external job worker facilities"
+    },
+    "tenants/{tenantId}/jobWorkGRNs": {
+      "schema": "JobWorkGRN",
+      "description": "Goods Receipt Notes generated upon inward receipt of job work materials"
+    },
+    "tenants/{tenantId}/vendorStockLedger": {
+      "schema": "VendorStockLedger",
+      "description": "Chronological audit ledger of material movements between factory and job workers"
     },
 
     "users": {

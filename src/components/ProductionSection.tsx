@@ -20,8 +20,15 @@ import { logActivityEvent } from '../utils/activityLogger';
 import { ActivityTimeline } from './ActivityTimeline';
 import { PRODUCTION_STAGES_ENUM } from '../data/mockData';
 import { sendWhatsAppNotification } from '../utils/whatsapp';
-import { Layers, Calendar, ArrowRight, ClipboardList, PenTool, CheckCircle2, MessageSquare, Plus, Clock, Zap, Boxes } from 'lucide-react';
+import { Layers, Calendar, ArrowRight, ClipboardList, PenTool, CheckCircle2, MessageSquare, Plus, Clock, Zap, Boxes, GitBranch, History } from 'lucide-react';
 import { GenerateWorkOrdersModal } from './orders/GenerateWorkOrdersModal';
+import { OrderLifecycleStepper } from './orders/OrderLifecycleStepper';
+import { VisualOrderLifecycleBar } from './orders/VisualOrderLifecycleBar';
+import { OrderDetailModal } from './orders/OrderDetailModal';
+import { OrderStatusHistoryModal } from './orders/OrderStatusHistoryModal';
+import { OrderStateTransitionModal } from './orders/OrderStateTransitionModal';
+import { OrderLifecycleState, normalizeOrderState } from '../types/orderStateMachine';
+import { OrderStateMachineService } from '../services/orderStateMachineService';
 
 interface ProductionSectionProps {
   preselectedOrderId: string | null;
@@ -46,6 +53,14 @@ export const ProductionSection: React.FC<ProductionSectionProps> = ({
   const [stageNotes, setStageNotes] = useState('');
   const [selectedStage, setSelectedStage] = useState<string>('cutting');
   const [orderForWorkOrders, setOrderForWorkOrders] = useState<Order | null>(null);
+  
+  // State Machine modals state
+  const [historyOrder, setHistoryOrder] = useState<Order | null>(null);
+  const [transitionOrder, setTransitionOrder] = useState<Order | null>(null);
+  const [transitionTargetState, setTransitionTargetState] = useState<OrderLifecycleState>('in_production');
+  const [isOverrideModal, setIsOverrideModal] = useState<boolean>(false);
+  const [selectedOrderForStepperId, setSelectedOrderForStepperId] = useState<string | null>(null);
+  const [orderDetailModalTarget, setOrderDetailModalTarget] = useState<Order | null>(null);
 
   // Load Orders & Jobs
   useEffect(() => {
@@ -54,7 +69,9 @@ export const ProductionSection: React.FC<ProductionSectionProps> = ({
     if (isSandboxMode) {
       // Direct load from local stores
       const cachedOrders = localStorage.getItem(`orders_${tenant.id}`) || '[]';
-      const parsedOrders = JSON.parse(cachedOrders);
+      let parsedOrders: Order[] = JSON.parse(cachedOrders);
+      // Ensure orders have initialized version and statusHistory
+      parsedOrders = parsedOrders.map(o => OrderStateMachineService.seedInitialStateHistoryIfEmpty(o, profile?.name));
       setOrders(parsedOrders);
 
       const cachedJobs = localStorage.getItem(`jobs_${tenant.id}`);
@@ -547,6 +564,56 @@ export const ProductionSection: React.FC<ProductionSectionProps> = ({
                     </div>
                   </div>
 
+                    {/* Visual Order Lifecycle Bar (Stepper with Tooltips, Checkmarks, Metrics, On Hold, Line States) */}
+                    <div className="mt-4 pt-3 border-t border-slate-100">
+                      <VisualOrderLifecycleBar
+                        order={order}
+                        canManageHold={['admin', 'manager', 'management', 'production'].includes(profile?.role || 'viewer')}
+                        onHoldToggle={(putOnHold, reason) => {
+                          const updated: Order = {
+                            ...order,
+                            isOnHold: putOnHold,
+                            holdReason: putOnHold ? reason : undefined,
+                            holdActor: putOnHold ? `${profile?.name || 'Supervisor'} (${profile?.role})` : undefined,
+                            holdTimestamp: putOnHold ? new Date().toISOString() : undefined,
+                            version: (order.version || 1) + 1,
+                            updatedAt: new Date().toISOString()
+                          };
+                          setOrders(prev => prev.map(o => o.id === updated.id ? updated : o));
+                          try {
+                            const localKey = `orders_${tenant?.id}`;
+                            const cached = localStorage.getItem(localKey);
+                            if (cached) {
+                              const list: Order[] = JSON.parse(cached);
+                              const idx = list.findIndex(o => o.id === updated.id);
+                              if (idx !== -1) {
+                                list[idx] = updated;
+                                localStorage.setItem(localKey, JSON.stringify(list));
+                              }
+                            }
+                          } catch (e) {
+                            console.warn(e);
+                          }
+                        }}
+                      />
+                    </div>
+
+                    {/* Interactive State Machine Stepper & Controls */}
+                    <div className="mt-3 pt-3 border-t border-slate-100">
+                      <OrderLifecycleStepper
+                        order={order}
+                        userRole={profile?.role || 'viewer'}
+                        onInitiateTransition={(targetState, isOverride) => {
+                          setTransitionOrder(order);
+                          setTransitionTargetState(targetState);
+                          setIsOverrideModal(!!isOverride);
+                        }}
+                        onViewHistory={() => {
+                          setHistoryOrder(order);
+                        }}
+                      />
+                    </div>
+
                   {/* Move to dispatch button if all ready */}
                   <div className="mt-5 pt-3.5 border-t border-slate-100 flex items-center justify-between">
                     <span className="text-[10px] font-mono text-slate-400">
@@ -561,6 +628,15 @@ export const ProductionSection: React.FC<ProductionSectionProps> = ({
                       >
                         <Zap className="h-3 w-3 text-indigo-200" />
                         <span>{((order as any).workOrderNumbers?.length || 0) > 0 ? 'Work Orders' : '⚡ Generate Work Orders'}</span>
+                      </button>
+
+                      <button
+                        onClick={() => setOrderDetailModalTarget(order)}
+                        className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-bold text-[10px] uppercase tracking-wider px-2.5 py-1.5 rounded flex items-center space-x-1 cursor-pointer transition-all shrink-0"
+                        title="Open comprehensive Order Detail Page & Visual Lifecycle Bar"
+                      >
+                        <Layers className="h-3 w-3 text-indigo-500" />
+                        <span>View Order Detail</span>
                       </button>
 
                       <button
@@ -605,6 +681,57 @@ export const ProductionSection: React.FC<ProductionSectionProps> = ({
           order={orderForWorkOrders}
           onSuccess={(workOrders, updatedOrder) => {
             setOrders(prev => prev.map(o => o.id === updatedOrder.id ? updatedOrder : o));
+          }}
+        />
+      )}
+
+      {/* Order State Transition Modal (Enforced Rules, Concurrency Check, Admin Override, Partial Dispatch Cancellation) */}
+      {transitionOrder && (
+        <OrderStateTransitionModal
+          isOpen={!!transitionOrder}
+          order={transitionOrder}
+          targetState={transitionTargetState}
+          isOverrideModal={isOverrideModal}
+          userRole={profile?.role || 'viewer'}
+          userName={profile?.name || 'Operations Lead'}
+          userId={profile?.uid || 'user_demo'}
+          userEmail={profile?.email}
+          tenantId={tenant?.id || 'demo_tenant'}
+          isSandboxMode={isSandboxMode}
+          onClose={() => {
+            setTransitionOrder(null);
+            setIsOverrideModal(false);
+          }}
+          onSuccess={(updatedOrder) => {
+            setOrders(prev => prev.map(o => o.id === updatedOrder.id ? updatedOrder : o));
+          }}
+        />
+      )}
+
+      {/* Order Status History Immutable Audit Timeline Drawer */}
+      {historyOrder && (
+        <OrderStatusHistoryModal
+          isOpen={!!historyOrder}
+          order={historyOrder}
+          onClose={() => setHistoryOrder(null)}
+        />
+      )}
+
+      {/* Full Order Detail Workspace Modal */}
+      {orderDetailModalTarget && (
+        <OrderDetailModal
+          isOpen={!!orderDetailModalTarget}
+          order={orderDetailModalTarget}
+          userRole={profile?.role || 'viewer'}
+          userName={profile?.name || 'Operations Lead'}
+          userId={profile?.uid || 'user_lead'}
+          userEmail={profile?.email}
+          tenantId={tenant?.id || 'demo_tenant'}
+          isSandboxMode={isSandboxMode}
+          onClose={() => setOrderDetailModalTarget(null)}
+          onOrderUpdated={(updated) => {
+            setOrders(prev => prev.map(o => o.id === updated.id ? updated : o));
+            setOrderDetailModalTarget(updated);
           }}
         />
       )}

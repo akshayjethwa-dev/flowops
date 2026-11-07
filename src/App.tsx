@@ -37,6 +37,7 @@ import { InventoryPage } from './pages/InventoryPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { PublicRfqWebFormPage } from './pages/public/PublicRfqWebFormPage';
 import { SubcontractorsPage } from './pages/subcontractors/SubcontractorsPage';
+import { JobWorkPage } from './pages/job-work/JobWorkPage';
 import { MultiLevelBomPage } from './pages/engineering/MultiLevelBomPage';
 import { RoutingsPage } from './pages/engineering/RoutingsPage';
 import { FiniteSchedulingPage } from './pages/planning/FiniteSchedulingPage';
@@ -294,9 +295,27 @@ export default function App() {
                 />
 
                 <Route 
+                  path="job-work" 
+                  element={
+                    <ProtectedRoute allowedRoles={['admin', 'manager', 'operator', 'store_keeper', 'production', 'management', 'viewer', 'sales']}>
+                      <JobWorkPage />
+                    </ProtectedRoute>
+                  } 
+                />
+
+                <Route 
+                  path="job-work/gate-pass" 
+                  element={
+                    <ProtectedRoute allowedRoles={['admin', 'manager', 'operator', 'store_keeper', 'production', 'management', 'viewer', 'sales']}>
+                      <JobWorkPage />
+                    </ProtectedRoute>
+                  } 
+                />
+
+                <Route 
                   path="orders" 
                   element={
-                    <ProtectedRoute allowedRoles={['admin', 'manager', 'operator', 'quality_inspector', 'store_keeper', 'production', 'management', 'viewer']}>
+                    <ProtectedRoute allowedRoles={['admin', 'manager', 'sales', 'dispatch', 'operator', 'quality_inspector', 'store_keeper', 'production', 'management', 'viewer']}>
                       <OrdersPage />
                     </ProtectedRoute>
                   } 

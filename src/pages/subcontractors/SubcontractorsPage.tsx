@@ -1,7 +1,7 @@
 // src/pages/subcontractors/SubcontractorsPage.tsx
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { 
   Building2, 
   Send, 
@@ -50,6 +50,7 @@ export const SubcontractorsPage: React.FC = () => {
   const { toastSuccess, toastError, toastInfo } = useToast();
 
   const location = useLocation();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'rfqs' | 'directory' | 'pos'>('rfqs');
   const [subcontractors, setSubcontractors] = useState<Subcontractor[]>([]);
   const [rfqs, setRfqs] = useState<SubcontractRfq[]>([]);
@@ -214,6 +215,15 @@ export const SubcontractorsPage: React.FC = () => {
           >
             <Building2 className="h-4 w-4 text-slate-500" />
             <span>Add Subcontractor</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => navigate('/job-work')}
+            className="border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-mono text-[10px] uppercase font-bold tracking-wider px-3.5 py-2.5 rounded-xl flex items-center space-x-1.5 cursor-pointer transition-colors shadow-3xs"
+          >
+            <Truck className="h-4 w-4 text-indigo-600" />
+            <span>Job Work Gate Passes</span>
           </button>
 
           <button
