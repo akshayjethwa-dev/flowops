@@ -19,6 +19,7 @@ import {
   normalizeOrderState 
 } from '../types/orderStateMachine';
 import { logActivityEvent } from '../utils/activityLogger';
+import { transitionOrderState } from './orderStateService';
 
 export interface TransitionValidationResult {
   valid: boolean;
@@ -90,18 +91,17 @@ export class OrderStateMachineService {
 
     // ADMIN OVERRIDE PATH (Edge Case 1)
     if (isOverride) {
-      const allowedOverrideRoles: UserRole[] = ['admin', 'manager', 'management'];
-      if (!allowedOverrideRoles.includes(userRole)) {
+      if (userRole !== 'admin') {
         return {
           valid: false,
-          error: `Permission Denied: Only Admin or Management can execute a State Machine Override.`
+          error: `Only admins can override order state.`
         };
       }
 
-      if (!overrideReason || overrideReason.trim().length < 5) {
+      if (!overrideReason || overrideReason.trim().length < 10) {
         return {
           valid: false,
-          error: `A mandatory reason for Admin Override is required (minimum 5 characters).`
+          error: `Override reason must be at least 10 characters.`
         };
       }
 
@@ -158,6 +158,36 @@ export class OrderStateMachineService {
     },
     options: ExecuteTransitionOptions = {}
   ): Promise<{ success: boolean; order: Order; historyItem: OrderStatusHistoryItem }> {
+    const res = await transitionOrderState(
+      orderId,
+      targetState,
+      actor.userId,
+      options.remarks,
+      {
+        ...options,
+        tenantId,
+        userRole: actor.userRole,
+        userName: actor.userName,
+        userEmail: actor.email
+      }
+    );
+    return {
+      success: res.success,
+      order: res.order,
+      historyItem: res.historyItem
+    };
+  }
+
+  /**
+   * Legacy transaction and sandbox handlers kept for reference
+   */
+  private static async executeTransitionFirestore(
+    tenantId: string,
+    orderId: string,
+    targetState: OrderLifecycleState,
+    actor: any,
+    options: any = {}
+  ): Promise<any> {
     const {
       remarks = '',
       isOverride = false,
@@ -167,16 +197,6 @@ export class OrderStateMachineService {
       metadata = {},
       isSandboxMode = false
     } = options;
-
-    if (isSandboxMode) {
-      return this.executeTransitionSandbox(
-        tenantId,
-        orderId,
-        targetState,
-        actor,
-        options
-      );
-    }
 
     // FIRESTORE TRANSACTION PATH
     try {

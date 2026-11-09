@@ -93,8 +93,8 @@ export const OrderStateTransitionModal: React.FC<OrderStateTransitionModalProps>
       return;
     }
 
-    if (isOverrideModal && (!overrideReason || overrideReason.trim().length < 5)) {
-      setErrorMessage('Admin Override requires a mandatory reason (minimum 5 characters).');
+    if (isOverrideModal && (!overrideReason || overrideReason.trim().length < 10)) {
+      setErrorMessage('Override reason must be at least 10 characters.');
       return;
     }
 
@@ -298,17 +298,29 @@ export const OrderStateTransitionModal: React.FC<OrderStateTransitionModalProps>
           {/* Edge Case 1: Admin Override Reason Field */}
           {isOverrideModal && (
             <div className="space-y-1.5">
-              <label className="block text-xs font-mono font-bold text-amber-900 uppercase tracking-wider flex items-center space-x-1">
-                <ShieldAlert className="h-3.5 w-3.5 text-amber-600" />
-                <span>Mandatory Override Justification (Min 5 chars) *</span>
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-mono font-bold text-amber-900 uppercase tracking-wider flex items-center space-x-1">
+                  <ShieldAlert className="h-3.5 w-3.5 text-amber-600" />
+                  <span>Mandatory Override Justification *</span>
+                </label>
+                <span className={`text-[10px] font-mono font-bold ${
+                  overrideReason.trim().length >= 10 ? 'text-emerald-700' : 'text-amber-700'
+                }`}>
+                  {overrideReason.trim().length}/10 chars minimum
+                </span>
+              </div>
               <textarea
                 value={overrideReason}
                 onChange={(e) => setOverrideReason(e.target.value)}
-                placeholder="Explain why an out-of-sequence override is necessary (e.g. ERP sync correction, manual customer fast-track approval, production rework loop)..."
+                placeholder="Explain why an out-of-sequence override is necessary (e.g. Incorrectly advanced by supervisor on 05 Nov, data-entry correction, etc.)..."
                 rows={2}
                 className="w-full text-xs p-2.5 rounded-lg border border-amber-300 focus:ring-2 focus:ring-amber-500 focus:outline-none bg-amber-50/20 text-slate-900 font-sans"
               />
+              {overrideReason.length > 0 && overrideReason.trim().length < 10 && (
+                <p className="text-[11px] text-amber-700 font-mono">
+                  Needs at least {10 - overrideReason.trim().length} more characters.
+                </p>
+              )}
             </div>
           )}
 

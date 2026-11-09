@@ -23,7 +23,6 @@ import { sendWhatsAppNotification } from '../utils/whatsapp';
 import { Layers, Calendar, ArrowRight, ClipboardList, PenTool, CheckCircle2, MessageSquare, Plus, Clock, Zap, Boxes, GitBranch, History } from 'lucide-react';
 import { GenerateWorkOrdersModal } from './orders/GenerateWorkOrdersModal';
 import { OrderLifecycleStepper } from './orders/OrderLifecycleStepper';
-import { VisualOrderLifecycleBar } from './orders/VisualOrderLifecycleBar';
 import { OrderDetailModal } from './orders/OrderDetailModal';
 import { OrderStatusHistoryModal } from './orders/OrderStatusHistoryModal';
 import { OrderStateTransitionModal } from './orders/OrderStateTransitionModal';
@@ -564,10 +563,11 @@ export const ProductionSection: React.FC<ProductionSectionProps> = ({
                     </div>
                   </div>
 
-                    {/* Visual Order Lifecycle Bar (Stepper with Tooltips, Checkmarks, Metrics, On Hold, Line States) */}
+                    {/* Visual Order Lifecycle Stepper & Controls */}
                     <div className="mt-4 pt-3 border-t border-slate-100">
-                      <VisualOrderLifecycleBar
+                      <OrderLifecycleStepper
                         order={order}
+                        userRole={profile?.role || 'viewer'}
                         canManageHold={['admin', 'manager', 'management', 'production'].includes(profile?.role || 'viewer')}
                         onHoldToggle={(putOnHold, reason) => {
                           const updated: Order = {
@@ -595,14 +595,6 @@ export const ProductionSection: React.FC<ProductionSectionProps> = ({
                             console.warn(e);
                           }
                         }}
-                      />
-                    </div>
-
-                    {/* Interactive State Machine Stepper & Controls */}
-                    <div className="mt-3 pt-3 border-t border-slate-100">
-                      <OrderLifecycleStepper
-                        order={order}
-                        userRole={profile?.role || 'viewer'}
                         onInitiateTransition={(targetState, isOverride) => {
                           setTransitionOrder(order);
                           setTransitionTargetState(targetState);

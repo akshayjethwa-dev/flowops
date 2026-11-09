@@ -32,6 +32,7 @@ export interface OrderStatusHistoryItem {
   remarks?: string;
   isOverride?: boolean;
   overrideReason?: string;
+  unmetPreconditionWarning?: string;
   version: number;
   // Specific metadata for audit
   metadata?: {
@@ -145,6 +146,78 @@ export const ORDER_LIFECYCLE_STATES: {
     iconName: 'XCircle'
   }
 ];
+
+export const STATE_DISPLAY_NAMES: Record<OrderLifecycleState, string> = {
+  enquiry: 'Enquiry',
+  quoted: 'Quoted',
+  order_confirmed: 'Order Confirmed',
+  in_production: 'In Production',
+  partially_dispatched: 'Partially Dispatched',
+  fully_dispatched: 'Fully Dispatched',
+  invoiced: 'Invoiced',
+  payment_received: 'Payment Received',
+  closed: 'Closed',
+  cancelled: 'Cancelled'
+};
+
+/**
+ * Direct mapping of allowed forward and reversible transitions from each state.
+ * Valid transition: from → to must exist in this ALLOWED_TRANSITIONS map.
+ */
+export const ALLOWED_TRANSITIONS: Record<OrderLifecycleState, OrderLifecycleState[]> = {
+  enquiry: ['quoted', 'cancelled'],
+  quoted: ['order_confirmed', 'enquiry', 'cancelled'],
+  order_confirmed: ['in_production', 'cancelled'],
+  in_production: ['partially_dispatched', 'fully_dispatched', 'cancelled'],
+  partially_dispatched: ['fully_dispatched', 'cancelled'],
+  fully_dispatched: ['invoiced'],
+  invoiced: ['payment_received'],
+  payment_received: ['closed'],
+  closed: [],
+  cancelled: []
+};
+
+// ── Typed State Machine Errors ──────────────────────────────────────
+
+export class InvalidTransitionError extends Error {
+  name = 'InvalidTransitionError';
+  constructor(message: string) {
+    super(message);
+    Object.setPrototypeOf(this, InvalidTransitionError.prototype);
+  }
+}
+
+export class UnauthorizedTransitionError extends Error {
+  name = 'UnauthorizedTransitionError';
+  constructor(message: string) {
+    super(message);
+    Object.setPrototypeOf(this, UnauthorizedTransitionError.prototype);
+  }
+}
+
+export class PreconditionFailedError extends Error {
+  name = 'PreconditionFailedError';
+  constructor(message: string) {
+    super(message);
+    Object.setPrototypeOf(this, PreconditionFailedError.prototype);
+  }
+}
+
+export class ValidationError extends Error {
+  name = 'ValidationError';
+  constructor(message: string) {
+    super(message);
+    Object.setPrototypeOf(this, ValidationError.prototype);
+  }
+}
+
+export class StaleStateError extends Error {
+  name = 'StaleStateError';
+  constructor(message: string = 'Order status has changed. Please refresh.') {
+    super(message);
+    Object.setPrototypeOf(this, StaleStateError.prototype);
+  }
+}
 
 /**
  * Canonical state machine transition rules.

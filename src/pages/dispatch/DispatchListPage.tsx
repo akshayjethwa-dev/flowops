@@ -19,17 +19,19 @@ import {
   ShieldCheck,
   AlertOctagon,
   Boxes,
-  Receipt
+  Receipt,
+  QrCode
 } from 'lucide-react';
 import { Order, Backorder, Dispatch } from '../../types';
 import { DispatchReleaseGateBadge } from '../../components/fqc/DispatchReleaseGateBadge';
 import { qualityHoldService } from '../../services/qualityHoldService';
 import { getBackordersSync } from '../../services/partialDispatchService';
 import { GeneratePartialInvoiceModal } from '../../components/dispatch/GeneratePartialInvoiceModal';
+import { GenerateEInvoiceModal } from '../../components/dispatch/GenerateEInvoiceModal';
 
 export const DispatchListPage: React.FC = () => {
   const navigate = useNavigate();
-  const { tenant } = useAuth();
+  const { tenant, profile } = useAuth();
   
   // Dynamic filter state conforming to FilterBar
   const [filters, setFilters] = useState<Record<string, any>>({
@@ -100,6 +102,10 @@ export const DispatchListPage: React.FC = () => {
   // Partial Invoicing Modal state
   const [invoicingDispatch, setInvoicingDispatch] = useState<Dispatch | null>(null);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+
+  // e-Invoice Modal state
+  const [eInvoiceDispatch, setEInvoiceDispatch] = useState<Dispatch | null>(null);
+  const [showEInvoiceModal, setShowEInvoiceModal] = useState(false);
 
   // Load orders & backorders for dispatch dropdown selection
   useEffect(() => {
@@ -395,6 +401,35 @@ export const DispatchListPage: React.FC = () => {
                           )
                         )}
 
+                        {/* e-Invoice trigger / badge */}
+                        {disp.status !== 'Cancelled' && (
+                          disp.eInvoice?.status === 'generated' || disp.irn ? (
+                            <span 
+                              className="inline-flex items-center space-x-1 px-2 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded text-[9px] font-mono font-bold uppercase"
+                              title={`IRN Generated: ${disp.irn || disp.eInvoice?.irn}`}
+                            >
+                              <QrCode className="h-3 w-3 text-indigo-600" />
+                              <span>IRN</span>
+                            </span>
+                          ) : (
+                            ['admin', 'finance', 'management'].includes((profile?.role || '').toLowerCase()) && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEInvoiceDispatch(disp);
+                                  setShowEInvoiceModal(true);
+                                }}
+                                className="inline-flex items-center space-x-1 px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-[9px] font-mono font-bold uppercase transition cursor-pointer"
+                                title="Generate GST e-Invoice (IRN & QR)"
+                              >
+                                <QrCode className="h-3 w-3 text-indigo-600" />
+                                <span>e-Invoice</span>
+                              </button>
+                            )
+                          )
+                        )}
+
                         <button
                           onClick={() => navigate(`/dispatch/${disp.id}`)}
                           className="p-1 px-2.5 border border-slate-200 rounded-lg hover:border-indigo-300 hover:text-indigo-655 hover:bg-indigo-50/20 transition cursor-pointer font-mono font-bold uppercase text-[9px]"
@@ -454,6 +489,11 @@ export const DispatchListPage: React.FC = () => {
                           Generate Invoice
                         </button>
                       )
+                    )}
+                    {disp.eInvoice?.status === 'generated' && (
+                      <span className="text-[9px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
+                        IRN
+                      </span>
                     )}
                     <span className="text-indigo-650 font-bold flex items-center">
                       Review <ChevronRight className="h-3 w-3 ml-0.5" />
@@ -692,6 +732,21 @@ export const DispatchListPage: React.FC = () => {
             setInvoicingDispatch(null);
           }}
           dispatch={invoicingDispatch}
+          onSuccess={() => {
+            reset();
+          }}
+        />
+      )}
+
+      {/* e-INVOICE GENERATION MODAL (IRN & Signed QR) */}
+      {showEInvoiceModal && eInvoiceDispatch && (
+        <GenerateEInvoiceModal
+          isOpen={showEInvoiceModal}
+          onClose={() => {
+            setShowEInvoiceModal(false);
+            setEInvoiceDispatch(null);
+          }}
+          dispatch={eInvoiceDispatch}
           onSuccess={() => {
             reset();
           }}

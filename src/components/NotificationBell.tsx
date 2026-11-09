@@ -88,6 +88,11 @@ export const NotificationBell: React.FC = () => {
           icon: CheckCircle,
           iconClass: 'text-indigo-600 bg-indigo-50 border border-indigo-100',
         };
+      case 'order_override':
+        return {
+          icon: ShieldAlert,
+          iconClass: 'text-rose-600 bg-rose-50 border border-rose-200',
+        };
       case 'quote_approval_request':
         return {
           icon: ShieldAlert,

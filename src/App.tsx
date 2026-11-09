@@ -27,6 +27,7 @@ import { RfqCreateForm } from './pages/rfqs/RfqCreateForm';
 import { RfqDetailPage } from './pages/rfqs/RfqDetailPage';
 import { QuotationEditorPage } from './pages/rfqs/QuotationEditorPage';
 import { OrdersPage } from './pages/orders/OrdersPage';
+import { CommercialPipelinePage } from './pages/orders/CommercialPipelinePage';
 import { JobDetailPage } from './pages/orders/JobDetailPage';
 import { ProductionPage } from './pages/ProductionPage';
 import { DispatchPage } from './pages/dispatch/DispatchPage';
@@ -317,6 +318,15 @@ export default function App() {
                   element={
                     <ProtectedRoute allowedRoles={['admin', 'manager', 'sales', 'dispatch', 'operator', 'quality_inspector', 'store_keeper', 'production', 'management', 'viewer']}>
                       <OrdersPage />
+                    </ProtectedRoute>
+                  } 
+                />
+
+                <Route 
+                  path="pipeline" 
+                  element={
+                    <ProtectedRoute allowedRoles={['admin', 'manager', 'sales', 'dispatch', 'operator', 'quality_inspector', 'store_keeper', 'production', 'management', 'viewer']}>
+                      <CommercialPipelinePage />
                     </ProtectedRoute>
                   } 
                 />

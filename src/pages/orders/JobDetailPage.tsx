@@ -40,6 +40,7 @@ import { useWorkOrders, WorkOrder } from '../../hooks/useWorkOrders';
 import { DispatchCreateForm } from '../dispatch/DispatchCreateForm';
 import { getOrderLinesQuantities, getBackordersForOrder } from '../../services/partialDispatchService';
 import { GeneratePartialInvoiceModal } from '../../components/dispatch/GeneratePartialInvoiceModal';
+import { OrderLifecycleStepper } from '../../components/orders/OrderLifecycleStepper';
 import { Order, Backorder, Dispatch } from '../../types';
 
 const defaultStages = [
@@ -335,6 +336,12 @@ export const JobDetailPage: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
         <div className="lg:col-span-2 space-y-6">
+
+          {/* VISUAL ORDER LIFECYCLE STEPPER */}
+          <OrderLifecycleStepper
+            order={effectiveOrder}
+            userRole={(profile?.role as any) || 'sales'}
+          />
 
           {/* ORDER LINE ITEMS & DISPATCH FULFILLMENT BREAKDOWN */}
           <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-2xs space-y-5">

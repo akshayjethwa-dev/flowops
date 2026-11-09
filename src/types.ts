@@ -196,6 +196,8 @@ export interface QuoteItem {
   lineItemStatus?: string; // e.g. 'enquiry' | 'quoted' | 'order_confirmed' | 'in_production' | 'partially_dispatched' | 'fully_dispatched' | 'invoiced' | 'payment_received' | 'closed';
   producedQty?: number;
   materialAvailability?: 'available' | 'partially_available' | 'unavailable';
+  atpShortfalls?: any[];
+  atpSnapshot?: any;
   atpAcknowledgement?: {
     acknowledgedBy: string;
     acknowledgedAt: string;
@@ -394,6 +396,15 @@ export interface Order {
   routingData?: any;
   termsAndConditions?: string;
   notes?: string;
+  hasOverride?: boolean;
+  isForceOverridden?: boolean;
+  unmetPreconditionWarning?: string;
+  lastOverrideReason?: string;
+  lastOverrideBy?: string;
+  lastOverrideAt?: string;
+  shortfallAcknowledgementReason?: string;
+  atpSnapshot?: any;
+  hasAtpShortfall?: boolean;
   createdBy: string;
   createdAt: any;
   updatedAt?: any;
@@ -475,6 +486,14 @@ export interface Dispatch {
   invoiceId?: string;
   isInvoiced?: boolean;
   invoicedAt?: any;
+  // GST e-Invoice (IRP) tracking fields
+  eInvoice?: any;
+  eInvoiceStatus?: 'pending' | 'generated' | 'cancelled' | 'e_invoice_failed' | string;
+  eInvoiceFailedReason?: string;
+  irn?: string;
+  ackNo?: string;
+  ackDate?: string;
+  signedQrCode?: string;
   status: 'Planned' | 'Dispatched' | 'Delivered' | 'Cancelled' | 'shipped' | 'delivered';
   dispatchedAt: any;
   notes?: string;
@@ -535,6 +554,8 @@ export interface Customer {
   phone: string;
   email: string;
   gstNumber?: string;
+  gstin?: string;
+  registrationType?: 'regular' | 'composition' | 'unregistered' | 'consumer';
   billingAddress: string;
   shippingAddress: string;
   city: string;
@@ -1051,6 +1072,7 @@ export type NotificationType =
   | "new_rfq" 
   | "dispatch_sent" 
   | "stage_changed" 
+  | "order_override"
   | "reminder_sent"
   | "quote_approval_request"
   | "quote_approved"
@@ -1104,3 +1126,9 @@ export * from './types/barcodeMovement';
 export * from './types/mrp';
 export * from './types/purchaseOrder';
 export * from './types/dispatchManagement';
+export type {
+  StockReservationStatus,
+  StockReservationSummary,
+  ManualReleaseRequest,
+  WriteOffRequest
+} from './types/stockReservation';

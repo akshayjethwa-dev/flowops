@@ -89,7 +89,7 @@ export const OrderStatusHistoryModal: React.FC<OrderStatusHistoryModalProps> = (
                     {/* Bullet marker */}
                     <div className={`absolute -left-6 top-1.5 w-5 h-5 rounded-full flex items-center justify-center ring-4 ring-white ${
                       item.isOverride
-                        ? 'bg-amber-500 text-white shadow-xs'
+                        ? 'bg-rose-600 text-white shadow-xs'
                         : item.newState === 'cancelled'
                           ? 'bg-rose-500 text-white shadow-xs'
                           : item.newState === 'closed'
@@ -106,7 +106,7 @@ export const OrderStatusHistoryModal: React.FC<OrderStatusHistoryModalProps> = (
                     {/* Event Card */}
                     <div className={`p-4 rounded-xl border text-sm transition-shadow ${
                       item.isOverride 
-                        ? 'bg-amber-50/40 border-amber-200 shadow-3xs' 
+                        ? 'bg-rose-50/40 border-rose-200 shadow-3xs' 
                         : 'bg-white border-slate-200 hover:shadow-2xs'
                     }`}>
                       <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
@@ -121,9 +121,9 @@ export const OrderStatusHistoryModal: React.FC<OrderStatusHistoryModalProps> = (
                           </span>
 
                           {item.isOverride && (
-                            <span className="text-[10px] font-mono font-bold uppercase tracking-wider bg-amber-600 text-white px-2 py-0.5 rounded shadow-3xs flex items-center space-x-1">
+                            <span className="text-[10px] font-mono font-bold uppercase tracking-wider bg-rose-600 text-white px-2 py-0.5 rounded shadow-xs flex items-center space-x-1">
                               <ShieldAlert className="h-3 w-3" />
-                              <span>Admin Override</span>
+                              <span>OVERRIDE</span>
                             </span>
                           )}
                         </div>
@@ -163,12 +163,20 @@ export const OrderStatusHistoryModal: React.FC<OrderStatusHistoryModalProps> = (
 
                       {/* Override Reason Box */}
                       {item.isOverride && item.overrideReason && (
-                        <div className="mt-2 p-2.5 bg-amber-100/70 border border-amber-300 rounded-lg text-xs text-amber-900 font-sans">
-                          <div className="font-bold font-mono text-[11px] uppercase tracking-wider text-amber-800 mb-0.5 flex items-center space-x-1">
-                            <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
-                            <span>Mandatory Override Justification:</span>
+                        <div className="mt-2 p-2.5 bg-rose-100/70 border border-rose-300 rounded-lg text-xs text-rose-950 font-sans">
+                          <div className="font-bold font-mono text-[11px] uppercase tracking-wider text-rose-800 mb-0.5 flex items-center space-x-1">
+                            <AlertTriangle className="h-3.5 w-3.5 text-rose-600" />
+                            <span>Mandatory Override Justification (Admin Audit):</span>
                           </div>
                           <p>{item.overrideReason}</p>
+                        </div>
+                      )}
+
+                      {/* Persistent Warning for Unmet Preconditions if flagged */}
+                      {item.isOverride && item.unmetPreconditionWarning && (
+                        <div className="mt-2 p-2 bg-amber-50 border border-amber-300 rounded-lg text-xs font-mono text-amber-900 flex items-center space-x-2">
+                          <AlertTriangle className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+                          <span><strong>Unmet Precondition Warning:</strong> {item.unmetPreconditionWarning}</span>
                         </div>
                       )}
 

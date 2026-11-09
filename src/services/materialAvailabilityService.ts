@@ -6,9 +6,11 @@ import {
   AtpComponentBreakdown, 
   AtpCheckResult,
   OrderAtpSummary,
-  OrderAtpLineSummary
+  OrderAtpLineSummary,
+  EvaluateConsolidatedAtpOptions
 } from '../types/materialAvailability';
 import { MultiLevelBom, MultiLevelBomNode } from '../types/multiLevelBom';
+import { StockReservationService } from './stockReservationService';
 
 // Fallback BOM definitions for demo catalog products if not yet in database
 const CATALOG_BOM_MAP: Record<string, { partNumber: string; components: { partNumber: string; partName: string; qtyPerParent: number; unit: string; itemType: any; leadTimeDays: number; children?: any[] }[] }> = {
@@ -388,6 +390,13 @@ export class MaterialAvailabilityService {
       }
     });
 
+    // Also deduct recorded stock reservations for other orders from available stock
+    const activeReservations = StockReservationService.getAlreadyReservedQty(
+      'default_tenant',
+      partNumber
+    );
+    committedOrders = Math.max(committedOrders, activeReservations);
+
     // Provide default reserved commitment if existing orders don't explicitly reference this raw component
     if (committedOrders === 0 && (pClean.includes('shf') || nameClean.includes('shaft'))) {
       committedOrders = 15; // 15 reserved for existing work orders
@@ -458,27 +467,22 @@ export class MaterialAvailabilityService {
    * - Identifies individual line shortfalls and critical bottleneck components
    */
   static async evaluateOrderConsolidatedAtp(
-    order: { id: string; orderNumber: string; version?: number; items: QuoteItem[] },
+    order: { id: string; orderNumber: string; customerName?: string; version?: number; status?: string; items: QuoteItem[] },
     stockItems: StockItem[] = [],
     existingOrders: Order[] = [],
     multiLevelBoms: MultiLevelBom[] = [],
-    options?: {
-      forceRefresh?: boolean;
-      syncTimestamp?: string | number;
-      onProgress?: (completed: number, total: number) => void;
-    }
+    options?: EvaluateConsolidatedAtpOptions
   ): Promise<OrderAtpSummary> {
     const cacheKey = this.getOrderItemsFingerprint(order);
     const sessionKey = `atp_consolidated_cache_${order.id}`;
 
-    // 1. Session Cache Check (unless forceRefresh)
-    if (!options?.forceRefresh) {
+    // 1. Session Cache Check (unless forceRefresh or network retry)
+    if (!options?.forceRefresh && !options?.retryLineIndices && !options?.simulateNetworkFailure) {
       try {
         const cachedRaw = sessionStorage.getItem(sessionKey);
         if (cachedRaw) {
           const parsed: OrderAtpSummary = JSON.parse(cachedRaw);
-          if (parsed.cacheKey === cacheKey) {
-            // Immediate cache hit for this exact order state
+          if (parsed.cacheKey === cacheKey && !parsed.hasNetworkFailure) {
             return parsed;
           }
         }
@@ -489,23 +493,95 @@ export class MaterialAvailabilityService {
 
     const items = order.items || [];
     const totalLines = items.length;
-    const lineResults: OrderAtpLineSummary[] = [];
 
-    let availableCount = 0;
-    let partialCount = 0;
-    let unavailableCount = 0;
-    let longestLeadTimeDays = 0;
-    let criticalBottleneckComponent: OrderAtpSummary['criticalBottleneckComponent'] | undefined;
+    // Parallel ATP calculation across all lines with progress tracking
+    let completedCount = 0;
+    const isAsyncLargeOrder = totalLines > 20;
 
-    // Asynchronous processing loop yielding control every batch (EC: 50+ lines responsiveness)
-    for (let i = 0; i < totalLines; i++) {
-      const itm = items[i];
-      if (totalLines > 8 && i % 4 === 0) {
-        await new Promise(res => setTimeout(res, 8));
+    const linePromises = items.map(async (itm, index) => {
+      const lineIndex = index + 1;
+
+      // Yield for async progress animation especially on large orders (>20 lines)
+      if (isAsyncLargeOrder) {
+        await new Promise(res => setTimeout(res, 60 + (index * 25)));
+      } else if (totalLines > 3) {
+        await new Promise(res => setTimeout(res, 20));
       }
 
-      options?.onProgress?.(i + 1, totalLines);
+      // EC 4: Network failure mid-check simulation (e.g. lines after 60% fail if simulateNetworkFailure is true)
+      if (options?.simulateNetworkFailure && index >= 3 && (!options.retryLineIndices || !options.retryLineIndices.includes(lineIndex))) {
+        completedCount++;
+        options?.onProgress?.(completedCount, totalLines);
+        return {
+          failedFromNetwork: true,
+          lineIndex,
+          itemId: itm.id || `line_${lineIndex}`,
+          productName: itm.name || `Line #${lineIndex}`,
+          orderedQty: Number(itm.quantity) || 1,
+          unit: itm.unit || 'pcs',
+          status: 'unavailable' as AtpAvailabilityStatus,
+          hasBOM: false,
+          isNoStockNoBom: false,
+          errorMessage: 'Network error occurred during availability evaluation',
+          summaryText: 'Network connection failed during check',
+          shortfallComponents: [],
+          atpResult: {
+            orderItemId: itm.id || `line_${lineIndex}`,
+            productName: itm.name || `Line #${lineIndex}`,
+            orderedQty: Number(itm.quantity) || 1,
+            overallStatus: 'unavailable' as AtpAvailabilityStatus,
+            hasBOM: false,
+            components: [],
+            worstCaseShortfall: Number(itm.quantity) || 1,
+            lastSyncedTimestamp: new Date().toISOString(),
+            isStale: false,
+            stalenessMinutes: 0,
+            summaryText: 'Network connection failed during check'
+          }
+        } as OrderAtpLineSummary;
+      }
 
+      // EC 2: A line's product was deleted after being added
+      const isProductDeleted = 
+        !itm.name || 
+        !itm.name.trim() || 
+        (itm as any).isDeleted || 
+        (itm as any).isProductDeleted || 
+        itm.name.toLowerCase().includes('[deleted]');
+
+      if (isProductDeleted) {
+        completedCount++;
+        options?.onProgress?.(completedCount, totalLines);
+        return {
+          lineIndex,
+          itemId: itm.id || `line_${lineIndex}`,
+          productName: itm.name || 'Deleted Product',
+          orderedQty: Number(itm.quantity) || 1,
+          unit: itm.unit || 'pcs',
+          status: 'unavailable' as AtpAvailabilityStatus,
+          hasBOM: false,
+          isNoStockNoBom: true,
+          isProductDeleted: true,
+          errorMessage: 'Product not found in master catalog',
+          summaryText: 'Product not found',
+          shortfallComponents: [],
+          atpResult: {
+            orderItemId: itm.id || `line_${lineIndex}`,
+            productName: itm.name || 'Deleted Product',
+            orderedQty: Number(itm.quantity) || 1,
+            overallStatus: 'unavailable' as AtpAvailabilityStatus,
+            hasBOM: false,
+            components: [],
+            worstCaseShortfall: Number(itm.quantity) || 1,
+            lastSyncedTimestamp: new Date().toISOString(),
+            isStale: false,
+            stalenessMinutes: 0,
+            summaryText: 'Product not found'
+          }
+        } as OrderAtpLineSummary;
+      }
+
+      // Standard ATP evaluation for the line
       const atpRes = this.evaluateOrderLineAtp(
         itm,
         stockItems,
@@ -514,15 +590,6 @@ export class MaterialAvailabilityService {
         options?.syncTimestamp
       );
 
-      if (atpRes.overallStatus === 'available') {
-        availableCount++;
-      } else if (atpRes.overallStatus === 'partially_available') {
-        partialCount++;
-      } else {
-        unavailableCount++;
-      }
-
-      // Collect specific shortfall components for this line
       const lineShortfalls: OrderAtpLineSummary['shortfallComponents'] = [];
       for (const comp of atpRes.components) {
         if (comp.shortfall > 0) {
@@ -538,6 +605,13 @@ export class MaterialAvailabilityService {
             else leadTime = 7;
           }
 
+          let repDate = comp.expectedReplenishmentDate;
+          if (!repDate) {
+            const d = new Date();
+            d.setDate(d.getDate() + leadTime);
+            repDate = d.toISOString().split('T')[0];
+          }
+
           lineShortfalls.push({
             partNumber: comp.partNumber,
             partName: comp.partName,
@@ -545,29 +619,19 @@ export class MaterialAvailabilityService {
             unit: comp.unit,
             currentStock: comp.currentStock,
             leadTimeDays: leadTime,
-            expectedReplenishmentDate: comp.expectedReplenishmentDate
+            expectedReplenishmentDate: repDate
           });
-
-          // Check if this component sets the worst-case longest lead time
-          if (leadTime > longestLeadTimeDays) {
-            longestLeadTimeDays = leadTime;
-            criticalBottleneckComponent = {
-              partName: comp.partName,
-              partNumber: comp.partNumber,
-              leadTimeDays: leadTime,
-              shortfall: comp.shortfall,
-              unit: comp.unit,
-              productName: itm.name
-            };
-          }
         }
       }
 
       const isNoStockNoBom = !!atpRes.isNoStockNoBom || (!atpRes.hasBOM && atpRes.components.some(c => c.currentStock === 0 && atpRes.overallStatus === 'unavailable'));
 
-      lineResults.push({
-        lineIndex: i + 1,
-        itemId: itm.id || `line_${i + 1}`,
+      completedCount++;
+      options?.onProgress?.(completedCount, totalLines);
+
+      return {
+        lineIndex,
+        itemId: itm.id || `line_${lineIndex}`,
         productName: itm.name,
         orderedQty: Number(itm.quantity) || 1,
         unit: itm.unit || 'pcs',
@@ -579,33 +643,96 @@ export class MaterialAvailabilityService {
         earliestAvailableDate: atpRes.earliestAvailableDate,
         summaryText: isNoStockNoBom ? 'Unavailable – No Stock and No BOM' : atpRes.summaryText,
         atpResult: atpRes
-      });
-    }
+      } as OrderAtpLineSummary;
+    });
 
-    // Earliest Possible Fulfilment Date calculation
-    const targetDate = new Date();
-    targetDate.setDate(targetDate.getDate() + (longestLeadTimeDays > 0 ? longestLeadTimeDays : 1));
-    const earliestPossibleFulfilmentDate = targetDate.toISOString().split('T')[0];
+    // Await all lines in parallel
+    const settledResults = await Promise.all(linePromises);
+
+    let availableCount = 0;
+    let partialCount = 0;
+    let unavailableCount = 0;
+    let longestLeadTimeDays = 0;
+    let criticalBottleneckComponent: OrderAtpSummary['criticalBottleneckComponent'] | undefined;
+    const failedLineIndices: number[] = [];
+    const allReplenishmentDates: string[] = [];
+
+    settledResults.forEach(lr => {
+      if (lr.failedFromNetwork) {
+        failedLineIndices.push(lr.lineIndex);
+        unavailableCount++;
+        return;
+      }
+
+      if (lr.status === 'available') {
+        availableCount++;
+      } else if (lr.status === 'partially_available') {
+        partialCount++;
+      } else {
+        unavailableCount++;
+      }
+
+      lr.shortfallComponents.forEach(sc => {
+        if (sc.expectedReplenishmentDate) {
+          allReplenishmentDates.push(sc.expectedReplenishmentDate);
+        }
+        if (sc.leadTimeDays > longestLeadTimeDays) {
+          longestLeadTimeDays = sc.leadTimeDays;
+          criticalBottleneckComponent = {
+            partName: sc.partName,
+            partNumber: sc.partNumber,
+            leadTimeDays: sc.leadTimeDays,
+            shortfall: sc.shortfall,
+            unit: sc.unit,
+            productName: lr.productName
+          };
+        }
+      });
+    });
+
+    // Acceptance criteria: "The panel must display an 'Earliest Possible Fulfilment Date' computed as max(expectedReplenishmentDate across all shortfalls), or 'Immediate' if no shortfalls."
+    let earliestPossibleFulfilmentDate: string | undefined;
+    if (partialCount === 0 && unavailableCount === 0 && failedLineIndices.length === 0) {
+      earliestPossibleFulfilmentDate = 'Immediate';
+    } else if (allReplenishmentDates.length > 0) {
+      allReplenishmentDates.sort();
+      earliestPossibleFulfilmentDate = allReplenishmentDates[allReplenishmentDates.length - 1];
+    } else {
+      const fallbackDate = new Date();
+      fallbackDate.setDate(fallbackDate.getDate() + (longestLeadTimeDays > 0 ? longestLeadTimeDays : 7));
+      earliestPossibleFulfilmentDate = fallbackDate.toISOString().split('T')[0];
+    }
 
     const overallStatus: AtpAvailabilityStatus = 
       unavailableCount > 0 ? 'unavailable' : 
       partialCount > 0 ? 'partially_available' : 
       'available';
 
+    // EC 5: Order is already confirmed check
+    const isOrderConfirmed = options?.isConfirmedOrder || 
+      ['order_confirmed', 'in_production', 'partially_dispatched'].includes((order.status || '').toLowerCase());
+    const degradedCount = isOrderConfirmed ? (partialCount + unavailableCount) : 0;
+    const hasConfirmedDegradation = isOrderConfirmed && degradedCount > 0;
+
     const summary: OrderAtpSummary = {
       orderId: order.id,
       orderNumber: order.orderNumber,
+      customerName: order.customerName,
       checkTimestamp: new Date().toISOString(),
       cacheKey,
       totalLines,
       availableLinesCount: availableCount,
       partiallyAvailableLinesCount: partialCount,
       unavailableLinesCount: unavailableCount,
-      lineResults,
+      lineResults: settledResults,
       earliestPossibleFulfilmentDate,
       longestLeadTimeDays,
       criticalBottleneckComponent,
-      overallStatus
+      overallStatus,
+      hasNetworkFailure: failedLineIndices.length > 0,
+      failedLineIndices: failedLineIndices.length > 0 ? failedLineIndices : undefined,
+      hasConfirmedDegradation,
+      degradedLinesCount: degradedCount
     };
 
     // Store in session cache

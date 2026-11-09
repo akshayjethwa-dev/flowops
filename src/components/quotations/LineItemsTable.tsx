@@ -4,6 +4,7 @@ import React from 'react';
 import { QuoteItem } from '../../types';
 import { Plus, Trash2, Hash, Percent, DollarSign, Layers, Calculator, Sparkles } from 'lucide-react';
 import { calculateLineItemAmount } from '../../utils/quotationUtils';
+import { TrafficLightAvailabilityBadge } from '../orders/TrafficLightAvailabilityBadge';
 
 interface LineItemsTableProps {
   items: QuoteItem[];
@@ -45,6 +46,28 @@ export const LineItemRow: React.FC<{
           onChange={(e) => handleFieldChange('name', e.target.value)}
           placeholder="Enter technical specifications & product model..."
           className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 focus:bg-white focus:ring-1 focus:ring-sky-500/30 text-xs text-slate-800 font-semibold leading-relaxed resize-none focus:outline-hidden"
+        />
+      </td>
+
+      {/* Material Availability (ATP) */}
+      <td className="p-3 text-center">
+        <TrafficLightAvailabilityBadge
+          productName={item.name}
+          quantity={item.quantity}
+          initialStatus={item.materialAvailability as any}
+          onStatusChange={(status) => {
+            const mapped =
+              status === 'available'
+                ? 'available'
+                : status === 'partial'
+                ? 'partially_available'
+                : status === 'unavailable'
+                ? 'unavailable'
+                : undefined;
+            if (item.materialAvailability !== mapped) {
+              handleFieldChange('materialAvailability', mapped);
+            }
+          }}
         />
       </td>
 
@@ -220,6 +243,7 @@ export const LineItemsTable: React.FC<LineItemsTableProps> = ({
             <tr className="bg-slate-50 text-[10px] font-bold font-mono uppercase text-slate-500 border-b border-slate-200">
               <th className="p-3 text-center w-8">#</th>
               <th className="p-3">Specification / Particular Description *</th>
+              <th className="p-3 text-center">Availability (ATP)</th>
               <th className="p-3 w-28">HSN Code</th>
               <th className="p-3 w-20 text-center">Qty *</th>
               <th className="p-3 w-20 text-center">Unit</th>
@@ -242,7 +266,7 @@ export const LineItemsTable: React.FC<LineItemsTableProps> = ({
             ))}
             {items.length === 0 && (
               <tr>
-                <td colSpan={10} className="p-8 text-center text-slate-400 font-mono text-xs">
+                <td colSpan={11} className="p-8 text-center text-slate-400 font-mono text-xs">
                   Your Quotation is currently empty. Click "Add Component Particular Line" below.
                 </td>
               </tr>
@@ -278,6 +302,31 @@ export const LineItemsTable: React.FC<LineItemsTableProps> = ({
                 onChange={(e) => handleUpdateItem(index, { ...item, name: e.target.value })}
                 placeholder="Enter specifications..."
                 className="w-full bg-white border border-slate-200 rounded px-2.5 py-1.5 focus:ring-1 focus:ring-sky-505 text-xs text-slate-800 font-medium"
+              />
+            </div>
+
+            {/* Availability (ATP) */}
+            <div className="flex items-center justify-between bg-white border border-slate-200 rounded-lg p-2">
+              <span className="text-[10px] uppercase font-mono font-bold text-slate-500">
+                ATP Availability:
+              </span>
+              <TrafficLightAvailabilityBadge
+                productName={item.name}
+                quantity={item.quantity}
+                initialStatus={item.materialAvailability as any}
+                onStatusChange={(status) => {
+                  const mapped =
+                    status === 'available'
+                      ? 'available'
+                      : status === 'partial'
+                      ? 'partially_available'
+                      : status === 'unavailable'
+                      ? 'unavailable'
+                      : undefined;
+                  if (item.materialAvailability !== mapped) {
+                    handleUpdateItem(index, { ...item, materialAvailability: mapped });
+                  }
+                }}
               />
             </div>
 

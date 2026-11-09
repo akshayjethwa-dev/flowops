@@ -57,6 +57,9 @@ export interface OrderAtpLineSummary {
   status: AtpAvailabilityStatus;
   hasBOM: boolean;
   isNoStockNoBom: boolean;
+  isProductDeleted?: boolean;
+  failedFromNetwork?: boolean;
+  errorMessage?: string;
   shortfallComponents: {
     partNumber: string;
     partName: string;
@@ -75,6 +78,7 @@ export interface OrderAtpLineSummary {
 export interface OrderAtpSummary {
   orderId: string;
   orderNumber: string;
+  customerName?: string;
   checkTimestamp: string;
   cacheKey: string;
   totalLines: number;
@@ -94,4 +98,18 @@ export interface OrderAtpSummary {
   };
   overallStatus: AtpAvailabilityStatus;
   isStaleFromEdit?: boolean;
+  hasNetworkFailure?: boolean;
+  failedLineIndices?: number[];
+  hasConfirmedDegradation?: boolean;
+  degradedLinesCount?: number;
+}
+
+export interface EvaluateConsolidatedAtpOptions {
+  forceRefresh?: boolean;
+  syncTimestamp?: string | number;
+  onProgress?: (completed: number, total: number) => void;
+  simulateNetworkFailure?: boolean;
+  retryLineIndices?: number[];
+  isConfirmedOrder?: boolean;
+  [key: string]: any;
 }

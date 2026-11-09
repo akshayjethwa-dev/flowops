@@ -18,7 +18,8 @@ import { handleFirestoreError, OperationType } from '../firebaseErrors';
 import { Dispatch, Order } from '../types';
 import { logActivityEvent } from '../utils/activityLogger';
 import { sendWhatsAppNotification } from '../utils/whatsapp';
-import { Truck, Navigation, PhoneCall, Check, Plus } from 'lucide-react';
+import { Truck, Navigation, PhoneCall, Check, Plus, QrCode } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 interface DispatchSectionProps {
   preselectedOrderForDispatch: Order | null;
@@ -29,6 +30,7 @@ export const DispatchSection: React.FC<DispatchSectionProps> = ({
   preselectedOrderForDispatch,
   clearPreselectedOrder
 }) => {
+  const navigate = useNavigate();
   const { profile, tenant, isSandboxMode } = useAuth();
   const [dispatches, setDispatches] = useState<Dispatch[]>([]);
   const [loading, setLoading] = useState(true);
@@ -439,26 +441,45 @@ export const DispatchSection: React.FC<DispatchSectionProps> = ({
               </div>
 
               {/* Action layout */}
-              <div className="pt-3 border-t border-slate-100 flex justify-between items-center bg-slate-50/50 -mx-4.5 -mb-4.5 p-3 rounded-b-lg">
-                <span className="text-[10px] font-mono text-slate-400">
-                  Shipped date: {new Date(disp.dispatchedAt).toLocaleDateString()}
-                </span>
-
-                {disp.status !== 'delivered' ? (
-                  <button
-                    onClick={() => handleMarkDelivered(disp)}
-                    className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[10px] uppercase tracking-wider px-3.5 py-1.5 rounded flex items-center space-x-1 cursor-pointer transition-transform hover:scale-102"
-                    id={`delivered-btn-${disp.id}`}
-                  >
-                    <Check className="h-3 w-3 mr-1" />
-                    <span>Confirm Order Delivered</span>
-                  </button>
-                ) : (
-                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded px-2.5 py-1 flex items-center">
-                    <Check className="h-3.5 w-3.5 mr-1 text-emerald-500" />
-                    <span>Trip Completed</span>
+              <div className="pt-3 border-t border-slate-100 flex flex-wrap justify-between items-center gap-2 bg-slate-50/50 -mx-4.5 -mb-4.5 p-3 rounded-b-lg">
+                <div className="flex items-center space-x-2">
+                  <span className="text-[10px] font-mono text-slate-400">
+                    Shipped: {new Date(disp.dispatchedAt).toLocaleDateString()}
                   </span>
-                )}
+                  {disp.eInvoice?.status === 'generated' ? (
+                    <span className="inline-flex items-center space-x-1 px-2 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded text-[9px] font-mono font-bold uppercase">
+                      <QrCode className="h-3 w-3 text-indigo-600" />
+                      <span>IRN Active</span>
+                    </span>
+                  ) : null}
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/dispatch/${disp.id}`)}
+                    className="border border-slate-205 bg-white hover:bg-slate-100 text-slate-700 px-2.5 py-1.5 rounded font-mono text-[9px] uppercase font-bold tracking-wider flex items-center space-x-1 cursor-pointer transition shadow-3xs"
+                    title="View details, generate e-Invoice, or print slips"
+                  >
+                    <span>Slip & e-Invoice</span>
+                  </button>
+
+                  {disp.status !== 'delivered' ? (
+                    <button
+                      onClick={() => handleMarkDelivered(disp)}
+                      className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[10px] uppercase tracking-wider px-3.5 py-1.5 rounded flex items-center space-x-1 cursor-pointer transition-transform hover:scale-102"
+                      id={`delivered-btn-${disp.id}`}
+                    >
+                      <Check className="h-3 w-3 mr-1" />
+                      <span>Confirm Delivered</span>
+                    </button>
+                  ) : (
+                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded px-2.5 py-1 flex items-center">
+                      <Check className="h-3.5 w-3.5 mr-1 text-emerald-500" />
+                      <span>Trip Completed</span>
+                    </span>
+                  )}
+                </div>
               </div>
 
             </div>

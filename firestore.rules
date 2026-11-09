@@ -544,6 +544,10 @@ service cloud.firestore {
         allow read, write: if isTenantMember(tenantId);
       }
 
+      match /stock_reservations/{reservationId} {
+        allow read, write: if isTenantMember(tenantId);
+      }
+
       match /loginAuditLogs/{logId} {
         allow read: if isTenantMember(tenantId) && getUserRole() in ['admin', 'manager', 'management'];
         allow create: if isSignedIn();
@@ -690,6 +694,14 @@ service cloud.firestore {
       allow list: if isSignedIn() && resource.data.tenantId == getUserTenantId();
       allow create: if isSignedIn() && isTenantMember(incoming().tenantId);
       allow update, delete: if false;
+    }
+
+    // 15. Stock Reservations
+    match /stock_reservations/{reservationId} {
+      allow get: if isTenantMember(resource.data.tenantId);
+      allow list: if isSignedIn() && resource.data.tenantId == getUserTenantId();
+      allow create, update: if isSignedIn() && isTenantMember(incoming().tenantId);
+      allow delete: if false;
     }
   }
 }

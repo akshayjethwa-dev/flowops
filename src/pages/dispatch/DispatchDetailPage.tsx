@@ -27,7 +27,7 @@ import {
 } from 'lucide-react';
 import { FileUploader } from '../../components/FileUploader';
 import { AttachmentsList } from '../../components/AttachmentsList';
-import { FileSymlink, Boxes, RotateCcw, Receipt } from 'lucide-react';
+import { FileSymlink, Boxes, RotateCcw, Receipt, QrCode } from 'lucide-react';
 import { fqcService } from '../../services/fqcService';
 import { CertificateOfConformanceModal } from '../../components/fqc/CertificateOfConformanceModal';
 import { qualityHoldService } from '../../services/qualityHoldService';
@@ -36,7 +36,10 @@ import { useToast } from '../../context/ToastContext';
 import { GeneratePartialInvoiceModal } from '../../components/dispatch/GeneratePartialInvoiceModal';
 import { SalesReturnCreditNoteModal } from '../../components/dispatch/SalesReturnCreditNoteModal';
 import { checkInvoiceExistsForDispatch, getCreditNotesForInvoice } from '../../services/partialInvoiceService';
-import { Invoice, CreditNote } from '../../types';
+import { GenerateEInvoiceModal } from '../../components/dispatch/GenerateEInvoiceModal';
+import { EInvoicePanel } from '../../components/dispatch/EInvoicePanel';
+import { downloadEInvoicePdf } from '../../utils/eInvoicePdfGenerator';
+import { Invoice, CreditNote, Dispatch } from '../../types';
 
 export const DispatchDetailPage: React.FC = () => {
   const { dispatchId } = useParams<{ dispatchId: string }>();
@@ -45,6 +48,7 @@ export const DispatchDetailPage: React.FC = () => {
   const { toastSuccess, toastError } = useToast();
   const { dispatchItem, loading, error, updateDispatchStatus } = useDispatchDetail(tenant?.id, dispatchId);
 
+  const [currentDispatch, setCurrentDispatch] = useState<Dispatch | null>(null);
   const [updating, setUpdating] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [showCocModal, setShowCocModal] = useState(false);
@@ -54,9 +58,31 @@ export const DispatchDetailPage: React.FC = () => {
   // Invoicing & Credit Note state
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [showCreditNoteModal, setShowCreditNoteModal] = useState(false);
+  const [showEInvoiceModal, setShowEInvoiceModal] = useState(false);
   const [linkedInvoice, setLinkedInvoice] = useState<Invoice | null>(null);
   const [creditNotes, setCreditNotes] = useState<CreditNote[]>([]);
   const [refreshInvoicingKey, setRefreshInvoicingKey] = useState(0);
+
+  // Keep currentDispatch in sync with loaded dispatch
+  useEffect(() => {
+    if (dispatchItem) {
+      setCurrentDispatch(dispatchItem);
+    }
+  }, [dispatchItem]);
+
+  const handleReloadDispatch = () => {
+    if (!tenant?.id || !dispatchId) return;
+    try {
+      const cached = localStorage.getItem(`dispatches_${tenant.id}`);
+      if (cached) {
+        const list = JSON.parse(cached);
+        const updated = list.find((d: any) => d.id === dispatchId);
+        if (updated) setCurrentDispatch(updated);
+      }
+    } catch (e) {
+      console.warn('Error reloading dispatch', e);
+    }
+  };
 
   // Load linked invoice & credit notes
   useEffect(() => {
@@ -237,6 +263,44 @@ export const DispatchDetailPage: React.FC = () => {
               )
             )}
 
+            {/* e-Invoice Action */}
+            {(currentDispatch || dispatchItem).status !== 'Cancelled' && (
+              ((currentDispatch as any) || dispatchItem).eInvoice?.status === 'generated' ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const disp: any = currentDispatch || dispatchItem;
+                    downloadEInvoicePdf(
+                      disp?.eInvoice || null,
+                      disp,
+                      {
+                        name: tenant?.name || 'NexFlow Manufacturing Industries Ltd',
+                        gstin: tenant?.gstin || '27AABCS1429B1ZB',
+                        address: { street: 'Industrial Estate', city: 'Pune', state: 'Maharashtra', pincode: '411018' }
+                      }
+                    );
+                  }}
+                  className="border border-indigo-300 bg-indigo-50 hover:bg-indigo-100 text-indigo-900 px-3 py-2 rounded-lg font-mono text-[10px] uppercase font-bold tracking-wider flex items-center space-x-1.5 cursor-pointer shadow-3xs transition"
+                  title="Print official GST e-Invoice with signed QR code"
+                >
+                  <QrCode className="h-4 w-4 text-indigo-600 shrink-0" />
+                  <span>e-Invoice (IRN Active)</span>
+                </button>
+              ) : (
+                ['admin', 'finance', 'management'].includes((profile?.role || '').toLowerCase()) && (
+                  <button
+                    type="button"
+                    onClick={() => setShowEInvoiceModal(true)}
+                    className="border border-indigo-200 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg font-mono text-[10px] uppercase font-bold tracking-wider flex items-center space-x-1.5 cursor-pointer shadow-xs transition"
+                    title="Generate GST e-Invoice (IRN & QR)"
+                  >
+                    <QrCode className="h-4 w-4 shrink-0" />
+                    <span>Generate e-Invoice</span>
+                  </button>
+                )
+              )
+            )}
+
             <button
               onClick={() => window.print()}
               className="border border-slate-205 bg-white hover:bg-slate-50 text-slate-700 px-3 py-2 rounded-lg font-mono text-[10px] uppercase font-black tracking-wider flex items-center space-x-1.5 cursor-pointer shadow-3xs transition-all select-none"
@@ -376,6 +440,13 @@ export const DispatchDetailPage: React.FC = () => {
 
         {/* RIGHT COLUMN: Action triggers, transporter details (1/3 width) */}
         <div className="space-y-6">
+
+          {/* GST e-Invoice Panel (IRN & Signed QR) */}
+          <EInvoicePanel
+            dispatch={currentDispatch || dispatchItem}
+            onOpenGenerateModal={() => setShowEInvoiceModal(true)}
+            onRefreshDispatch={handleReloadDispatch}
+          />
 
           {/* Card: Final Quality Control & Dispatch Release Gate */}
           <div className="bg-white border rounded-xl p-5 shadow-2xs space-y-3">
@@ -686,6 +757,25 @@ export const DispatchDetailPage: React.FC = () => {
           onSuccess={(cn) => {
             setCreditNotes(prev => [cn, ...prev]);
             setRefreshInvoicingKey(k => k + 1);
+          }}
+        />
+      )}
+
+      {/* Generate e-Invoice Modal (IRN & Signed QR) */}
+      {showEInvoiceModal && (currentDispatch || dispatchItem) && (
+        <GenerateEInvoiceModal
+          isOpen={showEInvoiceModal}
+          onClose={() => setShowEInvoiceModal(false)}
+          dispatch={currentDispatch || dispatchItem}
+          onSuccess={(eInvoiceData) => {
+            setCurrentDispatch(prev => prev ? { 
+              ...prev, 
+              eInvoice: eInvoiceData, 
+              eInvoiceStatus: eInvoiceData.status, 
+              irn: eInvoiceData.irn, 
+              ackNo: eInvoiceData.ackNo 
+            } : null);
+            setShowEInvoiceModal(false);
           }}
         />
       )}

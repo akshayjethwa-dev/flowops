@@ -24,6 +24,15 @@ import {
   dispatchApprovalNotification,
   createQuoteRevision
 } from '../../services/quoteApprovalService';
+import { 
+  AtpShortfallSaveConfirmationModal, 
+  ShortfallLineItem 
+} from '../orders/AtpShortfallSaveConfirmationModal';
+import { MaterialAvailabilityService } from '../../services/materialAvailabilityService';
+import { OrderAtpSummary } from '../../types/materialAvailability';
+import { OrderAtpSummaryPanel } from '../orders/OrderAtpSummaryPanel';
+import { useStockItems } from '../../hooks/useStockInventory';
+import { useMultiLevelBom } from '../../hooks/useMultiLevelBom';
 
 interface QuotationEditorProps {
   prefillRFQ?: any;
@@ -73,6 +82,76 @@ export const QuotationEditor: React.FC<QuotationEditorProps> = ({
   // Cost Engine integration
   const { activeTemplate } = useCostEngine(tenant?.id);
   const [costEngineModalOpen, setCostEngineModalOpen] = useState(false);
+
+  // Non-blocking Shortfall Save Confirmation Modal
+  const [shortfallModalOpen, setShortfallModalOpen] = useState(false);
+  const [pendingShortfallLines, setPendingShortfallLines] = useState<ShortfallLineItem[]>([]);
+  const [pendingPublishStatus, setPendingPublishStatus] = useState<'draft' | 'sent' | null>(null);
+  const [acknowledgementReason, setAcknowledgementReason] = useState<string>('');
+
+  // Stock Inventory & BOM for Consolidated ATP Availability Check
+  const { items: stockItems, lastSyncedTimestamp } = useStockItems(tenant?.id || '');
+  const { boms: multiLevelBoms } = useMultiLevelBom(tenant?.id || '');
+
+  const [atpSummary, setAtpSummary] = useState<OrderAtpSummary | null>(null);
+  const [isRunningAtpCheck, setIsRunningAtpCheck] = useState<boolean>(false);
+  const [atpProgress, setAtpProgress] = useState<{ completed: number; total: number }>({ completed: 0, total: 0 });
+
+  const isAtpStaleFromEdit = atpSummary 
+    ? MaterialAvailabilityService.getOrderItemsFingerprint({ id: editingQuote?.id || 'new_quote', items } as any) !== atpSummary.cacheKey 
+    : false;
+
+  const isQuoteConfirmed = Boolean(
+    editingQuote && ['accepted', 'confirmed', 'converted', 'approved'].includes(editingQuote.status?.toLowerCase() || '')
+  );
+
+  const handleRunAvailabilityCheck = async (forceRefresh = false) => {
+    if (items.length === 0) return;
+    setIsRunningAtpCheck(true);
+    setAtpProgress({ completed: 0, total: items.length });
+
+    try {
+      const mockOrder: any = {
+        id: editingQuote?.id || `draft_quote_${Date.now()}`,
+        orderNumber: editingQuote?.quoteNumber || `DRAFT-QUOTE-${new Date().getFullYear()}`,
+        customerName: customerName || 'Prospective Client',
+        customerPoNumber: (editingQuote as any)?.customerPoNumber || '',
+        deliveryDate: new Date(new Date(date).getTime() + Number(validDays) * 24 * 3600 * 1000).toISOString().split('T')[0],
+        status: editingQuote?.status || 'quoted',
+        items: items.map(it => ({
+          id: it.id,
+          productId: (it as any).productId || it.id,
+          name: it.name,
+          quantity: it.quantity,
+          unit: it.unit || 'PCS',
+          unitPrice: it.unitPrice,
+          materialAvailability: it.materialAvailability,
+          atpShortfalls: it.atpShortfalls,
+          atpSnapshot: it.atpSnapshot
+        }))
+      };
+
+      const summary = await MaterialAvailabilityService.evaluateOrderConsolidatedAtp(
+        mockOrder,
+        stockItems,
+        [],
+        multiLevelBoms,
+        {
+          forceRefresh,
+          syncTimestamp: lastSyncedTimestamp,
+          onProgress: (completed, total) => {
+            setAtpProgress({ completed, total });
+          }
+        }
+      );
+
+      setAtpSummary(summary);
+    } catch (err) {
+      console.error('Consolidated ATP check failed in quotation editor', err);
+    } finally {
+      setIsRunningAtpCheck(false);
+    }
+  };
 
   const handleApplyCostEngine = (result: {
     partName: string;
@@ -239,7 +318,33 @@ export const QuotationEditor: React.FC<QuotationEditorProps> = ({
 
   const totals: QuotationTotals = calculateQuotationTotals(items);
 
-  const handlePublishForm = async (status: 'draft' | 'sent') => {
+  const handleConfirmShortfallSave = async (reason: string) => {
+    setShortfallModalOpen(false);
+    setAcknowledgementReason(reason);
+
+    const updatedItems = items.map(item => {
+      if (
+        item.materialAvailability === 'partially_available' ||
+        item.materialAvailability === 'unavailable' ||
+        (item as any).materialAvailability === 'partial'
+      ) {
+        return {
+          ...item,
+          atpAcknowledgement: {
+            acknowledgedBy: profile?.name || 'Sales Staff',
+            acknowledgedAt: new Date().toISOString(),
+            reason
+          }
+        };
+      }
+      return item;
+    });
+
+    setItems(updatedItems);
+    await executeSave(pendingPublishStatus || 'draft', updatedItems, reason);
+  };
+
+  const handlePublishForm = async (status: 'draft' | 'sent', bypassShortfallCheck = false) => {
     if (!tenant?.id) return;
     if (!customerName.trim()) {
       alert('Buying Company / Customer Name is a required field.');
@@ -250,6 +355,41 @@ export const QuotationEditor: React.FC<QuotationEditorProps> = ({
       return;
     }
 
+    // Intercept if any line has 🔴 or 🟡 availability shortfall
+    if (!bypassShortfallCheck) {
+      const flagged = items
+        .map((item, idx) => ({ item, idx }))
+        .filter(({ item }) =>
+          !item.atpAcknowledgement &&
+          (item.materialAvailability === 'partially_available' ||
+            item.materialAvailability === 'unavailable' ||
+            (item as any).materialAvailability === 'partial')
+        );
+
+      if (flagged.length > 0) {
+        setPendingShortfallLines(
+          flagged.map(({ item, idx }) => ({
+            lineIndex: idx,
+            productName: item.name || `Line #${idx + 1}`,
+            quantity: item.quantity,
+            unit: item.unit,
+            status:
+              item.materialAvailability === 'partially_available' || (item as any).materialAvailability === 'partial'
+                ? 'partial'
+                : 'unavailable'
+          }))
+        );
+        setPendingPublishStatus(status);
+        setShortfallModalOpen(true);
+        return;
+      }
+    }
+
+    await executeSave(status, items, acknowledgementReason);
+  };
+
+  const executeSave = async (status: 'draft' | 'sent', saveItems: QuoteItem[], ackReason?: string) => {
+    if (!tenant?.id) return;
     const calculatedValidity = new Date(new Date(date).getTime() + Number(validDays) * 24 * 3600 * 1000)
       .toISOString().split('T')[0];
 
@@ -410,13 +550,43 @@ export const QuotationEditor: React.FC<QuotationEditorProps> = ({
           </div>
         </div>
 
-        <button
-          onClick={onCancel}
-          type="button"
-          className="text-slate-450 hover:text-slate-700 bg-white border border-slate-250 hover:bg-slate-50 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer"
-        >
-          {isRevision ? 'Cancel Revision' : 'Discard Draft'}
-        </button>
+        <div className="flex items-center space-x-2">
+          {/* Consolidated Check Availability Action Button (Primary Action, Prominent Placement) */}
+          <button
+            type="button"
+            onClick={() => handleRunAvailabilityCheck()}
+            disabled={isRunningAtpCheck || items.length === 0}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-mono font-bold transition flex items-center space-x-1.5 shadow-xs ${
+              items.length === 0
+                ? 'bg-slate-200 text-slate-400 cursor-not-allowed border border-slate-300'
+                : 'bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white cursor-pointer ring-2 ring-indigo-300/50'
+            }`}
+            title={
+              items.length === 0
+                ? 'Add at least one line to check availability.'
+                : isQuoteConfirmed
+                ? 'Re-check availability for this confirmed quote / order'
+                : 'Run 1-Click Consolidated ATP Availability Check across all lines'
+            }
+          >
+            <Sparkles className="h-4 w-4 text-indigo-200" />
+            <span>
+              {isRunningAtpCheck
+                ? `Checking ${atpProgress.completed}/${atpProgress.total} lines…`
+                : isQuoteConfirmed
+                ? 'Re-check Availability'
+                : 'Check Availability'}
+            </span>
+          </button>
+
+          <button
+            onClick={onCancel}
+            type="button"
+            className="text-slate-450 hover:text-slate-700 bg-white border border-slate-250 hover:bg-slate-50 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer"
+          >
+            {isRevision ? 'Cancel Revision' : 'Discard Draft'}
+          </button>
+        </div>
       </div>
 
       {/* REVISION NOTICE & PREVIOUS REJECTION FEEDBACK BANNER */}
@@ -545,6 +715,28 @@ export const QuotationEditor: React.FC<QuotationEditorProps> = ({
             </p>
           </div>
         </div>
+
+        {/* Consolidated Whole-Order ATP Availability Summary Panel */}
+        {(atpSummary || isRunningAtpCheck) && (
+          <div className="pt-2">
+            <OrderAtpSummaryPanel
+              summary={atpSummary}
+              isRunningCheck={isRunningAtpCheck}
+              progress={atpProgress}
+              isStaleFromEdit={isAtpStaleFromEdit}
+              isOrderConfirmed={isQuoteConfirmed}
+              deliveryDate={new Date(new Date(date).getTime() + Number(validDays) * 24 * 3600 * 1000).toISOString().split('T')[0]}
+              onRerunCheck={() => handleRunAvailabilityCheck(true)}
+              onRetryFailedLines={() => handleRunAvailabilityCheck(true)}
+              onClose={() => setAtpSummary(null)}
+              onApplyEarliestDate={(earliestDateStr) => {
+                const diffMs = new Date(earliestDateStr).getTime() - new Date(date).getTime();
+                const days = Math.max(15, Math.ceil(diffMs / (24 * 3600 * 1000)));
+                setValidDays(days);
+              }}
+            />
+          </div>
+        )}
 
         {/* SECTION 3: EDITABLE LINE ITEMS TABLE */}
         <div className="pt-2">
@@ -681,6 +873,15 @@ export const QuotationEditor: React.FC<QuotationEditorProps> = ({
           onApplyToQuote={handleApplyCostEngine}
         />
       )}
+
+      {/* Non-blocking ATP Shortfall Save Confirmation Modal */}
+      <AtpShortfallSaveConfirmationModal
+        isOpen={shortfallModalOpen}
+        onClose={() => setShortfallModalOpen(false)}
+        onConfirm={handleConfirmShortfallSave}
+        shortfallLines={pendingShortfallLines}
+        isSaving={saving}
+      />
 
     </div>
   );

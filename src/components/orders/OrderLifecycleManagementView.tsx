@@ -10,7 +10,6 @@ import {
 } from '../../types/orderStateMachine';
 import { OrderStateMachineService } from '../../services/orderStateMachineService';
 import { OrderLifecycleStepper } from './OrderLifecycleStepper';
-import { VisualOrderLifecycleBar } from './VisualOrderLifecycleBar';
 import { OrderDetailModal } from './OrderDetailModal';
 import { OrderStateTransitionModal } from './OrderStateTransitionModal';
 import { OrderStatusHistoryModal } from './OrderStatusHistoryModal';
@@ -35,12 +34,22 @@ import {
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { MaterialAvailabilityBadge } from './MaterialAvailabilityBadge';
+import { TrafficLightAvailabilityBadge } from './TrafficLightAvailabilityBadge';
 import { AtpAcknowledgementModal } from './AtpAcknowledgementModal';
 import { AtpCheckResult, OrderAtpSummary } from '../../types/materialAvailability';
 import { MaterialAvailabilityService } from '../../services/materialAvailabilityService';
 import { OrderAtpSummaryPanel } from './OrderAtpSummaryPanel';
+import { ReservedMaterialsPanel } from './ReservedMaterialsPanel';
 import { useStockItems } from '../../hooks/useStockInventory';
 import { useMultiLevelBom } from '../../hooks/useMultiLevelBom';
+import { 
+  transitionOrderState, 
+  onOrderStatusChanged,
+  InvalidTransitionError,
+  UnauthorizedTransitionError,
+  PreconditionFailedError,
+  StaleStateError
+} from '../../services/orderStateService';
 
 export const OrderLifecycleManagementView: React.FC = () => {
   const { profile, tenant, isSandboxMode } = useAuth();
@@ -239,6 +248,12 @@ export const OrderLifecycleManagementView: React.FC = () => {
 
   useEffect(() => {
     loadOrders();
+    const unsubEvent = onOrderStatusChanged((event) => {
+      setOrders(prev => prev.map(o => o.id === event.orderId ? event.order : o));
+    });
+    return () => {
+      unsubEvent();
+    };
   }, [profile, tenant, isSandboxMode]);
 
   // Selected Order
@@ -292,7 +307,49 @@ export const OrderLifecycleManagementView: React.FC = () => {
     return orders.filter(o => normalizeOrderState(o.status) === stateId).length;
   };
 
-  // Quick Simulation Test: Simultaneous Concurrency Trigger (EC 3)
+  // Quick Simulation Test 1: Invalid Step (EC 1)
+  const handleSimulateInvalidTransition = async () => {
+    if (!activeOrder || !tenant || !profile) return;
+    try {
+      await transitionOrderState(
+        activeOrder.id,
+        'fully_dispatched',
+        profile.uid,
+        'Simulating invalid jump directly to fully dispatched',
+        {
+          userRole: 'sales',
+          tenantId: tenant.id,
+          isSandboxMode: true
+        }
+      );
+      setSimulationNotice(`Unexpected success transitioning to fully_dispatched.`);
+    } catch (err: any) {
+      setSimulationNotice(`🚫 [${err.name}]: "${err.message}"`);
+    }
+  };
+
+  // Quick Simulation Test 2: Role Unauthorized (EC 2)
+  const handleSimulateUnauthorizedRole = async () => {
+    if (!activeOrder || !tenant) return;
+    try {
+      await transitionOrderState(
+        activeOrder.id,
+        'order_confirmed',
+        'user_prod_demo',
+        'Production user attempting to confirm customer order',
+        {
+          userRole: 'production',
+          tenantId: tenant.id,
+          isSandboxMode: true
+        }
+      );
+      setSimulationNotice(`Unexpected success with production role confirming order.`);
+    } catch (err: any) {
+      setSimulationNotice(`🔒 [${err.name}]: "${err.message}"`);
+    }
+  };
+
+  // Quick Simulation Test 3: Concurrency Collision Lock (EC 3)
   const handleSimulateConcurrencyCollision = async () => {
     if (!activeOrder || !tenant || !profile) return;
     setSimulationNotice('Simulating simultaneous transition collision: altering order version in backend cache...');
@@ -313,37 +370,173 @@ export const OrderLifecycleManagementView: React.FC = () => {
 
     // Now attempt a transition using the stale activeOrder (whose expectedVersion is old)
     try {
-      await OrderStateMachineService.executeTransition(
-        tenant.id,
+      await transitionOrderState(
         activeOrder.id,
         'in_production',
+        profile.uid,
+        'Simulating transition with stale client version',
         {
-          userId: profile.uid,
-          userName: profile.name || 'Sales User',
-          userRole: profile.role
-        },
-        {
+          userRole: 'production',
           expectedVersion: activeOrder.version, // stale version
+          tenantId: tenant.id,
           isSandboxMode: true
         }
       );
     } catch (err: any) {
-      setSimulationNotice(`✅ Concurrency collision blocked as specified! Message: "${err.message}"`);
+      setSimulationNotice(`⚡ [${err.name}]: "${err.message}"`);
       loadOrders();
     }
   };
 
-  // Quick Simulation Test: Invalid Transition Attempt (e.g., Sales moving In Production to Fully Dispatched directly)
-  const handleSimulateInvalidTransition = () => {
-    if (!activeOrder) return;
-    const val = OrderStateMachineService.validateTransition(
-      activeOrder,
-      'fully_dispatched',
-      'sales', // Sales role attempting dispatch
-      false
-    );
-    if (!val.valid) {
-      setSimulationNotice(`🚫 Invalid Transition Blocked: ${val.error}`);
+  // Quick Simulation Test 4: Precondition Guard Check (EC 4)
+  const handleSimulatePreconditionFail = async () => {
+    if (!activeOrder || !tenant || !profile) return;
+    try {
+      // Create a mock open backorder with 40 units remaining if none exists
+      const boKey = `backorders_${tenant.id}`;
+      const existingBos = JSON.parse(localStorage.getItem(boKey) || '[]');
+      const hasOrderBo = existingBos.some((b: any) => b.originalOrderId === activeOrder.id && b.status !== 'fulfilled' && b.status !== 'cancelled');
+      if (!hasOrderBo) {
+        existingBos.push({
+          id: `bo_mock_${activeOrder.id}`,
+          originalOrderId: activeOrder.id,
+          orderNumber: activeOrder.orderNumber,
+          backorderQty: 40,
+          remainingQty: 40,
+          status: 'open'
+        });
+        localStorage.setItem(boKey, JSON.stringify(existingBos));
+      }
+
+      await transitionOrderState(
+        activeOrder.id,
+        'fully_dispatched',
+        profile.uid,
+        'Dispatch clerk trying to full dispatch while 40 units backordered',
+        {
+          userRole: 'dispatch',
+          tenantId: tenant.id,
+          isSandboxMode: true
+        }
+      );
+      setSimulationNotice('Unexpected success marking fully dispatched with open backorders.');
+    } catch (err: any) {
+      setSimulationNotice(`⚠️ [${err.name}]: "${err.message}"`);
+    }
+  };
+
+  // Quick Simulation Test 5: Admin Override Flow (ORD-002: in_production -> order_confirmed)
+  const handleSimulateAdminOverrideFlow = async () => {
+    if (!activeOrder || !tenant || !profile) return;
+    try {
+      const targetState: OrderLifecycleState = 'order_confirmed';
+      const result = await transitionOrderState(
+        activeOrder.id,
+        targetState,
+        'admin_1',
+        'Incorrectly advanced by supervisor on 05 Nov',
+        {
+          isOverride: true,
+          overrideReason: 'Incorrectly advanced by supervisor on 05 Nov',
+          userRole: 'admin',
+          userName: 'System Administrator',
+          tenantId: tenant.id,
+          isSandboxMode: true
+        }
+      );
+      setSimulationNotice(`✅ [Admin Override]: Forced Order #${result.order.orderNumber} to '${targetState}'. Management notified.`);
+      loadOrders();
+    } catch (err: any) {
+      setSimulationNotice(`❌ [${err.name}]: "${err.message}"`);
+    }
+  };
+
+  // Quick Simulation Test 6: Non-Admin Override Rejection (EC: UnauthorizedTransitionError)
+  const handleSimulateNonAdminOverride = async () => {
+    if (!activeOrder || !tenant || !profile) return;
+    try {
+      await transitionOrderState(
+        activeOrder.id,
+        'order_confirmed',
+        'usr_sales_2',
+        'Attempting override without admin credentials',
+        {
+          isOverride: true,
+          overrideReason: 'Incorrectly advanced by supervisor on 05 Nov',
+          userRole: 'sales', // Non-admin caller
+          userName: 'Sales Rep',
+          tenantId: tenant.id,
+          isSandboxMode: true
+        }
+      );
+      setSimulationNotice('Unexpected success with non-admin override.');
+    } catch (err: any) {
+      setSimulationNotice(`🔒 [${err.name}]: "${err.message}"`);
+    }
+  };
+
+  // Quick Simulation Test 7: Override Reason <10 Chars Rejection (EC: ValidationError)
+  const handleSimulateShortReasonOverride = async () => {
+    if (!activeOrder || !tenant) return;
+    try {
+      await transitionOrderState(
+        activeOrder.id,
+        'order_confirmed',
+        'admin_1',
+        'Too short',
+        {
+          isOverride: true,
+          overrideReason: 'Too short', // Only 9 characters
+          userRole: 'admin',
+          userName: 'Admin Lead',
+          tenantId: tenant.id,
+          isSandboxMode: true
+        }
+      );
+      setSimulationNotice('Unexpected success with short override reason.');
+    } catch (err: any) {
+      setSimulationNotice(`⚠️ [${err.name}]: "${err.message}"`);
+    }
+  };
+
+  // Quick Simulation Test 8: Override with Unmet Preconditions (EC: Persistent Warning Banner)
+  const handleSimulateOverrideUnmetPreconditions = async () => {
+    if (!activeOrder || !tenant) return;
+    try {
+      // Mock open backorder if none exists
+      const boKey = `backorders_${tenant.id}`;
+      const existingBos = JSON.parse(localStorage.getItem(boKey) || '[]');
+      const hasOrderBo = existingBos.some((b: any) => b.originalOrderId === activeOrder.id && b.status !== 'fulfilled' && b.status !== 'cancelled');
+      if (!hasOrderBo) {
+        existingBos.push({
+          id: `bo_mock_${activeOrder.id}`,
+          originalOrderId: activeOrder.id,
+          orderNumber: activeOrder.orderNumber,
+          backorderQty: 40,
+          remainingQty: 40,
+          status: 'open'
+        });
+        localStorage.setItem(boKey, JSON.stringify(existingBos));
+      }
+
+      const result = await transitionOrderState(
+        activeOrder.id,
+        'fully_dispatched',
+        'admin_1',
+        'Force-closing order by executive dispensation with open backorder',
+        {
+          isOverride: true,
+          overrideReason: 'Executive order closeout approved by COO dispensation',
+          userRole: 'admin',
+          userName: 'Admin Lead',
+          tenantId: tenant.id,
+          isSandboxMode: true
+        }
+      );
+      setSimulationNotice(`⚡ [Override with Unmet Preconditions]: Allowed! Persistent banner: "${result.order.unmetPreconditionWarning}"`);
+      loadOrders();
+    } catch (err: any) {
+      setSimulationNotice(`❌ [${err.name}]: "${err.message}"`);
     }
   };
 
@@ -353,7 +546,7 @@ export const OrderLifecycleManagementView: React.FC = () => {
       {/* Top Banner / Philosophy */}
       <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-2xl p-6 shadow-md border border-slate-800">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div className="max-w-3xl">
+          <div className="max-w-2xl">
             <div className="flex items-center space-x-2 mb-2">
               <span className="text-[10px] font-mono font-bold uppercase tracking-widest bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 px-2 py-0.5 rounded">
                 Deterministic State Machine Engine
@@ -361,36 +554,63 @@ export const OrderLifecycleManagementView: React.FC = () => {
               <span className="text-[10px] font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 px-2 py-0.5 rounded font-bold">
                 Role-Enforced RBAC
               </span>
-              <span className="text-[10px] font-mono bg-amber-500/20 text-amber-300 border border-amber-400/30 px-2 py-0.5 rounded font-bold">
-                Optimistic Concurrency
+              <span className="text-[10px] font-mono bg-rose-500/20 text-rose-300 border border-rose-400/30 px-2 py-0.5 rounded font-bold">
+                Admin Override Audit
               </span>
             </div>
             <h2 className="text-xl font-bold tracking-tight text-white">
               Order Lifecycle State Machine
             </h2>
             <p className="text-xs text-slate-300 mt-1 leading-relaxed">
-              Enforces the strict order progression: <span className="text-white font-mono font-semibold">Enquiry → Quoted → Order Confirmed → In Production → Partially Dispatched → Fully Dispatched → Invoiced → Payment Received → Closed</span>. Bypasses are rejected; every step writes an immutable audit record.
+              Enforces the strict order progression: <span className="text-white font-mono font-semibold">Enquiry → Quoted → Order Confirmed → In Production → Partially Dispatched → Fully Dispatched → Invoiced → Payment Received → Closed</span>. Admin overrides allow out-of-sequence corrections with mandatory justification and audit alerts.
             </p>
           </div>
 
           {/* Quick Simulation testing tools */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 shrink-0">
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
             <button
-              onClick={handleSimulateInvalidTransition}
-              className="px-3 py-1.5 bg-rose-950/60 hover:bg-rose-900/80 border border-rose-500/40 text-rose-200 rounded-lg text-xs font-mono font-bold transition flex items-center space-x-1.5 cursor-pointer shadow-3xs"
-              title="Simulate Sales user attempting invalid skip to Fully Dispatched"
+              onClick={handleSimulateAdminOverrideFlow}
+              className="px-2.5 py-1.5 bg-rose-900/80 hover:bg-rose-800 border border-rose-400 text-white rounded-lg text-[11px] font-mono font-bold transition flex items-center space-x-1.5 cursor-pointer shadow-3xs"
+              title="Test Admin Override Flow (ORD-002: in_production -> order_confirmed)"
             >
-              <ShieldAlert className="h-3.5 w-3.5 text-rose-400" />
-              <span>Test Invalid Transition</span>
+              <ShieldAlert className="h-3.5 w-3.5 text-rose-300" />
+              <span>Admin Override Flow</span>
             </button>
 
             <button
-              onClick={handleSimulateConcurrencyCollision}
-              className="px-3 py-1.5 bg-indigo-900/60 hover:bg-indigo-800/80 border border-indigo-400/40 text-indigo-200 rounded-lg text-xs font-mono font-bold transition flex items-center space-x-1.5 cursor-pointer shadow-3xs"
-              title="Simulate simultaneous collision (EC 3)"
+              onClick={handleSimulateNonAdminOverride}
+              className="px-2.5 py-1.5 bg-rose-950/60 hover:bg-rose-900/80 border border-rose-500/40 text-rose-200 rounded-lg text-[11px] font-mono font-bold transition flex items-center space-x-1.5 cursor-pointer shadow-3xs"
+              title="Test Non-Admin Override Rejection (UnauthorizedTransitionError)"
             >
-              <RotateCcw className="h-3.5 w-3.5 text-indigo-300" />
-              <span>Test Concurrency Lock</span>
+              <ShieldAlert className="h-3.5 w-3.5 text-rose-400" />
+              <span>EC: Non-Admin</span>
+            </button>
+
+            <button
+              onClick={handleSimulateShortReasonOverride}
+              className="px-2.5 py-1.5 bg-amber-950/60 hover:bg-amber-900/80 border border-amber-500/40 text-amber-200 rounded-lg text-[11px] font-mono font-bold transition flex items-center space-x-1.5 cursor-pointer shadow-3xs"
+              title="Test Short Reason (<10 chars) Rejection (ValidationError)"
+            >
+              <AlertTriangle className="h-3.5 w-3.5 text-amber-400" />
+              <span>EC: Reason &lt;10 Chars</span>
+            </button>
+
+            <button
+              onClick={handleSimulateOverrideUnmetPreconditions}
+              className="px-2.5 py-1.5 bg-amber-900/70 hover:bg-amber-800/80 border border-amber-400 text-amber-100 rounded-lg text-[11px] font-mono font-bold transition flex items-center space-x-1.5 cursor-pointer shadow-3xs"
+              title="Test Override with Unmet Preconditions (EC: Persistent Warning Banner)"
+            >
+              <AlertTriangle className="h-3.5 w-3.5 text-amber-300" />
+              <span>EC: Unmet Preconditions</span>
+            </button>
+
+            <button
+              onClick={handleSimulateInvalidTransition}
+              className="px-2.5 py-1.5 bg-slate-800/80 hover:bg-slate-700 border border-slate-600 text-slate-200 rounded-lg text-[11px] font-mono font-bold transition flex items-center space-x-1.5 cursor-pointer shadow-3xs"
+              title="Test Invalid Transition (EC: Enquiry -> Fully Dispatched)"
+            >
+              <ShieldAlert className="h-3.5 w-3.5 text-slate-400" />
+              <span>Invalid Step</span>
             </button>
           </div>
         </div>
@@ -466,6 +686,7 @@ export const OrderLifecycleManagementView: React.FC = () => {
                   const state = normalizeOrderState(ord.status);
                   const isSelected = activeOrder?.id === ord.id;
                   const stateMeta = ORDER_LIFECYCLE_STATES.find(s => s.id === state);
+                  const hasOrdOverride = !!ord.hasOverride || !!ord.isForceOverridden || (ord.statusHistory || []).some(h => h.isOverride);
 
                   return (
                     <div
@@ -478,9 +699,16 @@ export const OrderLifecycleManagementView: React.FC = () => {
                       }`}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="font-mono font-bold text-slate-900">
-                          {ord.orderNumber}
-                        </span>
+                        <div className="flex items-center space-x-1.5">
+                          <span className="font-mono font-bold text-slate-900">
+                            {ord.orderNumber}
+                          </span>
+                          {hasOrdOverride && (
+                            <span className="text-[9px] font-mono font-bold uppercase tracking-wider bg-rose-600 text-white px-1.5 py-0.2 rounded shadow-xs">
+                              OVERRIDE
+                            </span>
+                          )}
+                        </div>
                         <span className={`text-[9px] font-mono font-bold px-2 py-0.5 rounded border uppercase ${stateMeta?.badgeClass}`}>
                           {stateMeta?.label || state}
                         </span>
@@ -517,8 +745,13 @@ export const OrderLifecycleManagementView: React.FC = () => {
                     <span className="text-[10px] font-mono font-bold text-indigo-600 uppercase tracking-widest block">
                       Active Manufacturing Order
                     </span>
-                    <h3 className="text-lg font-bold text-slate-900 mt-0.5">
-                      Order #{activeOrder.orderNumber}
+                    <h3 className="text-lg font-bold text-slate-900 mt-0.5 flex items-center space-x-2">
+                      <span>Order #{activeOrder.orderNumber}</span>
+                      {(activeOrder.hasOverride || activeOrder.isForceOverridden || (activeOrder.statusHistory || []).some(h => h.isOverride)) && (
+                        <span className="text-[10px] font-mono font-bold uppercase tracking-wider bg-rose-600 text-white px-2 py-0.5 rounded shadow-xs animate-pulse">
+                          OVERRIDE
+                        </span>
+                      )}
                     </h3>
                   </div>
 
@@ -531,6 +764,24 @@ export const OrderLifecycleManagementView: React.FC = () => {
                     </span>
                   </div>
                 </div>
+
+                {/* Persistent Warning Banner (EC: Override with unmet preconditions) */}
+                {activeOrder.unmetPreconditionWarning && (
+                  <div className="mb-3 p-3 bg-amber-500/10 border-2 border-amber-500 rounded-xl flex items-start space-x-2.5 text-amber-950 text-xs shadow-xs animate-in fade-in">
+                    <ShieldAlert className="h-4 w-4 text-rose-600 shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-1.5">
+                        <span className="text-[9px] font-mono font-bold uppercase tracking-wider bg-rose-600 text-white px-1.5 py-0.2 rounded">
+                          OVERRIDE
+                        </span>
+                        <span className="font-bold font-mono text-amber-900">
+                          State Machine Forced Transition
+                        </span>
+                      </div>
+                      <p className="mt-0.5 text-xs font-semibold text-amber-950">{activeOrder.unmetPreconditionWarning}</p>
+                    </div>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-3 bg-slate-50 rounded-xl border border-slate-150 text-xs font-mono">
                   <div>
@@ -549,15 +800,45 @@ export const OrderLifecycleManagementView: React.FC = () => {
 
                 <div className="mt-3 pt-3 border-t border-slate-150 flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center space-x-2">
-                    <button
-                      onClick={() => handleRunAvailabilityCheck()}
-                      disabled={isRunningAtpCheck}
-                      className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-lg text-xs font-mono font-bold transition flex items-center space-x-1.5 cursor-pointer shadow-3xs"
-                      title="Run 1-Click Consolidated ATP Availability Check across all lines"
-                    >
-                      <Sparkles className="h-3.5 w-3.5 text-indigo-200" />
-                      <span>{isRunningAtpCheck ? 'Checking...' : 'Check Availability'}</span>
-                    </button>
+                    {(() => {
+                      const hasNoLines = !activeOrder.items || activeOrder.items.length === 0;
+                      const isOrderConfirmed = [
+                        'order_confirmed',
+                        'in_production',
+                        'partially_dispatched',
+                        'fully_dispatched',
+                        'invoiced',
+                        'payment_received'
+                      ].includes(normalizeOrderState(activeOrder.status));
+
+                      return (
+                        <button
+                          onClick={() => handleRunAvailabilityCheck()}
+                          disabled={isRunningAtpCheck || hasNoLines}
+                          className={`px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold transition flex items-center space-x-1.5 shadow-3xs ${
+                            hasNoLines
+                              ? 'bg-slate-200 text-slate-400 cursor-not-allowed border border-slate-300'
+                              : 'bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white cursor-pointer ring-2 ring-indigo-300/40'
+                          }`}
+                          title={
+                            hasNoLines
+                              ? 'Add at least one line to check availability.'
+                              : isOrderConfirmed
+                              ? 'Re-check availability for this confirmed order'
+                              : 'Run 1-Click Consolidated ATP Availability Check across all lines'
+                          }
+                        >
+                          <Sparkles className="h-3.5 w-3.5 text-indigo-200" />
+                          <span>
+                            {isRunningAtpCheck
+                              ? `Checking ${atpProgress.completed}/${atpProgress.total} lines…`
+                              : isOrderConfirmed
+                              ? 'Re-check Availability'
+                              : 'Check Availability'}
+                          </span>
+                        </button>
+                      );
+                    })()}
                     {activeAtpSummary && (
                       <span className="text-[11px] font-mono text-slate-500">
                         {activeAtpSummary.availableLinesCount}/{activeAtpSummary.totalLines} Lines Available
@@ -582,7 +863,18 @@ export const OrderLifecycleManagementView: React.FC = () => {
                   isRunningCheck={isRunningAtpCheck}
                   progress={atpProgress}
                   isStaleFromEdit={isAtpStaleFromEdit}
+                  isOrderConfirmed={[
+                    'order_confirmed',
+                    'in_production',
+                    'partially_dispatched',
+                    'fully_dispatched',
+                    'invoiced',
+                    'payment_received'
+                  ].includes(normalizeOrderState(activeOrder.status))}
+                  customerPoNumber={activeOrder.customerPoNumber}
+                  deliveryDate={activeOrder.deliveryDate}
                   onRerunCheck={() => handleRunAvailabilityCheck(true)}
+                  onRetryFailedLines={() => handleRunAvailabilityCheck(true)}
                   onClose={() => setActiveAtpSummary(null)}
                   onApplyEarliestDate={(earliestDateStr) => {
                     if (!activeOrder) return;
@@ -614,9 +906,10 @@ export const OrderLifecycleManagementView: React.FC = () => {
                 />
               )}
 
-              {/* Visual Order Lifecycle Bar (Stepper with Tooltips, Checkmarks, Metrics, On Hold, Line States) */}
-              <VisualOrderLifecycleBar
+              {/* Visual Order Lifecycle Stepper Component */}
+              <OrderLifecycleStepper
                 order={activeOrder}
+                userRole={profile?.role || 'viewer'}
                 canManageHold={['admin', 'manager', 'management', 'production'].includes(profile?.role || 'viewer')}
                 onHoldToggle={(putOnHold, reason) => {
                   const updated: Order = {
@@ -644,12 +937,6 @@ export const OrderLifecycleManagementView: React.FC = () => {
                     console.warn(e);
                   }
                 }}
-              />
-
-              {/* Interactive State Machine Stepper Component */}
-              <OrderLifecycleStepper
-                order={activeOrder}
-                userRole={profile?.role || 'viewer'}
                 onInitiateTransition={(targetState, isOverride) => {
                   setTransitionOrder(activeOrder);
                   setTransitionTargetState(targetState);
@@ -675,17 +962,49 @@ export const OrderLifecycleManagementView: React.FC = () => {
                     <div key={item.id || idx} className="py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                       <div>
                         <span className="font-bold text-slate-800 block">{item.name}</span>
-                        <span className="text-[11px] font-mono text-slate-500">
-                          Qty: {item.quantity} units @ ₹{item.unitPrice?.toLocaleString('en-IN')}
-                        </span>
+                        <div className="flex items-center space-x-2 mt-0.5">
+                          <span className="text-[11px] font-mono text-slate-500">
+                            Qty: <strong className="text-slate-900">{item.quantity}</strong> units @ ₹{item.unitPrice?.toLocaleString('en-IN')}
+                          </span>
+                          <div className="inline-flex items-center space-x-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newQty = Math.max(1, item.quantity - (item.quantity === 50 ? 25 : 5));
+                                const updatedItems = [...(activeOrder.items || [])];
+                                updatedItems[idx] = { ...item, quantity: newQty, total: newQty * (item.unitPrice || 0) };
+                                const updatedOrder = { ...activeOrder, items: updatedItems };
+                                setOrders(prev => prev.map(o => o.id === updatedOrder.id ? updatedOrder : o));
+                              }}
+                              className="px-1.5 py-0.2 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded text-[10px] font-mono font-bold cursor-pointer"
+                              title="Decrease Quantity"
+                            >
+                              -
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newQty = item.quantity + (item.quantity === 25 ? 25 : 5);
+                                const updatedItems = [...(activeOrder.items || [])];
+                                updatedItems[idx] = { ...item, quantity: newQty, total: newQty * (item.unitPrice || 0) };
+                                const updatedOrder = { ...activeOrder, items: updatedItems };
+                                setOrders(prev => prev.map(o => o.id === updatedOrder.id ? updatedOrder : o));
+                              }}
+                              className="px-1.5 py-0.2 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded text-[10px] font-mono font-bold cursor-pointer"
+                              title="Increase Quantity"
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
                       </div>
                       <div className="flex items-center space-x-3 self-end sm:self-auto">
-                        <MaterialAvailabilityBadge
-                          item={item}
-                          stockItems={stockItems}
-                          multiLevelBoms={multiLevelBoms}
-                          lastSyncedTimestamp={lastSyncedTimestamp}
-                          onOpenAcknowledgement={(atpRes) => setActiveAtpAckResult(atpRes)}
+                        <TrafficLightAvailabilityBadge
+                          productName={item.name}
+                          quantity={item.quantity}
+                          asOfDate={activeOrder.deliveryDate}
+                          orderStatus={activeOrder.status}
+                          wasConfirmedAvailable={true}
                         />
                         <div className="font-mono font-bold text-slate-800 text-right min-w-[70px]">
                           ₹{(item.total || item.quantity * (item.unitPrice || 0)).toLocaleString('en-IN')}
@@ -695,6 +1014,18 @@ export const OrderLifecycleManagementView: React.FC = () => {
                   ))}
                 </div>
               </div>
+
+              {/* RESERVED MATERIALS PANEL (Acceptance Criteria 6) */}
+              <ReservedMaterialsPanel
+                order={activeOrder}
+                tenantId={tenant?.id || 'demo_tenant'}
+                userRole={profile?.role || 'viewer'}
+                userName={profile?.name || 'Production Planner'}
+                isSandboxMode={isSandboxMode}
+                onReservationUpdated={() => {
+                  loadOrders();
+                }}
+              />
 
             </div>
           ) : (
