@@ -452,6 +452,12 @@ export const DispatchSection: React.FC<DispatchSectionProps> = ({
                       <span>IRN Active</span>
                     </span>
                   ) : null}
+                  {disp.ewayBill?.status === 'active' || disp.ewbNumber ? (
+                    <span className="inline-flex items-center space-x-1 px-2 py-0.5 bg-sky-50 text-sky-700 border border-sky-200 rounded text-[9px] font-mono font-bold uppercase">
+                      <Truck className="h-3 w-3 text-sky-600" />
+                      <span>EWB Active</span>
+                    </span>
+                  ) : null}
                 </div>
 
                 <div className="flex items-center space-x-2">
@@ -459,9 +465,9 @@ export const DispatchSection: React.FC<DispatchSectionProps> = ({
                     type="button"
                     onClick={() => navigate(`/dispatch/${disp.id}`)}
                     className="border border-slate-205 bg-white hover:bg-slate-100 text-slate-700 px-2.5 py-1.5 rounded font-mono text-[9px] uppercase font-bold tracking-wider flex items-center space-x-1 cursor-pointer transition shadow-3xs"
-                    title="View details, generate e-Invoice, or print slips"
+                    title="View details, generate e-Way Bill, e-Invoice, or print slips"
                   >
-                    <span>Slip & e-Invoice</span>
+                    <span>Slip & EWB</span>
                   </button>
 
                   {disp.status !== 'delivered' ? (

@@ -20,7 +20,8 @@ import {
   AlertOctagon,
   Boxes,
   Receipt,
-  QrCode
+  QrCode,
+  RotateCcw
 } from 'lucide-react';
 import { Order, Backorder, Dispatch } from '../../types';
 import { DispatchReleaseGateBadge } from '../../components/fqc/DispatchReleaseGateBadge';
@@ -28,6 +29,9 @@ import { qualityHoldService } from '../../services/qualityHoldService';
 import { getBackordersSync } from '../../services/partialDispatchService';
 import { GeneratePartialInvoiceModal } from '../../components/dispatch/GeneratePartialInvoiceModal';
 import { GenerateEInvoiceModal } from '../../components/dispatch/GenerateEInvoiceModal';
+import { GenerateEWayBillModal } from '../../components/dispatch/GenerateEWayBillModal';
+import { SalesReturnCreditNoteModal } from '../../components/dispatch/SalesReturnCreditNoteModal';
+import { useEWayBillExpiryMonitor } from '../../hooks/useEWayBillExpiryMonitor';
 
 export const DispatchListPage: React.FC = () => {
   const navigate = useNavigate();
@@ -106,6 +110,15 @@ export const DispatchListPage: React.FC = () => {
   // e-Invoice Modal state
   const [eInvoiceDispatch, setEInvoiceDispatch] = useState<Dispatch | null>(null);
   const [showEInvoiceModal, setShowEInvoiceModal] = useState(false);
+
+  // e-Way Bill Modal state & expiry background monitor
+  useEWayBillExpiryMonitor();
+  const [ewbDispatch, setEwbDispatch] = useState<Dispatch | null>(null);
+  const [showEwbModal, setShowEwbModal] = useState(false);
+
+  // Credit Note Modal state
+  const [cnDispatch, setCnDispatch] = useState<Dispatch | null>(null);
+  const [showCnModal, setShowCnModal] = useState(false);
 
   // Load orders & backorders for dispatch dropdown selection
   useEffect(() => {
@@ -430,6 +443,62 @@ export const DispatchListPage: React.FC = () => {
                           )
                         )}
 
+                        {/* e-Way Bill trigger / badge */}
+                        {disp.status !== 'Cancelled' && (
+                          disp.ewayBill?.status === 'active' || disp.ewbNumber ? (
+                            <span 
+                              className="inline-flex items-center space-x-1 px-2 py-0.5 bg-sky-50 text-sky-800 border border-sky-200 rounded text-[9px] font-mono font-bold uppercase"
+                              title={`e-Way Bill Active: #${disp.ewbNumber || disp.ewayBill?.ewbNumber}`}
+                            >
+                              <Truck className="h-3 w-3 text-sky-600" />
+                              <span>EWB</span>
+                            </span>
+                          ) : (
+                            ['admin', 'dispatch', 'management'].includes((profile?.role || '').toLowerCase()) && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEwbDispatch(disp);
+                                  setShowEwbModal(true);
+                                }}
+                                className="inline-flex items-center space-x-1 px-2 py-1 bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 rounded-lg text-[9px] font-mono font-bold uppercase transition cursor-pointer"
+                                title="Generate GST e-Way Bill for road transit (₹50,000+)"
+                              >
+                                <Truck className="h-3 w-3 text-sky-600" />
+                                <span>e-Way Bill</span>
+                              </button>
+                            )
+                          )
+                        )}
+
+                        {/* Credit Note badge / Sales Return trigger */}
+                        {disp.creditNoteIssued ? (
+                          <span 
+                            className="inline-flex items-center space-x-1 px-2 py-0.5 bg-rose-50 text-rose-800 border border-rose-200 rounded text-[9px] font-mono font-bold uppercase"
+                            title={`Credit Note Issued: #${disp.lastCreditNoteNumber || 'Issued'}`}
+                          >
+                            <RotateCcw className="h-3 w-3 text-rose-600" />
+                            <span>CN Issued</span>
+                          </span>
+                        ) : disp.salesReturnRecorded ? (
+                          ['admin', 'finance', 'management'].includes((profile?.role || '').toLowerCase()) && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setCnDispatch(disp);
+                                setShowCnModal(true);
+                              }}
+                              className="inline-flex items-center space-x-1 px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-lg text-[9px] font-mono font-bold uppercase transition cursor-pointer"
+                              title="Generate Credit Note for Sales Return"
+                            >
+                              <RotateCcw className="h-3 w-3 text-amber-600" />
+                              <span>Gen CN</span>
+                            </button>
+                          )
+                        ) : null}
+
                         <button
                           onClick={() => navigate(`/dispatch/${disp.id}`)}
                           className="p-1 px-2.5 border border-slate-200 rounded-lg hover:border-indigo-300 hover:text-indigo-655 hover:bg-indigo-50/20 transition cursor-pointer font-mono font-bold uppercase text-[9px]"
@@ -493,6 +562,16 @@ export const DispatchListPage: React.FC = () => {
                     {disp.eInvoice?.status === 'generated' && (
                       <span className="text-[9px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
                         IRN
+                      </span>
+                    )}
+                    {(disp.ewayBill?.status === 'active' || disp.ewbNumber) && (
+                      <span className="text-[9px] font-bold text-sky-700 bg-sky-50 px-2 py-0.5 rounded border border-sky-200">
+                        EWB
+                      </span>
+                    )}
+                    {disp.creditNoteIssued && (
+                      <span className="text-[9px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
+                        CN
                       </span>
                     )}
                     <span className="text-indigo-650 font-bold flex items-center">
@@ -748,6 +827,84 @@ export const DispatchListPage: React.FC = () => {
           }}
           dispatch={eInvoiceDispatch}
           onSuccess={() => {
+            reset();
+          }}
+        />
+      )}
+
+      {/* e-WAY BILL GENERATION MODAL */}
+      {showEwbModal && ewbDispatch && (
+        <GenerateEWayBillModal
+          isOpen={showEwbModal}
+          onClose={() => {
+            setShowEwbModal(false);
+            setEwbDispatch(null);
+          }}
+          dispatch={ewbDispatch}
+          onSuccess={() => {
+            reset();
+          }}
+        />
+      )}
+
+      {/* SALES RETURN CREDIT NOTE MODAL */}
+      {showCnModal && cnDispatch && (
+        <SalesReturnCreditNoteModal
+          isOpen={showCnModal}
+          onClose={() => {
+            setShowCnModal(false);
+            setCnDispatch(null);
+          }}
+          invoice={{
+            id: cnDispatch.invoiceId || `INV-${cnDispatch.id}`,
+            tenantId: cnDispatch.tenantId || tenant?.id || '',
+            orderId: cnDispatch.orderId,
+            orderNumber: cnDispatch.orderId,
+            dispatchId: cnDispatch.id,
+            dispatchNumber: cnDispatch.dispatchNumber,
+            invoiceNumber: cnDispatch.invoiceNumber || cnDispatch.dispatchNumber || `INV-${cnDispatch.id}`,
+            invoiceDate: cnDispatch.dispatchDate || new Date().toISOString(),
+            dueDate: new Date().toISOString(),
+            status: 'issued',
+            type: 'STANDARD',
+            customerId: cnDispatch.customerId || 'cust-1',
+            customerName: cnDispatch.customerName || 'Customer',
+            items: (cnDispatch.items || (cnDispatch as any).lines || []).map((l: any, idx: number) => ({
+              id: l.id || `line-${idx}`,
+              name: l.name || l.productName || l.itemCode || `Item #${idx + 1}`,
+              quantity: l.quantity || l.dispatchQuantity || 1,
+              unitPrice: l.unitPrice || l.rate || 1000,
+              gstPercent: l.gstPercent || l.taxRate || 18,
+              total: (l.quantity || 1) * (l.unitPrice || 1000) * 1.18
+            })),
+            lines: (cnDispatch.items || (cnDispatch as any).lines || []).map((l: any, idx: number) => ({
+              id: l.id || `line-${idx}`,
+              lineItemId: l.lineItemId || l.id,
+              productId: l.productId,
+              productName: l.name || l.productName || l.itemCode,
+              hsnCode: l.hsnCode || l.hsn || '84834000',
+              quantity: l.quantity || l.dispatchQuantity || 1,
+              unitPrice: l.unitPrice || l.rate || 1000,
+              taxRate: l.taxRate || l.gstPercent || 18,
+              taxAmount: (l.quantity || 1) * (l.unitPrice || 1000) * 0.18,
+              lineTotal: (l.quantity || 1) * (l.unitPrice || 1000) * 1.18
+            })),
+            amount: (cnDispatch.totalValue || cnDispatch.items?.reduce((s, it) => s + (it.total || 0), 0) || 1180) / 1.18,
+            subtotal: (cnDispatch.totalValue || cnDispatch.items?.reduce((s, it) => s + (it.total || 0), 0) || 1180) / 1.18,
+            taxAmount: (cnDispatch.totalValue || 1180) - ((cnDispatch.totalValue || 1180) / 1.18),
+            total: cnDispatch.totalValue || cnDispatch.items?.reduce((s, it) => s + (it.total || 0), 0) || 1180,
+            totalPaid: 0,
+            outstanding: cnDispatch.totalValue || cnDispatch.items?.reduce((s, it) => s + (it.total || 0), 0) || 1180,
+            currency: 'INR',
+            irn: cnDispatch.irn || cnDispatch.eInvoice?.irn,
+            createdAt: new Date().toISOString(),
+            createdBy: profile?.uid || 'user',
+            createdByName: profile?.name || 'User'
+          }}
+          dispatch={cnDispatch}
+          onSuccess={() => {
+            setShowCnModal(false);
+            setCnDispatch(null);
             reset();
           }}
         />

@@ -494,6 +494,24 @@ export interface Dispatch {
   ackNo?: string;
   ackDate?: string;
   signedQrCode?: string;
+  // GST e-Way Bill tracking fields
+  ewbNumber?: string;
+  ewbValidUntil?: string;
+  ewbStatus?: 'active' | 'expiring_soon' | 'expired' | 'cancelled' | string;
+  ewbDistanceKm?: number;
+  transporterId?: string;
+  distanceKm?: number;
+  // Sales Return & Credit Note tracking fields
+  creditNoteIssued?: boolean;
+  creditNotesCount?: number;
+  lastCreditNoteNumber?: string;
+  lastCreditNoteIrn?: string;
+  salesReturnRecorded?: boolean;
+  salesReturnReason?: string;
+  salesReturnDate?: string;
+  salesReturnItems?: Array<{ lineItemId: string; returnQty: number; reason?: string }>;
+  lines?: any[];
+  totalValue?: number;
   status: 'Planned' | 'Dispatched' | 'Delivered' | 'Cancelled' | 'shipped' | 'delivered';
   dispatchedAt: any;
   notes?: string;
@@ -761,6 +779,7 @@ export interface ActivityEvent {
   module?: 'rfq' | 'order' | 'dispatch' | 'payment' | 'inventory' | 'whatsapp';
   action?: string;
   entityLabel?: string;
+  isSandboxMode?: boolean;
 }
 
 export interface Attachment {
@@ -882,7 +901,7 @@ export interface StockEntryInput {
   reason: string;
 }
 
-export type InvoiceStatus = 'draft' | 'sent' | 'partial' | 'paid' | 'overdue';
+export type InvoiceStatus = 'draft' | 'sent' | 'partial' | 'paid' | 'overdue' | 'issued' | 'cancelled';
 
 export interface PaymentRecord {
   id: string;
@@ -915,6 +934,7 @@ export interface Invoice {
   invoiceDate: string;
   dueDate: string;
   amount: number;
+  subtotal?: number;
   taxAmount?: number;
   taxBreakdown?: {
     cgst?: number;
@@ -936,6 +956,11 @@ export interface Invoice {
   lastReminderSentAt?: string;
   reminderCount?: number;
   items?: any[];
+  lines?: any[];
+  currency?: string;
+  type?: string;
+  irn?: string;
+  eInvoice?: any;
   isPartialInvoice?: boolean;
   creditNoteIds?: string[];
   totalCredited?: number;
@@ -983,6 +1008,13 @@ export interface CreditNote {
   createdBy: string;
   createdByName: string;
   createdAt: string;
+  originalIrn?: string; // Referenced parent invoice IRN
+  creditNoteIrn?: string; // Statutory 64-hex Credit Note IRN from IRP
+  ackNo?: string;
+  ackDate?: string;
+  signedQrCode?: string;
+  qrCodeDataUrl?: string;
+  irpResponse?: any;
 }
 
 export interface InvoiceSummary {
@@ -1132,3 +1164,12 @@ export type {
   ManualReleaseRequest,
   WriteOffRequest
 } from './types/stockReservation';
+export type {
+  EwbVehicleType,
+  EwbTransportMode,
+  EWayBillPartBHistory,
+  EWayBillExtensionHistory,
+  EWayBillData,
+  EWayBillValidationResult,
+  EWayBillConfig
+} from './types/ewayBill';

@@ -32,6 +32,7 @@ interface EInvoicePanelProps {
   dispatch: Dispatch;
   customer?: Partial<Customer> | null;
   onOpenGenerateModal: () => void;
+  onOpenCreditNoteModal?: () => void;
   onRefreshDispatch?: () => void;
 }
 
@@ -39,6 +40,7 @@ export const EInvoicePanel: React.FC<EInvoicePanelProps> = ({
   dispatch,
   customer,
   onOpenGenerateModal,
+  onOpenCreditNoteModal,
   onRefreshDispatch
 }) => {
   const { tenant, profile } = useAuth();
@@ -178,6 +180,52 @@ export const EInvoicePanel: React.FC<EInvoicePanelProps> = ({
           </span>
         )}
       </div>
+
+      {/* Credit Note Issued Banner (Flow: Stores Credit Note Number + IRN -> Dispatch shows "Credit Note Issued") */}
+      {(dispatch.creditNoteIssued || (dispatch as any).lastCreditNoteNumber) && (
+        <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl space-y-1.5 font-mono text-xs">
+          <div className="flex items-center justify-between">
+            <span className="font-bold text-rose-900 flex items-center space-x-1.5">
+              <RotateCcw className="h-4 w-4 text-rose-600 shrink-0" />
+              <span>Credit Note Issued</span>
+            </span>
+            <span className="text-[10px] bg-rose-100 text-rose-800 px-2 py-0.5 rounded font-extrabold uppercase">
+              CN Active
+            </span>
+          </div>
+          <div className="text-[11px] text-rose-800 space-y-0.5 font-sans">
+            <p><strong>Note Ref:</strong> #{dispatch.lastCreditNoteNumber || 'Issued'}</p>
+            {dispatch.lastCreditNoteIrn && (
+              <p className="font-mono text-[10px] break-all text-rose-700">
+                <strong>CN IRN:</strong> {dispatch.lastCreditNoteIrn}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Sales Return Recorded Alert Banner (Acceptance Criteria 1) */}
+      {dispatch.salesReturnRecorded && !dispatch.creditNoteIssued && (
+        <div className="p-3 bg-amber-50 border-2 border-amber-300 rounded-xl space-y-2 text-xs">
+          <div className="flex items-center space-x-1.5 font-bold text-amber-900">
+            <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+            <span>Sales Return Recorded on Dispatch</span>
+          </div>
+          <p className="text-[11px] text-amber-800 font-sans">
+            {dispatch.salesReturnReason || 'A sales return was logged for this shipment. Please issue a statutory Credit Note to adjust GST liability and order invoiced quantities.'}
+          </p>
+          {onOpenCreditNoteModal && (
+            <button
+              type="button"
+              onClick={onOpenCreditNoteModal}
+              className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded text-[10px] font-mono font-bold uppercase tracking-wider flex items-center space-x-1.5 shadow-2xs transition cursor-pointer"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              <span>Generate Credit Note</span>
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Case 1: Active e-Invoice Generated */}
       {status === 'generated' && eInvoice && (
@@ -519,29 +567,42 @@ export const EInvoicePanel: React.FC<EInvoicePanelProps> = ({
                 </div>
               </div>
             ) : (
-              /* Case: Beyond 24 hours (EC 6) */
-              <div className="space-y-3 text-xs">
-                <div className="p-3.5 bg-rose-50 border border-rose-300 rounded-xl text-rose-900 space-y-2">
-                  <div className="flex items-center space-x-2 font-bold">
-                    <Lock className="h-4 w-4 text-rose-600 shrink-0" />
-                    <span>Statutory 24-Hour Cancellation Period Expired (EC 6)</span>
+              /* Case: Beyond 24 hours (EC: Blocked with statutory message) */
+              <div className="space-y-4 text-xs">
+                <div className="p-4 bg-rose-50 border-2 border-rose-400 rounded-xl text-rose-900 space-y-2">
+                  <div className="flex items-center space-x-2 font-bold text-sm">
+                    <Lock className="h-5 w-5 text-rose-600 shrink-0" />
+                    <span>IRN cancellation window (24h) expired. Generate a credit note instead.</span>
                   </div>
-                  <p className="text-[11px] text-rose-800 leading-relaxed font-sans">
-                    This e-Invoice was generated <strong>{hoursSinceGeneration.toFixed(1)} hours ago</strong>. Under GST Notification 13/2020, IRNs cannot be cancelled on the IRP portal after 24 hours.
+                  <p className="text-xs text-rose-800 leading-relaxed font-sans">
+                    This e-Invoice was generated <strong>{hoursSinceGeneration.toFixed(1)} hours ago</strong>. Under GST rules, IRN cancellation is strictly restricted to within 24 hours of generation on the IRP.
                   </p>
-                  <div className="p-2.5 bg-white rounded border border-rose-200 text-[11px] font-sans text-slate-800">
-                    <strong>Mandatory Procedure:</strong> You must issue a <strong>Credit Note</strong> under Section 34 of the CGST Act and report it in your regular GSTR-1 return.
+                  <div className="p-3 bg-white rounded-lg border border-rose-200 text-xs font-sans text-slate-800">
+                    <strong>Statutory Resolution:</strong> To nullify this invoice or record a return, you must generate a <strong>Credit Note</strong> referencing this IRN.
                   </div>
                 </div>
 
-                <div className="flex justify-end space-x-2 pt-2">
+                <div className="flex items-center justify-end space-x-2 pt-2 border-t">
                   <button
                     type="button"
                     onClick={() => setShowCancelModal(false)}
-                    className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-mono font-bold uppercase cursor-pointer"
+                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-mono font-bold cursor-pointer"
                   >
-                    Understood
+                    Close
                   </button>
+                  {onOpenCreditNoteModal && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowCancelModal(false);
+                        onOpenCreditNoteModal();
+                      }}
+                      className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-mono font-bold uppercase tracking-wider flex items-center space-x-1.5 cursor-pointer shadow-sm"
+                    >
+                      <RotateCcw className="h-3.5 w-3.5" />
+                      <span>Generate Credit Note</span>
+                    </button>
+                  )}
                 </div>
               </div>
             )}

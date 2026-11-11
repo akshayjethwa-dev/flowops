@@ -11,16 +11,17 @@ import {
   DollarSign,
   Package
 } from 'lucide-react';
-import { Invoice, Order, CreditNote } from '../../types';
+import { Invoice, Order, CreditNote, Dispatch } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../context/ToastContext';
-import { issueSalesReturnCreditNote } from '../../services/partialInvoiceService';
+import { issueSalesReturnCreditNote, getCreditNotesForInvoice } from '../../services/partialInvoiceService';
 
 interface SalesReturnCreditNoteModalProps {
   isOpen: boolean;
   onClose: () => void;
   invoice: Invoice | null;
   order?: Order | null;
+  dispatch?: Dispatch | null;
   onSuccess?: (creditNote: CreditNote) => void;
 }
 
@@ -29,6 +30,7 @@ export const SalesReturnCreditNoteModal: React.FC<SalesReturnCreditNoteModalProp
   onClose,
   invoice,
   order: propOrder,
+  dispatch,
   onSuccess
 }) => {
   const { tenant, profile } = useAuth();
@@ -39,6 +41,18 @@ export const SalesReturnCreditNoteModal: React.FC<SalesReturnCreditNoteModalProp
   const [reason, setReason] = useState('Customer Quality Reject / Dimensional Non-Conformance (Sales Return)');
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [existingCreditNotes, setExistingCreditNotes] = useState<CreditNote[]>([]);
+
+  // Original IRN referenced from invoice or dispatch
+  const originalIrn = (invoice as any)?.eInvoice?.irn || (invoice as any)?.irn || dispatch?.eInvoice?.irn || dispatch?.irn || '';
+
+  // Load existing credit notes to check for duplicates (EC 4)
+  useEffect(() => {
+    if (!tenant?.id || !invoice?.id) return;
+    getCreditNotesForInvoice(tenant.id, invoice.id).then(cns => {
+      setExistingCreditNotes(cns);
+    });
+  }, [tenant?.id, invoice?.id, isOpen]);
 
   // Fetch parent order if not supplied
   useEffect(() => {
@@ -85,6 +99,10 @@ export const SalesReturnCreditNoteModal: React.FC<SalesReturnCreditNoteModalProp
     });
   }, [invoice]);
 
+  const totalInvoicedUnits = useMemo(() => {
+    return invoiceItems.reduce((acc, it) => acc + it.invoicedQty, 0);
+  }, [invoiceItems]);
+
   const handleReturnQtyChange = (lineId: string, val: string) => {
     setReturnQtys(prev => ({
       ...prev,
@@ -92,7 +110,7 @@ export const SalesReturnCreditNoteModal: React.FC<SalesReturnCreditNoteModalProp
     }));
   };
 
-  // Calculations for Credit Note
+  // Calculations for Credit Note & Validations
   const creditSummary = useMemo(() => {
     let totalTaxable = 0;
     let totalGst = 0;
@@ -108,6 +126,16 @@ export const SalesReturnCreditNoteModal: React.FC<SalesReturnCreditNoteModalProp
       } else if (retQty > item.invoicedQty) {
         errors[item.lineId] = `Cannot return more than invoiced quantity (${item.invoicedQty}).`;
       } else if (retQty > 0) {
+        // EC 4: Check cumulative return for this item across existing credit notes
+        const alreadyReturnedForItem = existingCreditNotes.reduce((sum, cn) => {
+          const m = (cn.items || []).find(it => it.lineItemId === item.lineId);
+          return sum + (m ? Number(m.returnQty) || 0 : 0);
+        }, 0);
+
+        if (alreadyReturnedForItem + retQty > item.invoicedQty) {
+          errors[item.lineId] = `Previously returned ${alreadyReturnedForItem}. Maximum remaining return is ${Math.max(0, item.invoicedQty - alreadyReturnedForItem)}.`;
+        }
+
         totalReturnUnits += retQty;
         const lineTaxable = Math.round(retQty * item.unitPrice);
         const lineGst = Math.round((lineTaxable * item.gstPercent) / 100);
@@ -117,15 +145,44 @@ export const SalesReturnCreditNoteModal: React.FC<SalesReturnCreditNoteModalProp
     });
 
     const grandTotal = totalTaxable + totalGst;
+
+    // EC 2: Credit note value exceeds original invoice check
+    const existingCredited = Number(invoice?.totalCredited) || 0;
+    const invoiceTotal = Number(invoice?.total) || 0;
+    if (grandTotal > invoiceTotal || (existingCredited + grandTotal) > invoiceTotal) {
+      errors['_general'] = 'Credit note cannot exceed original invoice value.';
+    }
+
+    // EC 4: Duplicate credit note check
+    if (totalReturnUnits > 0 && existingCreditNotes.length > 0) {
+      const isDuplicate = existingCreditNotes.some(cn => {
+        const cnItems = cn.items || [];
+        const returnedActive = invoiceItems.filter(it => Number(returnQtys[it.lineId]) > 0);
+        if (cnItems.length !== returnedActive.length) return false;
+        return returnedActive.every(r => {
+          const m = cnItems.find(it => it.lineItemId === r.lineId);
+          return m && Number(m.returnQty) === Number(returnQtys[r.lineId]);
+        });
+      });
+      if (isDuplicate) {
+        errors['_duplicate'] = 'Duplicate credit note detected: A credit note has already been issued for this return.';
+      }
+    }
+
+    const isPartialReturn = totalReturnUnits > 0 && totalReturnUnits < totalInvoicedUnits;
+    const remainingUnits = Math.max(0, totalInvoicedUnits - totalReturnUnits);
+
     return {
       totalTaxable,
       totalGst,
       grandTotal,
       totalReturnUnits,
+      isPartialReturn,
+      remainingUnits,
       hasErrors: Object.keys(errors).length > 0,
       errors
     };
-  }, [invoiceItems, returnQtys]);
+  }, [invoiceItems, returnQtys, invoice, existingCreditNotes, totalInvoicedUnits]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -179,15 +236,20 @@ export const SalesReturnCreditNoteModal: React.FC<SalesReturnCreditNoteModalProp
         tenantId: tenant.id,
         invoice,
         order: orderToUse,
+        dispatch: dispatch || null,
         returnItems: returnItemsPayload,
         reason,
         createdBy: profile?.uid || 'user',
         createdByName: profile?.name || 'Finance User'
       });
 
+      const irnNote = result.creditNote.creditNoteIrn 
+        ? ` (IRP Credit Note IRN: ${result.creditNote.creditNoteIrn.substring(0, 16)}...)` 
+        : '';
+
       toastSuccess(
         'Sales Return Credit Note Issued',
-        `Credit Note #${result.creditNote.creditNoteNumber} issued for ₹${result.creditNote.totalAmount.toLocaleString('en-IN')}. Invoiced Qty reduced by ${creditSummary.totalReturnUnits} units on Order #${orderToUse.orderNumber}.`
+        `Credit Note #${result.creditNote.creditNoteNumber} issued for ₹${result.creditNote.totalAmount.toLocaleString('en-IN')}${irnNote}. Invoiced Qty reduced by ${creditSummary.totalReturnUnits} units on Order #${orderToUse.orderNumber}.`
       );
 
       if (onSuccess) {
@@ -245,6 +307,47 @@ export const SalesReturnCreditNoteModal: React.FC<SalesReturnCreditNoteModalProp
             </div>
           )}
 
+          {creditSummary.errors['_general'] && (
+            <div className="bg-rose-50 border-2 border-rose-400 text-rose-900 p-3.5 rounded-xl text-xs font-mono flex items-start space-x-2">
+              <AlertCircle className="h-4 w-4 text-rose-600 shrink-0 mt-0.5" />
+              <div>
+                <strong className="block font-bold">Limit Exceeded (EC 2)</strong>
+                <span>{creditSummary.errors['_general']}</span>
+              </div>
+            </div>
+          )}
+
+          {creditSummary.errors['_duplicate'] && (
+            <div className="bg-amber-50 border-2 border-amber-400 text-amber-900 p-3.5 rounded-xl text-xs font-mono flex items-start space-x-2">
+              <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <strong className="block font-bold">Duplicate Detected (EC 4)</strong>
+                <span>{creditSummary.errors['_duplicate']}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Referenced Original IRN Box (Acceptance Criteria 2) */}
+          {originalIrn ? (
+            <div className="p-3 bg-indigo-50/70 border border-indigo-200 rounded-xl space-y-1 font-mono text-xs">
+              <div className="flex items-center justify-between text-[10px] text-indigo-700 uppercase font-bold">
+                <span>Referenced Original e-Invoice IRN</span>
+                <span className="bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded font-extrabold">IRP Connected</span>
+              </div>
+              <p className="text-[11px] font-bold text-slate-800 break-all select-all bg-white p-2 rounded border border-indigo-200">
+                {originalIrn}
+              </p>
+              <span className="text-[10px] text-indigo-600 block">
+                Credit Note will be transmitted to the GST IRP with document type "CRN" referencing this IRN.
+              </span>
+            </div>
+          ) : (
+            <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-mono text-slate-600 flex items-center justify-between">
+              <span>Original Invoice: #{invoice.invoiceNumber}</span>
+              <span className="text-[10px] text-slate-400 uppercase">Non-IRN Consignment</span>
+            </div>
+          )}
+
           {/* Context Banner */}
           <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between text-xs font-mono">
             <div>
@@ -260,6 +363,16 @@ export const SalesReturnCreditNoteModal: React.FC<SalesReturnCreditNoteModalProp
               <span className="font-bold text-slate-800 block truncate max-w-[150px]">{invoice.customerName}</span>
             </div>
           </div>
+
+          {/* Partial Return Notice (EC 3) */}
+          {creditSummary.isPartialReturn && (
+            <div className="p-3 bg-sky-50 border border-sky-200 rounded-xl text-xs text-sky-900 space-y-1 font-sans">
+              <strong className="block font-bold">Partial Return: Selective Credit (EC 3)</strong>
+              <p className="text-[11px] text-sky-800 leading-relaxed font-mono">
+                Generating credit note for {creditSummary.totalReturnUnits} returned units only. Original Invoice #{invoice.invoiceNumber} remains active with {creditSummary.remainingUnits} balance units.
+              </p>
+            </div>
+          )}
 
           {/* Explanation notice */}
           <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-xl text-xs text-amber-900 space-y-1 font-sans">

@@ -39,6 +39,11 @@ import { checkInvoiceExistsForDispatch, getCreditNotesForInvoice } from '../../s
 import { GenerateEInvoiceModal } from '../../components/dispatch/GenerateEInvoiceModal';
 import { EInvoicePanel } from '../../components/dispatch/EInvoicePanel';
 import { downloadEInvoicePdf } from '../../utils/eInvoicePdfGenerator';
+import { GenerateEWayBillModal } from '../../components/dispatch/GenerateEWayBillModal';
+import { EWayBillPanel } from '../../components/dispatch/EWayBillPanel';
+import { downloadEWayBillPdf } from '../../utils/ewayBillPdfGenerator';
+import { useEWayBillExpiryMonitor } from '../../hooks/useEWayBillExpiryMonitor';
+import { ActivityTimeline } from '../../components/ActivityTimeline';
 import { Invoice, CreditNote, Dispatch } from '../../types';
 
 export const DispatchDetailPage: React.FC = () => {
@@ -48,6 +53,9 @@ export const DispatchDetailPage: React.FC = () => {
   const { toastSuccess, toastError } = useToast();
   const { dispatchItem, loading, error, updateDispatchStatus } = useDispatchDetail(tenant?.id, dispatchId);
 
+  // Background monitor for expiring e-Way Bills (within 4 hours)
+  useEWayBillExpiryMonitor();
+
   const [currentDispatch, setCurrentDispatch] = useState<Dispatch | null>(null);
   const [updating, setUpdating] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -55,10 +63,11 @@ export const DispatchDetailPage: React.FC = () => {
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelling, setCancelling] = useState(false);
 
-  // Invoicing & Credit Note state
+  // Invoicing & Transit Permit state
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [showCreditNoteModal, setShowCreditNoteModal] = useState(false);
   const [showEInvoiceModal, setShowEInvoiceModal] = useState(false);
+  const [showEWayBillModal, setShowEWayBillModal] = useState(false);
   const [linkedInvoice, setLinkedInvoice] = useState<Invoice | null>(null);
   const [creditNotes, setCreditNotes] = useState<CreditNote[]>([]);
   const [refreshInvoicingKey, setRefreshInvoicingKey] = useState(0);
@@ -83,6 +92,16 @@ export const DispatchDetailPage: React.FC = () => {
       console.warn('Error reloading dispatch', e);
     }
   };
+
+  useEffect(() => {
+    const handleEwbUpdated = (e: any) => {
+      if (!e.detail?.dispatchId || e.detail.dispatchId === dispatchId) {
+        handleReloadDispatch();
+      }
+    };
+    window.addEventListener('ewaybill.updated', handleEwbUpdated);
+    return () => window.removeEventListener('ewaybill.updated', handleEwbUpdated);
+  }, [dispatchId]);
 
   // Load linked invoice & credit notes
   useEffect(() => {
@@ -240,26 +259,61 @@ export const DispatchDetailPage: React.FC = () => {
                     <span>Invoiced #{linkedInvoice?.invoiceNumber || dispatchItem.invoiceNumber}</span>
                   </button>
 
-                  <button
-                    type="button"
-                    onClick={() => setShowCreditNoteModal(true)}
-                    className="border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-800 px-3 py-2 rounded-lg font-mono text-[10px] uppercase font-bold tracking-wider flex items-center space-x-1.5 cursor-pointer shadow-3xs transition"
-                    title="Accept Sales Return and generate statutory Credit Note (Acceptance Criteria EC 2)"
-                  >
-                    <RotateCcw className="h-4 w-4 text-rose-600 shrink-0" />
-                    <span>Sales Return (Credit Note)</span>
-                  </button>
+                  {((currentDispatch || dispatchItem).creditNoteIssued || creditNotes.length > 0) ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowCreditNoteModal(true)}
+                      className="border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-800 px-3 py-2 rounded-lg font-mono text-[10px] uppercase font-bold tracking-wider flex items-center space-x-1.5 cursor-pointer shadow-3xs transition"
+                      title="Credit Note issued and applied to parent invoice"
+                    >
+                      <RotateCcw className="h-4 w-4 text-rose-600 shrink-0" />
+                      <span>Credit Note Issued #{creditNotes[0]?.creditNoteNumber || (currentDispatch || dispatchItem).lastCreditNoteNumber || ''}</span>
+                    </button>
+                  ) : (currentDispatch || dispatchItem).salesReturnRecorded ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowCreditNoteModal(true)}
+                      className="bg-rose-600 hover:bg-rose-700 text-white px-3.5 py-2 rounded-lg font-mono text-[10px] uppercase font-bold tracking-wider flex items-center space-x-1.5 cursor-pointer shadow-xs transition animate-pulse"
+                      title="Sales return recorded. Click to generate statutory Credit Note"
+                    >
+                      <RotateCcw className="h-4 w-4 shrink-0" />
+                      <span>Generate Credit Note</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setShowCreditNoteModal(true)}
+                      className="border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-800 px-3 py-2 rounded-lg font-mono text-[10px] uppercase font-bold tracking-wider flex items-center space-x-1.5 cursor-pointer shadow-3xs transition"
+                      title="Accept Sales Return and generate statutory Credit Note"
+                    >
+                      <RotateCcw className="h-4 w-4 text-rose-600 shrink-0" />
+                      <span>Sales Return (Credit Note)</span>
+                    </button>
+                  )}
                 </div>
               ) : (
-                <button
-                  type="button"
-                  onClick={() => setShowInvoiceModal(true)}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-lg font-mono text-[10px] uppercase font-bold tracking-wider flex items-center space-x-1.5 cursor-pointer shadow-xs transition"
-                  title="Generate Tax Invoice for only the quantity dispatched"
-                >
-                  <Receipt className="h-4 w-4 shrink-0" />
-                  <span>Generate Invoice</span>
-                </button>
+                <div className="flex items-center space-x-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowInvoiceModal(true)}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-lg font-mono text-[10px] uppercase font-bold tracking-wider flex items-center space-x-1.5 cursor-pointer shadow-xs transition"
+                    title="Generate Tax Invoice for only the quantity dispatched"
+                  >
+                    <Receipt className="h-4 w-4 shrink-0" />
+                    <span>Generate Invoice</span>
+                  </button>
+                  {(currentDispatch || dispatchItem).salesReturnRecorded && !((currentDispatch || dispatchItem).creditNoteIssued) && (
+                    <button
+                      type="button"
+                      onClick={() => setShowCreditNoteModal(true)}
+                      className="bg-rose-600 hover:bg-rose-700 text-white px-3.5 py-2 rounded-lg font-mono text-[10px] uppercase font-bold tracking-wider flex items-center space-x-1.5 cursor-pointer shadow-xs transition"
+                      title="Generate Credit Note for returned goods"
+                    >
+                      <RotateCcw className="h-4 w-4 shrink-0" />
+                      <span>Generate Credit Note</span>
+                    </button>
+                  )}
+                </div>
               )
             )}
 
@@ -296,6 +350,44 @@ export const DispatchDetailPage: React.FC = () => {
                   >
                     <QrCode className="h-4 w-4 shrink-0" />
                     <span>Generate e-Invoice</span>
+                  </button>
+                )
+              )
+            )}
+
+            {/* e-Way Bill Action */}
+            {(currentDispatch || dispatchItem).status !== 'Cancelled' && (
+              (((currentDispatch as any) || dispatchItem).ewayBill?.status === 'active' || ((currentDispatch as any) || dispatchItem).ewbNumber) ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const disp: any = currentDispatch || dispatchItem;
+                    downloadEWayBillPdf(
+                      disp?.ewayBill || null,
+                      disp,
+                      {
+                        name: tenant?.name || 'NexFlow Manufacturing Industries Ltd',
+                        gstin: tenant?.gstin || '27AABCS1429B1ZB',
+                        address: { street: 'Industrial Estate', city: 'Pune', state: 'Maharashtra', pincode: '411018' }
+                      }
+                    );
+                  }}
+                  className="border border-sky-300 bg-sky-50 hover:bg-sky-100 text-sky-900 px-3 py-2 rounded-lg font-mono text-[10px] uppercase font-bold tracking-wider flex items-center space-x-1.5 cursor-pointer shadow-3xs transition"
+                  title="Print official GST e-Way Bill (Form GST EWB-01)"
+                >
+                  <Truck className="h-4 w-4 text-sky-600 shrink-0" />
+                  <span>e-Way Bill #{((currentDispatch as any) || dispatchItem).ewbNumber || ((currentDispatch as any) || dispatchItem).ewayBill?.ewbNumber}</span>
+                </button>
+              ) : (
+                ['admin', 'dispatch', 'management'].includes((profile?.role || '').toLowerCase()) && (
+                  <button
+                    type="button"
+                    onClick={() => setShowEWayBillModal(true)}
+                    className="border border-sky-200 bg-sky-600 hover:bg-sky-700 text-white px-3 py-2 rounded-lg font-mono text-[10px] uppercase font-bold tracking-wider flex items-center space-x-1.5 cursor-pointer shadow-xs transition"
+                    title="Generate GST e-Way Bill for transit (₹50,000+)"
+                  >
+                    <Truck className="h-4 w-4 shrink-0" />
+                    <span>Generate e-Way Bill</span>
                   </button>
                 )
               )
@@ -375,6 +467,40 @@ export const DispatchDetailPage: React.FC = () => {
         {/* LEFT COLUMN: Loaded Freight specifications list (2/3 width) */}
         <div className="lg:col-span-2 space-y-6">
 
+          {/* Sales Return Notification Banner (Acceptance Criteria 1 & Flow) */}
+          {((currentDispatch || dispatchItem).salesReturnRecorded || (currentDispatch || dispatchItem).creditNoteIssued || creditNotes.length > 0) && (
+            <div className="p-4 bg-rose-50 border-2 border-rose-300 rounded-xl space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2 text-rose-900 font-bold text-xs uppercase font-mono tracking-wider">
+                  <RotateCcw className="h-4 w-4 text-rose-600" />
+                  <span>{(currentDispatch || dispatchItem).creditNoteIssued || creditNotes.length > 0 ? 'Credit Note Issued & Applied' : 'Sales Return Recorded on Dispatch'}</span>
+                </div>
+                {((currentDispatch || dispatchItem).creditNoteIssued || creditNotes.length > 0) && (
+                  <span className="px-2.5 py-0.5 rounded-full text-[9px] font-mono font-black uppercase bg-rose-600 text-white">
+                    Credit Note Active
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-rose-800 font-sans">
+                {((currentDispatch || dispatchItem).creditNoteIssued || creditNotes.length > 0)
+                  ? `Statutory Credit Note #${creditNotes[0]?.creditNoteNumber || (currentDispatch || dispatchItem).lastCreditNoteNumber || ''} has been issued and linked to original IRN. Parent order invoiced quantities have been reversed accordingly.`
+                  : 'A sales return has been flagged for this dispatch. Please generate an official GST Credit Note to maintain IRP compliance and update invoiced quantities.'}
+              </p>
+              {(!((currentDispatch || dispatchItem).creditNoteIssued) && creditNotes.length === 0) && (
+                <div className="pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowCreditNoteModal(true)}
+                    className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-mono font-bold uppercase tracking-wider flex items-center space-x-1.5 shadow-sm cursor-pointer"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    <span>Generate Credit Note</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Loaded components list */}
           <div className="bg-white border rounded-xl p-6 shadow-2xs space-y-4">
             <div className="flex justify-between items-center pb-2 border-b">
@@ -436,6 +562,20 @@ export const DispatchDetailPage: React.FC = () => {
             </div>
           </div>
 
+          {/* Audit Trail & Compliance History (Acceptance Criteria 5) */}
+          <div className="bg-white border rounded-xl p-6 shadow-2xs space-y-3.5">
+            <div className="flex items-center justify-between pb-2 border-b">
+              <h3 className="text-xs uppercase font-mono font-bold text-slate-600 tracking-wider flex items-center space-x-1.5">
+                <FileText className="h-4 w-4 text-indigo-600" />
+                <span>Audit Trail & Statutory Compliance History</span>
+              </h3>
+              <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200">
+                IRP Audit Trail
+              </span>
+            </div>
+            <ActivityTimeline entityId={dispatchId} entityType="dispatch" compact={true} maxLimit={6} />
+          </div>
+
         </div>
 
         {/* RIGHT COLUMN: Action triggers, transporter details (1/3 width) */}
@@ -445,6 +585,14 @@ export const DispatchDetailPage: React.FC = () => {
           <EInvoicePanel
             dispatch={currentDispatch || dispatchItem}
             onOpenGenerateModal={() => setShowEInvoiceModal(true)}
+            onOpenCreditNoteModal={() => setShowCreditNoteModal(true)}
+            onRefreshDispatch={handleReloadDispatch}
+          />
+
+          {/* GST e-Way Bill Panel (Form GST EWB-01 & Part B updates) */}
+          <EWayBillPanel
+            dispatch={currentDispatch || dispatchItem}
+            onOpenGenerateModal={() => setShowEWayBillModal(true)}
             onRefreshDispatch={handleReloadDispatch}
           />
 
@@ -748,15 +896,64 @@ export const DispatchDetailPage: React.FC = () => {
         />
       )}
 
-      {/* Sales Return Credit Note Modal (EC 2) */}
-      {showCreditNoteModal && linkedInvoice && (
+      {/* Sales Return Credit Note Modal (Acceptance Criteria 1 & 2) */}
+      {showCreditNoteModal && (linkedInvoice || currentDispatch || dispatchItem) && (
         <SalesReturnCreditNoteModal
           isOpen={showCreditNoteModal}
           onClose={() => setShowCreditNoteModal(false)}
-          invoice={linkedInvoice}
+          invoice={linkedInvoice || {
+            id: (currentDispatch || dispatchItem).invoiceId || (currentDispatch || dispatchItem).invoiceNumber,
+            invoiceNumber: (currentDispatch || dispatchItem).invoiceNumber,
+            tenantId: tenant?.id || '',
+            orderId: (currentDispatch || dispatchItem).orderId,
+            orderNumber: (currentDispatch || dispatchItem).orderId,
+            dispatchId: (currentDispatch || dispatchItem).id,
+            dispatchNumber: (currentDispatch || dispatchItem).dispatchNumber,
+            customerId: (currentDispatch || dispatchItem).customerId || '',
+            customerName: (currentDispatch || dispatchItem).customerName || 'Customer',
+            amount: totalCargoValue,
+            subtotal: totalCargoValue,
+            taxAmount: Math.round(totalCargoValue * 0.18),
+            total: Math.round(totalCargoValue * 1.18),
+            outstanding: Math.round(totalCargoValue * 1.18),
+            totalPaid: 0,
+            totalCredited: 0,
+            status: 'issued',
+            invoiceDate: (currentDispatch || dispatchItem).dispatchDate || new Date().toISOString().split('T')[0],
+            dueDate: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
+            items: (currentDispatch || dispatchItem).items?.map((it, idx) => ({
+              id: it.id || `line-${idx}`,
+              lineItemId: it.id || `line-${idx}`,
+              name: it.name,
+              hsn: (it as any).hsn || '8483',
+              quantity: it.quantity,
+              unitPrice: it.unitPrice,
+              gstPercent: it.gstPercent || 18,
+              taxableValue: it.quantity * it.unitPrice,
+              cgst: Math.round(it.quantity * it.unitPrice * 0.09),
+              sgst: Math.round(it.quantity * it.unitPrice * 0.09),
+              igst: 0,
+              gstAmount: Math.round(it.quantity * it.unitPrice * 0.18),
+              total: Math.round(it.quantity * it.unitPrice * 1.18)
+            })) || [],
+            eInvoice: (currentDispatch || dispatchItem).eInvoice,
+            irn: (currentDispatch || dispatchItem).irn || (currentDispatch || dispatchItem).eInvoice?.irn,
+            createdAt: new Date().toISOString(),
+            createdBy: profile?.uid || 'user',
+            createdByName: profile?.name || 'User'
+          }}
+          dispatch={currentDispatch || dispatchItem}
           onSuccess={(cn) => {
             setCreditNotes(prev => [cn, ...prev]);
+            setCurrentDispatch(prev => prev ? {
+              ...prev,
+              creditNoteIssued: true,
+              lastCreditNoteNumber: cn.creditNoteNumber,
+              lastCreditNoteIrn: cn.creditNoteIrn,
+              salesReturnRecorded: true
+            } : null);
             setRefreshInvoicingKey(k => k + 1);
+            handleReloadDispatch();
           }}
         />
       )}
@@ -776,6 +973,28 @@ export const DispatchDetailPage: React.FC = () => {
               ackNo: eInvoiceData.ackNo 
             } : null);
             setShowEInvoiceModal(false);
+          }}
+        />
+      )}
+
+      {/* Generate e-Way Bill Modal (Part A & Part B) */}
+      {showEWayBillModal && (currentDispatch || dispatchItem) && (
+        <GenerateEWayBillModal
+          isOpen={showEWayBillModal}
+          onClose={() => setShowEWayBillModal(false)}
+          dispatch={currentDispatch || dispatchItem}
+          onSuccess={(ewbData) => {
+            setCurrentDispatch(prev => prev ? {
+              ...prev,
+              ewayBill: ewbData,
+              ewbNumber: ewbData.ewayBillNumber || ewbData.ewbNumber,
+              ewbValidUntil: ewbData.validUntil || ewbData.validUpto,
+              ewbStatus: ewbData.status,
+              ewbDistanceKm: ewbData.distanceKm,
+              transporterId: ewbData.transporterId || prev.transporterId,
+              vehicleNumber: ewbData.vehicleNumber || prev.vehicleNumber
+            } : null);
+            setShowEWayBillModal(false);
           }}
         />
       )}
