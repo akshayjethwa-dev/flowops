@@ -329,170 +329,282 @@ export const SEED_MACHINES_LIVE_OEE: MachineLiveOee[] = [
   }
 ];
 
-// ── Seed Downtime Reason Codes ──────────────────────────────────────
+// ── Seed Downtime Reason Codes (5M Categories: Machine, Material, Manpower, Method, Measurement) ──
 export const SEED_DOWNTIME_REASONS: DowntimeReasonCode[] = [
-  // Breakdown Categories
+  // ── 1. MACHINE (Breakdown, Tool Change, Power Failure, Setup, etc.) ──
   {
-    id: 'dt_brk_01',
-    code: 'DT-BRK-01',
-    label: 'Tool Breakage & Insert Fracture',
-    category: 'breakdown',
-    categoryLabel: 'Equipment Breakdown',
+    id: 'dt_mch_01',
+    code: 'MC-BRK',
+    label: 'Breakdown',
+    category: 'machine',
+    categoryLabel: 'Machine',
+    severity: 'critical',
+    requiresTechnician: true,
+    active: true,
+    color: '#e11d48',
+    suggestedAction: 'Check spindle drive, hydraulic pack, e-stop circuit, and alert maintenance.'
+  },
+  {
+    id: 'dt_mch_02',
+    code: 'MC-TOOL',
+    label: 'Tool Change',
+    category: 'machine',
+    categoryLabel: 'Machine',
     severity: 'high',
     requiresTechnician: false,
+    active: true,
     color: '#f43f5e',
-    suggestedAction: 'Inspect toolholder pocket, indexing fresh insert, zero Z-axis offset'
+    suggestedAction: 'Index fresh insert / replace cutter blade and re-zero Z offset.'
   },
   {
-    id: 'dt_brk_02',
-    code: 'DT-BRK-02',
-    label: 'Spindle Inverter Overheat / Drive Trip',
-    category: 'breakdown',
-    categoryLabel: 'Equipment Breakdown',
+    id: 'dt_mch_03',
+    code: 'MC-PWR',
+    label: 'Power Failure',
+    category: 'machine',
+    categoryLabel: 'Machine',
     severity: 'critical',
     requiresTechnician: true,
-    color: '#e11d48',
-    suggestedAction: 'Check chiller temperature, cabinet heat exchanger fans, inverter reset'
-  },
-  {
-    id: 'dt_brk_03',
-    code: 'DT-BRK-03',
-    label: 'Hydraulic Chuck / Clamping Pressure Low',
-    category: 'breakdown',
-    categoryLabel: 'Equipment Breakdown',
-    severity: 'critical',
-    requiresTechnician: true,
+    active: true,
     color: '#be123c',
-    suggestedAction: 'Check hydraulic power pack oil level and line pressure gauge (min 35 bar)'
+    suggestedAction: 'Check main breaker, MCC cabinet fuse, and plant air header pressure.'
   },
   {
-    id: 'dt_brk_04',
-    code: 'DT-BRK-04',
-    label: 'Axis Servo Travel Limit / Soft Overtravel',
-    category: 'breakdown',
-    categoryLabel: 'Equipment Breakdown',
+    id: 'dt_mch_04',
+    code: 'MC-SETUP',
+    label: 'Setup',
+    category: 'machine',
+    categoryLabel: 'Machine',
     severity: 'medium',
     requiresTechnician: false,
-    color: '#fb7185',
-    suggestedAction: 'Manual handwheel jog in reverse axis, inspect chip buildup on way wipers'
-  },
-
-  // Setup / Changeover Categories
-  {
-    id: 'dt_set_01',
-    code: 'DT-SET-01',
-    label: 'Fixture Change & Tombstone Setup',
-    category: 'changeover',
-    categoryLabel: 'Setup & Changeover',
-    severity: 'medium',
-    requiresTechnician: false,
-    color: '#0ea5e9',
-    suggestedAction: 'Dial test fixture alignment, torque bolts to spec, load CNC program'
-  },
-  {
-    id: 'dt_set_02',
-    code: 'DT-SET-02',
-    label: 'Workpiece Touch-Off & Zero Offset Calibration',
-    category: 'changeover',
-    categoryLabel: 'Setup & Changeover',
-    severity: 'medium',
-    requiresTechnician: false,
+    active: true,
     color: '#0284c7',
-    suggestedAction: 'Renishaw probe routine or optical edge finder touch-off G54/G55'
+    suggestedAction: 'Mount fixture jaws, dial test workpiece TIR, and load CNC G-code program.'
   },
   {
-    id: 'dt_set_03',
-    code: 'DT-SET-03',
-    label: 'First Article Inspection & Quality Buy-Off',
-    category: 'changeover',
-    categoryLabel: 'Setup & Changeover',
-    severity: 'low',
-    requiresTechnician: false,
-    color: '#38bdf8',
-    suggestedAction: 'Submit first off sample to QC inspection lab for micrometry sign-off'
+    id: 'dt_mch_05',
+    code: 'MC-HYD',
+    label: 'Hydraulic Alarm',
+    category: 'machine',
+    categoryLabel: 'Machine',
+    severity: 'high',
+    requiresTechnician: true,
+    active: true,
+    color: '#7c3aed',
+    suggestedAction: 'Inspect oil temperature, filter bypass, and chuck pressure gauge.'
   },
 
-  // Material Starvation Categories
+  // ── 2. MATERIAL (Starvation, Stock Defect, Wrong Material, Route Card) ──
   {
     id: 'dt_mat_01',
-    code: 'DT-MAT-01',
-    label: 'Awaiting Raw Castings / Cut Billets',
-    category: 'starvation',
-    categoryLabel: 'Material Starvation',
+    code: 'MAT-STARV',
+    label: 'Starvation',
+    category: 'material',
+    categoryLabel: 'Material',
     severity: 'high',
     requiresTechnician: false,
+    active: true,
     color: '#f59e0b',
-    suggestedAction: 'Ping storekeeper / material handler for pallet replenishment'
+    suggestedAction: 'Call raw material storekeeper / forklift driver for billet pallet transfer.'
   },
   {
     id: 'dt_mat_02',
-    code: 'DT-MAT-02',
-    label: 'Awaiting Pre-Operation Stage Handover',
-    category: 'starvation',
-    categoryLabel: 'Material Starvation',
-    severity: 'medium',
+    code: 'MAT-DEF',
+    label: 'Stock Defect',
+    category: 'material',
+    categoryLabel: 'Material',
+    severity: 'high',
     requiresTechnician: false,
+    active: true,
     color: '#d97706',
-    suggestedAction: 'Expedite upstream cutting/roughing operation on Work Order traveler'
+    suggestedAction: 'Segregate porous/cracked raw blanks with yellow quarantine NCR tag.'
   },
   {
     id: 'dt_mat_03',
-    code: 'DT-MAT-03',
-    label: 'Defective Raw Stock / Porosity in Blanks',
-    category: 'starvation',
-    categoryLabel: 'Material Starvation',
-    severity: 'high',
+    code: 'MAT-WRONG',
+    label: 'Wrong Material',
+    category: 'material',
+    categoryLabel: 'Material',
+    severity: 'critical',
     requiresTechnician: false,
+    active: true,
     color: '#b45309',
-    suggestedAction: 'Tag lot with Non-Conformance Yellow tag and quarantine pallet'
+    suggestedAction: 'Cross-check heat number and mill test certificate against BOM specification.'
   },
-
-  // Utilities & Alarms
   {
-    id: 'dt_utl_01',
-    code: 'DT-UTL-01',
-    label: 'Coolant Flow Low / Filter Mesh Clogged',
-    category: 'utilities',
-    categoryLabel: 'Utilities & Alarms',
+    id: 'dt_mat_04',
+    code: 'MAT-TC',
+    label: 'Missing Traveler',
+    category: 'material',
+    categoryLabel: 'Material',
     severity: 'medium',
     requiresTechnician: false,
-    color: '#8b5cf6',
-    suggestedAction: 'Clean chip conveyor filter mesh basket and top up soluble cutting oil emulsion'
-  },
-  {
-    id: 'dt_utl_02',
-    code: 'DT-UTL-02',
-    label: 'Compressed Air Line Pressure Drop',
-    category: 'utilities',
-    categoryLabel: 'Utilities & Alarms',
-    severity: 'high',
-    requiresTechnician: true,
-    color: '#7c3aed',
-    suggestedAction: 'Alert facilities team; check main header air manifold pressure'
+    active: true,
+    color: '#78350f',
+    suggestedAction: 'Request production control reprint work order route card and batch traveler.'
   },
 
-  // Operator / Planned
+  // ── 3. MANPOWER (Operator Absent, Training, Shift Changeover, Fatigue) ──
   {
-    id: 'dt_opr_01',
-    code: 'DT-OPR-01',
-    label: 'Scheduled Shift Handover / 5S Cleaning',
-    category: 'operator_rest',
-    categoryLabel: 'Planned Rest & 5S',
-    severity: 'low',
+    id: 'dt_man_01',
+    code: 'MAN-ABS',
+    label: 'Operator Absent',
+    category: 'manpower',
+    categoryLabel: 'Manpower',
+    severity: 'high',
     requiresTechnician: false,
-    color: '#64748b',
-    suggestedAction: 'Sweep swarf chips, clean glass window, complete handover logbook'
+    active: true,
+    color: '#6366f1',
+    suggestedAction: 'Request line supervisor assign backup cross-trained operator from float pool.'
   },
   {
-    id: 'dt_opr_02',
-    code: 'DT-OPR-02',
-    label: 'Operator Mandatory Safety Briefing',
-    category: 'operator_rest',
-    categoryLabel: 'Planned Rest & 5S',
+    id: 'dt_man_02',
+    code: 'MAN-TRN',
+    label: 'Training & Briefing',
+    category: 'manpower',
+    categoryLabel: 'Manpower',
     severity: 'low',
     requiresTechnician: false,
-    color: '#475569',
-    suggestedAction: 'Morning toolbox safety talk & PPE check'
+    active: true,
+    color: '#4f46e5',
+    suggestedAction: 'Attend morning safety toolbox talk, SOP review, or Kaizen huddle.'
+  },
+  {
+    id: 'dt_man_03',
+    code: 'MAN-HND',
+    label: 'Shift Changeover',
+    category: 'manpower',
+    categoryLabel: 'Manpower',
+    severity: 'low',
+    requiresTechnician: false,
+    active: true,
+    color: '#4338ca',
+    suggestedAction: 'Conduct physical WIP count handover and workstation 5S inspection.'
+  },
+  {
+    id: 'dt_man_04',
+    code: 'MAN-BRK',
+    label: 'Operator Fatigue / Rest',
+    category: 'manpower',
+    categoryLabel: 'Manpower',
+    severity: 'low',
+    requiresTechnician: false,
+    active: true,
+    color: '#3730a3',
+    suggestedAction: 'Scheduled ergonomic rest, hydration, and stretching break.'
+  },
+
+  // ── 4. METHOD (Drawing Rev, Program Error, Process Deviation, Jig Rework) ──
+  {
+    id: 'dt_mth_01',
+    code: 'MTH-ECO',
+    label: 'Drawing Revision',
+    category: 'method',
+    categoryLabel: 'Method',
+    severity: 'high',
+    requiresTechnician: false,
+    active: true,
+    color: '#0d9488',
+    suggestedAction: 'Halt cutting pending design engineer sign-off on ECO dimension changes.'
+  },
+  {
+    id: 'dt_mth_02',
+    code: 'MTH-CNC',
+    label: 'Program Error',
+    category: 'method',
+    categoryLabel: 'Method',
+    severity: 'high',
+    requiresTechnician: true,
+    active: true,
+    color: '#0f766e',
+    suggestedAction: 'Verify CAM toolpath post-processor block, dry-run in single block mode.'
+  },
+  {
+    id: 'dt_mth_03',
+    code: 'MTH-PRC',
+    label: 'Process Deviation',
+    category: 'method',
+    categoryLabel: 'Method',
+    severity: 'medium',
+    requiresTechnician: false,
+    active: true,
+    color: '#115e59',
+    suggestedAction: 'Adjust spindle RPM, coolant nozzle direction, or feed per tooth (fz).'
+  },
+  {
+    id: 'dt_mth_04',
+    code: 'MTH-JIG',
+    label: 'Fixture Rework',
+    category: 'method',
+    categoryLabel: 'Method',
+    severity: 'medium',
+    requiresTechnician: true,
+    active: true,
+    color: '#134e4a',
+    suggestedAction: 'Shim locator pins or re-grind soft jaws to prevent workpiece deflection.'
+  },
+
+  // ── 5. MEASUREMENT (First Piece QC Buy-Off, Gage Calibration, Dimensional OOT) ──
+  {
+    id: 'dt_mea_01',
+    code: 'MEA-1ST',
+    label: 'First Piece QC Buy-Off',
+    category: 'measurement',
+    categoryLabel: 'Measurement',
+    severity: 'medium',
+    requiresTechnician: false,
+    active: true,
+    color: '#ea580c',
+    suggestedAction: 'Deliver first-off machined sample to CMM laboratory for FAI approval.'
+  },
+  {
+    id: 'dt_mea_02',
+    code: 'MEA-GAG',
+    label: 'Gage Calibration',
+    category: 'measurement',
+    categoryLabel: 'Measurement',
+    severity: 'low',
+    requiresTechnician: false,
+    active: true,
+    color: '#c2410c',
+    suggestedAction: 'Zero digital micrometer with gauge block master standard.'
+  },
+  {
+    id: 'dt_mea_03',
+    code: 'MEA-OOT',
+    label: 'Dimensional Out of Spec',
+    category: 'measurement',
+    categoryLabel: 'Measurement',
+    severity: 'high',
+    requiresTechnician: false,
+    active: true,
+    color: '#9a3412',
+    suggestedAction: 'Measure pitch circle runout, update tool wear offset register.'
+  },
+  {
+    id: 'dt_mea_04',
+    code: 'MEA-SURF',
+    label: 'Surface Finish Reject',
+    category: 'measurement',
+    categoryLabel: 'Measurement',
+    severity: 'medium',
+    requiresTechnician: false,
+    active: true,
+    color: '#7c2d12',
+    suggestedAction: 'Inspect wiper insert radius, increase spindle speed, check chatter marks.'
+  },
+
+  // ── OTHER / CUSTOM REASON (Free-Text Note) ──
+  {
+    id: 'dt_oth_01',
+    code: 'DT-OTHER',
+    label: 'Other',
+    category: 'other',
+    categoryLabel: 'Other',
+    severity: 'medium',
+    requiresTechnician: false,
+    active: true,
+    color: '#64748b',
+    suggestedAction: 'Type specific free-text note describing root cause of stoppage.'
   }
 ];
 
@@ -663,7 +775,14 @@ class OeeService {
 
       const savedReasons = localStorage.getItem(STORAGE_KEY_DOWNTIME_REASONS);
       if (savedReasons) {
-        this.downtimeReasons = JSON.parse(savedReasons);
+        const parsed = JSON.parse(savedReasons);
+        const has5M = Array.isArray(parsed) && parsed.some((r: any) => ['machine', 'material', 'manpower', 'method', 'measurement'].includes(r.category));
+        if (!has5M) {
+          this.downtimeReasons = [...SEED_DOWNTIME_REASONS];
+          this.persistReasons();
+        } else {
+          this.downtimeReasons = parsed.map((r: any) => ({ ...r, active: r.active !== false }));
+        }
       } else {
         this.downtimeReasons = [...SEED_DOWNTIME_REASONS];
         this.persistReasons();
@@ -676,6 +795,9 @@ class OeeService {
         this.downtimeEvents = [...SEED_DOWNTIME_EVENTS];
         this.persistEvents();
       }
+
+      // Auto-close any overdue events running >12h overnight (EC 1)
+      this.autoCloseOverdueDowntimeEvents();
     } catch (e) {
       console.error('Failed to init OEE service:', e);
       this.machines = [...SEED_MACHINES_LIVE_OEE];
@@ -1008,28 +1130,89 @@ class OeeService {
     return this.downtimeEvents.find(e => (e.machineId === machineId || e.machineCode === machineId) && !e.resolved);
   }
 
+  public getActiveDowntimeEventForJob(jobIdOrOrderNumber: string): DowntimeEventRecord | undefined {
+    if (!jobIdOrOrderNumber) return undefined;
+    return this.downtimeEvents.find(
+      e => !e.resolved && (e.jobId === jobIdOrOrderNumber || e.workOrderNumber === jobIdOrOrderNumber)
+    );
+  }
+
   /**
-   * Log an initial downtime event when a machine stops / faults / changes over
+   * Auto-close overdue downtime events (>12h) to handle when supervisor forgets to resume (EC 1)
+   */
+  public autoCloseOverdueDowntimeEvents(): number {
+    const now = Date.now();
+    const TWELVE_HOURS_MS = 12 * 60 * 60 * 1000;
+    let closedCount = 0;
+
+    this.downtimeEvents = this.downtimeEvents.map(evt => {
+      if (!evt.resolved && evt.startTime) {
+        const startMs = new Date(evt.startTime).getTime();
+        if (now - startMs > TWELVE_HOURS_MS) {
+          closedCount++;
+          const autoEndTime = new Date(startMs + TWELVE_HOURS_MS).toISOString();
+          return {
+            ...evt,
+            endTime: autoEndTime,
+            durationMinutes: 720,
+            resolved: true,
+            auto_closed: true,
+            auto_closed_reason: 'Auto-closed after 12h overnight threshold'
+          };
+        }
+      }
+      return evt;
+    });
+
+    if (closedCount > 0) {
+      this.persistEvents();
+      this.notify();
+    }
+    return closedCount;
+  }
+
+  /**
+   * Log an initial downtime event when a machine stops / faults / changes over (AC 2)
    */
   public logDowntimeEvent(params: {
     machineId: string;
     reasonCodeId: string;
     operatorId: string;
     operatorName: string;
+    jobId?: string;
+    workOrderNumber?: string;
+    partName?: string;
+    userId?: string;
     notes?: string;
+    deviceTimestamp?: string;
+    startTime?: string;
   }): DowntimeEventRecord {
+    // EC 2: Multiple downtime events overlap for the same job -> System blocks with exact message: "Job already stopped. Resume first."
+    if (params.jobId || params.workOrderNumber) {
+      const activeForJob = this.downtimeEvents.find(
+        e => !e.resolved && (
+          (params.jobId && e.jobId === params.jobId) || 
+          (params.workOrderNumber && e.workOrderNumber === params.workOrderNumber)
+        )
+      );
+      if (activeForJob) {
+        throw new Error('Job already stopped. Resume first.');
+      }
+    }
+
     const machine = this.machines.find(m => m.machineId === params.machineId || m.machineCode === params.machineId);
     const reason = this.downtimeReasons.find(r => r.id === params.reasonCodeId || r.code === params.reasonCodeId) 
       || this.downtimeReasons[0];
 
-    const now = new Date();
-    const nowIso = now.toISOString();
+    const deviceTime = params.deviceTimestamp || params.startTime || new Date().toISOString();
+    const nowIso = deviceTime;
 
     // Close any previous open downtime event on this machine
     this.downtimeEvents = this.downtimeEvents.map(e => {
       if ((e.machineId === params.machineId || e.machineCode === params.machineId) && !e.resolved) {
         const start = new Date(e.startTime).getTime();
-        const durationMin = Math.max(1, Math.round((now.getTime() - start) / 60000));
+        const endMs = new Date(nowIso).getTime();
+        const durationMin = Math.max(1, Math.round((endMs - start) / 60000));
         return {
           ...e,
           endTime: nowIso,
@@ -1042,11 +1225,12 @@ class OeeService {
 
     const newEvent: DowntimeEventRecord = {
       id: `dte_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      jobId: params.jobId,
+      workOrderNumber: params.workOrderNumber || machine?.activeWorkOrderNumber,
+      partName: params.partName || machine?.activePartName,
       machineId: machine?.machineId || params.machineId,
       machineCode: machine?.machineCode || params.machineId,
-      machineName: machine?.machineName || 'Machine',
-      workOrderNumber: machine?.activeWorkOrderNumber,
-      partName: machine?.activePartName,
+      machineName: machine?.machineName || 'Workstation Machine',
       startTime: nowIso,
       durationMinutes: 0,
       reasonCodeId: reason.id,
@@ -1054,11 +1238,13 @@ class OeeService {
       reasonLabel: reason.label,
       category: reason.category,
       categoryLabel: reason.categoryLabel,
+      userId: params.userId || params.operatorId,
       operatorId: params.operatorId,
       operatorName: params.operatorName,
       notes: params.notes,
       resolved: false,
-      createdAt: nowIso
+      deviceTimestamp: deviceTime,
+      createdAt: new Date().toISOString()
     };
 
     this.downtimeEvents.unshift(newEvent);
@@ -1066,7 +1252,7 @@ class OeeService {
 
     // Update machine state downtimeReason label
     if (machine) {
-      this.setMachineState(machine.machineId, machine.state === 'running' ? 'faulted' : machine.state, `[${reason.code}] ${reason.label}`);
+      this.setMachineState(machine.machineId, 'faulted', `[${reason.code}] ${reason.label}`);
     } else {
       this.notify();
     }
@@ -1075,7 +1261,7 @@ class OeeService {
   }
 
   /**
-   * Resolve an active downtime event when machine returns to running or problem fixed
+   * Resolve an active downtime event when machine returns to running or problem fixed (AC 3)
    */
   public resolveDowntimeEvent(
     eventId: string,
@@ -1111,17 +1297,161 @@ class OeeService {
   }
 
   /**
-   * Add a custom downtime reason code
+   * Resolve an active downtime event for a specific job when resumed or advanced (AC 3)
+   */
+  public resolveDowntimeEventForJob(
+    jobIdOrOrderNumber: string,
+    correctiveAction?: string
+  ): boolean {
+    if (!jobIdOrOrderNumber) return false;
+    const activeEvents = this.downtimeEvents.filter(
+      e => !e.resolved && (e.jobId === jobIdOrOrderNumber || e.workOrderNumber === jobIdOrOrderNumber)
+    );
+    if (activeEvents.length === 0) return false;
+
+    const now = new Date();
+    const nowIso = now.toISOString();
+
+    this.downtimeEvents = this.downtimeEvents.map(e => {
+      if (!e.resolved && (e.jobId === jobIdOrOrderNumber || e.workOrderNumber === jobIdOrOrderNumber)) {
+        const start = new Date(e.startTime).getTime();
+        const durationMin = Math.max(1, Math.round((now.getTime() - start) / 60000));
+        return {
+          ...e,
+          endTime: nowIso,
+          durationMinutes: durationMin,
+          resolved: true,
+          correctiveActionTaken: correctiveAction || 'Job resumed by supervisor'
+        };
+      }
+      return e;
+    });
+
+    this.persistEvents();
+
+    activeEvents.forEach(evt => {
+      const m = this.machines.find(x => x.machineId === evt.machineId);
+      if (m && m.state !== 'running') {
+        this.setMachineState(m.machineId, 'running');
+      }
+    });
+
+    this.notify();
+    return true;
+  }
+
+  /**
+   * Today's Downtime Summary for supervisor's workstation cell (AC 5)
+   */
+  public getDowntimeSummaryToday(filterMachineOrCell?: string): {
+    totalMinutes: number;
+    byCategory: {
+      machine: number;
+      material: number;
+      manpower: number;
+      method: number;
+      measurement: number;
+    };
+    occurrencesCount: number;
+  } {
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+    const startOfDayMs = startOfDay.getTime();
+
+    const summary = {
+      totalMinutes: 0,
+      byCategory: {
+        machine: 0,
+        material: 0,
+        manpower: 0,
+        method: 0,
+        measurement: 0
+      },
+      occurrencesCount: 0
+    };
+
+    this.downtimeEvents.forEach(e => {
+      const eventTime = new Date(e.startTime).getTime();
+      if (eventTime >= startOfDayMs) {
+        if (
+          filterMachineOrCell &&
+          filterMachineOrCell !== 'all' &&
+          e.machineId !== filterMachineOrCell &&
+          e.machineCode !== filterMachineOrCell &&
+          e.machineName !== filterMachineOrCell
+        ) {
+          return;
+        }
+
+        const duration = e.durationMinutes || (e.resolved ? 0 : Math.max(1, Math.round((Date.now() - eventTime) / 60000)));
+        summary.totalMinutes += duration;
+        summary.occurrencesCount += 1;
+
+        // Map to 5M category
+        let cat5M: 'machine' | 'material' | 'manpower' | 'method' | 'measurement' = 'machine';
+        if (e.category === 'material' || e.category === 'starvation') cat5M = 'material';
+        else if (e.category === 'manpower' || e.category === 'operator_rest') cat5M = 'manpower';
+        else if (e.category === 'method') cat5M = 'method';
+        else if (e.category === 'measurement' || e.category === 'quality_hold') cat5M = 'measurement';
+        else cat5M = 'machine';
+
+        summary.byCategory[cat5M] = (summary.byCategory[cat5M] || 0) + duration;
+      }
+    });
+
+    return summary;
+  }
+
+  /**
+   * Add a custom downtime reason code (AC 4)
    */
   public addDowntimeReason(code: Omit<DowntimeReasonCode, 'id'>): DowntimeReasonCode {
     const newReason: DowntimeReasonCode = {
       ...code,
-      id: `dt_${Date.now()}`
+      id: `dt_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`,
+      active: true
     };
     this.downtimeReasons.push(newReason);
     this.persistReasons();
     this.notify();
     return newReason;
+  }
+
+  /**
+   * Edit an existing reason code (AC 4)
+   */
+  public updateDowntimeReason(id: string, updates: Partial<DowntimeReasonCode>): boolean {
+    const idx = this.downtimeReasons.findIndex(r => r.id === id);
+    if (idx < 0) return false;
+    this.downtimeReasons[idx] = { ...this.downtimeReasons[idx], ...updates };
+    this.persistReasons();
+    this.notify();
+    return true;
+  }
+
+  /**
+   * Toggle reason code active / deactivated (AC 4)
+   */
+  public toggleDowntimeReasonActive(id: string): boolean {
+    const idx = this.downtimeReasons.findIndex(r => r.id === id);
+    if (idx < 0) return false;
+    const current = this.downtimeReasons[idx].active !== false;
+    this.downtimeReasons[idx].active = !current;
+    this.persistReasons();
+    this.notify();
+    return true;
+  }
+
+  /**
+   * Deactivate reason code (AC 4)
+   */
+  public deleteDowntimeReason(id: string): boolean {
+    const idx = this.downtimeReasons.findIndex(r => r.id === id);
+    if (idx < 0) return false;
+    this.downtimeReasons[idx].active = false;
+    this.persistReasons();
+    this.notify();
+    return true;
   }
 
   /**

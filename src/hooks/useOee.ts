@@ -57,7 +57,13 @@ export function useOee() {
     reasonCodeId: string;
     operatorId: string;
     operatorName: string;
+    jobId?: string;
+    workOrderNumber?: string;
+    partName?: string;
+    userId?: string;
     notes?: string;
+    deviceTimestamp?: string;
+    startTime?: string;
   }) => {
     return oeeService.logDowntimeEvent(params);
   }, []);
@@ -66,8 +72,36 @@ export function useOee() {
     return oeeService.resolveDowntimeEvent(eventId, correctiveAction);
   }, []);
 
+  const resolveDowntimeEventForJob = useCallback((jobIdOrOrderNumber: string, correctiveAction?: string) => {
+    return oeeService.resolveDowntimeEventForJob(jobIdOrOrderNumber, correctiveAction);
+  }, []);
+
+  const getActiveDowntimeEventForJob = useCallback((jobIdOrOrderNumber: string) => {
+    return oeeService.getActiveDowntimeEventForJob(jobIdOrOrderNumber);
+  }, []);
+
+  const getDowntimeSummaryToday = useCallback((filterMachineOrCell?: string) => {
+    return oeeService.getDowntimeSummaryToday(filterMachineOrCell);
+  }, []);
+
+  const autoCloseOverdueDowntimeEvents = useCallback(() => {
+    return oeeService.autoCloseOverdueDowntimeEvents();
+  }, []);
+
   const addDowntimeReason = useCallback((code: Omit<DowntimeReasonCode, 'id'>) => {
     return oeeService.addDowntimeReason(code);
+  }, []);
+
+  const updateDowntimeReason = useCallback((id: string, updates: Partial<DowntimeReasonCode>) => {
+    return oeeService.updateDowntimeReason(id, updates);
+  }, []);
+
+  const toggleDowntimeReasonActive = useCallback((id: string) => {
+    return oeeService.toggleDowntimeReasonActive(id);
+  }, []);
+
+  const deleteDowntimeReason = useCallback((id: string) => {
+    return oeeService.deleteDowntimeReason(id);
   }, []);
 
   const getParetoAnalysis = useCallback(() => {
@@ -87,7 +121,14 @@ export function useOee() {
     getHistoricalTrends,
     logDowntimeEvent,
     resolveDowntimeEvent,
+    resolveDowntimeEventForJob,
+    getActiveDowntimeEventForJob,
+    getDowntimeSummaryToday,
+    autoCloseOverdueDowntimeEvents,
     addDowntimeReason,
+    updateDowntimeReason,
+    toggleDowntimeReasonActive,
+    deleteDowntimeReason,
     getParetoAnalysis
   };
 }

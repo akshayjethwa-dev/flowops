@@ -107,48 +107,63 @@ export interface PlantOeeSummary {
 }
 
 // ── Downtime Reason Codes & Event Tracking ──────────────────────────
+export type Downtime5MCategory = 'machine' | 'material' | 'manpower' | 'method' | 'measurement';
+
 export type DowntimeCategoryType = 
-  | 'breakdown'      // Unplanned Equipment Failure
-  | 'changeover'    // Setup, Tooling & Fixture Adjustments
-  | 'starvation'    // Awaiting Materials, Blanks or Pre-op
-  | 'quality_hold'   // First Article Inspection, Defect Verification
-  | 'operator_rest'  // Shift Changeover, Tea Break, Planned Meeting
-  | 'utilities';     // Power, Compressed Air, Coolant Alarm
+  | 'machine'        // 5M: Machine (Breakdown, Tool Change, Power, Setup)
+  | 'material'       // 5M: Material (Starvation, Defect, Alloy, TC)
+  | 'manpower'       // 5M: Manpower (Absent, Training, Handover, Fatigue)
+  | 'method'         // 5M: Method (Drawing Rev, Program G-code, Process, Jig)
+  | 'measurement'    // 5M: Measurement (1st Piece Buy-off, Gage, Dimensional)
+  | 'breakdown'      // Legacy mapping: Equipment Failure
+  | 'changeover'     // Legacy mapping: Setup & Tooling
+  | 'starvation'     // Legacy mapping: Material Wait
+  | 'quality_hold'   // Legacy mapping: Defect Verification
+  | 'operator_rest'  // Legacy mapping: Shift Handover / Rest
+  | 'utilities'      // Legacy mapping: Power / Air
+  | 'other';         // Other / Custom Reason with note
 
 export interface DowntimeReasonCode {
   id: string;
-  code: string;              // e.g. "DT-BRK-01"
-  label: string;             // e.g. "Spindle Drive / Inverter Overheat Alarm"
+  code: string;              // e.g. "MC-BRK", "DT-MCH-01"
+  label: string;             // e.g. "Breakdown", "Tool Change"
   category: DowntimeCategoryType;
-  categoryLabel: string;      // "Equipment Breakdown"
-  severity: 'critical' | 'high' | 'medium' | 'low';
-  requiresTechnician: boolean;
-  color: string;
+  categoryLabel: string;      // "Machine", "Material", etc.
+  severity?: 'critical' | 'high' | 'medium' | 'low';
+  requiresTechnician?: boolean;
+  color?: string;
   iconName?: string;
   suggestedAction?: string;
+  active?: boolean;          // Configurable by admin: activate/deactivate
+  isDefault?: boolean;
 }
 
 export interface DowntimeEventRecord {
   id: string;
+  jobId?: string;            // Linked work order / job ID
+  workOrderNumber?: string;
+  partName?: string;
   machineId: string;
   machineCode: string;
   machineName: string;
-  workOrderNumber?: string;
-  partName?: string;
-  startTime: string;         // ISO timestamp when machine stopped/faulted
+  startTime: string;         // ISO timestamp (device timestamp for conflict resolution)
   endTime?: string;          // ISO timestamp when resolved/resumed
   durationMinutes: number;   // Automatically calculated
   reasonCodeId: string;
-  reasonCode: string;
+  reasonCode: string;        // e.g. "MC-TOOL"
   reasonLabel: string;
   category: DowntimeCategoryType;
   categoryLabel: string;
+  userId?: string;           // Operator / supervisor user ID
   operatorId: string;
   operatorName: string;
   notes?: string;
   resolved: boolean;
+  auto_closed?: boolean;     // True if auto-closed after >12h overnight threshold
+  auto_closed_reason?: string;
   correctiveActionTaken?: string;
   createdAt: string;
+  deviceTimestamp?: string;  // Device timestamp for offline sync
 }
 
 export interface DowntimeParetoItem {

@@ -1,8 +1,10 @@
 {
-  "name": "Ashrey FlowOps SME Forge Core Console",
-  "short_name": "Ashrey FlowOps",
+  "id": "/",
+  "name": "Ashrey FlowOps Manufacturing Operations",
+  "short_name": "FlowOps",
   "description": "Enterprise-grade B2B manufacturing workflow automation, costing and shopfloor supervisor.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "orientation": "any",
   "background_color": "#0f172a",

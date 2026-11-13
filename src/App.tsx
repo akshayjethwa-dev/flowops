@@ -9,6 +9,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { AppShell } from './components/layout/AppShell';
+import { MobileShopFloorShell } from './components/layout/MobileShopFloorShell';
 import { ProtectedRoute } from './components/layout/ProtectedRoute';
 import { Loader2, ShieldCheck } from 'lucide-react';
 
@@ -101,6 +102,14 @@ export default function App() {
                 element={
                   <ProtectedRoute allowedRoles={['admin']}>
                     <OnboardingWizard />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/shopfloor" 
+                element={
+                  <ProtectedRoute>
+                    <MobileShopFloorShell onSwitchToDesktop={() => window.location.href = '/dashboard'} />
                   </ProtectedRoute>
                 } 
               />

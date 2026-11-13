@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
-import { ChevronDown, LogOut, CheckCircle, Menu, Factory } from 'lucide-react';
+import { ChevronDown, LogOut, CheckCircle, Menu, Factory, Smartphone } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { NotificationBell } from '../NotificationBell';
 
@@ -96,7 +96,21 @@ export const Topbar: React.FC<TopbarProps> = ({ onMenuToggle }) => {
       )}
 
       {/* Operator profile card triggers dropdown */}
-      <div className="flex items-center space-x-4">
+      <div className="flex items-center space-x-3">
+        {/* Quick Launch Mobile Shop-Floor Mode */}
+        <button
+          type="button"
+          onClick={() => {
+            localStorage.setItem('preferred_shell_mode', 'shopfloor');
+            window.dispatchEvent(new Event('flowops:shell_mode_changed'));
+          }}
+          className="inline-flex items-center space-x-1.5 px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-bold font-mono transition cursor-pointer"
+          title="Switch to Mobile Shop-Floor Supervisor View (Glove-friendly)"
+        >
+          <Smartphone className="h-3.5 w-3.5 text-indigo-600" />
+          <span className="hidden sm:inline">Shop Floor View</span>
+        </button>
+
         <NotificationBell />
         <button 
           onClick={() => setDropdownOpen(!dropdownOpen)}
@@ -124,6 +138,17 @@ export const Topbar: React.FC<TopbarProps> = ({ onMenuToggle }) => {
               <p className="text-xs font-bold text-slate-800 truncate">{profile?.name || 'Authorized Staff'}</p>
               <p className="text-[10px] text-slate-400 font-mono truncate">{profile?.email || 'email@tenant.com'}</p>
             </div>
+            <button
+              onClick={() => {
+                setDropdownOpen(false);
+                localStorage.setItem('preferred_shell_mode', 'shopfloor');
+                window.dispatchEvent(new Event('flowops:shell_mode_changed'));
+              }}
+              className="w-full text-left px-4 py-2.5 text-xs text-indigo-700 hover:bg-indigo-50 flex items-center space-x-2 font-semibold cursor-pointer transition-colors border-b border-slate-100"
+            >
+              <Smartphone className="h-4 w-4 text-indigo-600 shrink-0" />
+              <span>Shop Floor View</span>
+            </button>
             <button
               onClick={handleSignOut}
               className="w-full text-left px-4 py-2.5 text-xs text-red-600 hover:bg-red-50/50 flex items-center space-x-2 font-semibold cursor-pointer transition-colors"

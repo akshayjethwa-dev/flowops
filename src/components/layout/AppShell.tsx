@@ -6,12 +6,40 @@ import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import { useAuth } from '../../hooks/useAuth';
 import { useTenantConfig } from '../../hooks/useTenantConfig';
+import { MobileShopFloorShell } from './MobileShopFloorShell';
 
 export const AppShell: React.FC = () => {
   const { profile, tenant } = useAuth();
   const { tenantConfig, loading } = useTenantConfig(tenant?.id);
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Viewport detection for mobile (<768px)
+  const [isMobileViewport, setIsMobileViewport] = useState<boolean>(() => {
+    return typeof window !== 'undefined' ? window.innerWidth < 768 : false;
+  });
+
+  // User manual preference for shell mode
+  const [preferredMode, setPreferredMode] = useState<string | null>(() => {
+    return typeof window !== 'undefined' ? localStorage.getItem('preferred_shell_mode') : null;
+  });
+
+  React.useEffect(() => {
+    const handleResize = () => {
+      setIsMobileViewport(window.innerWidth < 768);
+    };
+    window.addEventListener('resize', handleResize);
+
+    const handleModeChange = () => {
+      setPreferredMode(localStorage.getItem('preferred_shell_mode'));
+    };
+    window.addEventListener('flowops:shell_mode_changed', handleModeChange);
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('flowops:shell_mode_changed', handleModeChange);
+    };
+  }, []);
 
   if (loading) {
     return (
@@ -29,6 +57,25 @@ export const AppShell: React.FC = () => {
     if (sessionStorage.getItem('onboarding_skipped') !== 'true') {
       return <Navigate to="/onboarding" replace />;
     }
+  }
+
+  // Acceptance Criteria: On mobile viewports (<768px) or when the user's role is production,
+  // the app must render a MobileShopFloorShell instead of the desktop AppShell.
+  const isProductionRole = (profile?.role || '').toLowerCase() === 'production';
+  const shouldUseMobileShell =
+    preferredMode === 'shopfloor' ||
+    (preferredMode !== 'desktop' && (isMobileViewport || isProductionRole));
+
+  if (shouldUseMobileShell) {
+    return (
+      <MobileShopFloorShell
+        onSwitchToDesktop={() => {
+          localStorage.setItem('preferred_shell_mode', 'desktop');
+          setPreferredMode('desktop');
+          window.dispatchEvent(new Event('flowops:shell_mode_changed'));
+        }}
+      />
+    );
   }
 
   return (

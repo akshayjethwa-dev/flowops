@@ -319,6 +319,20 @@ class QualityHoldService {
     return this.holds.find(h => h.id === id);
   }
 
+  public getActiveHoldForJob(targetIdOrNumber: string): QualityHoldRecord | undefined {
+    const q = (targetIdOrNumber || '').toLowerCase().trim();
+    return this.holds.find(h => 
+      h.status === 'active_hold' &&
+      h.preventProductionProgression !== false &&
+      (
+        h.targetId.toLowerCase() === q ||
+        h.targetNumber.toLowerCase() === q ||
+        (h.workOrderNumber && h.workOrderNumber.toLowerCase() === q) ||
+        (h.salesOrderNumber && h.salesOrderNumber.toLowerCase() === q)
+      )
+    );
+  }
+
   public getActiveHoldForTarget(identifier: string): QualityHoldRecord | undefined {
     if (!identifier) return undefined;
     const clean = identifier.trim().toLowerCase();
